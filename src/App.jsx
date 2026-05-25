@@ -1,0 +1,117 @@
+import React, { useState, useEffect } from 'react';
+import { CRMProvider, useCRM } from './context/CRMContext';
+import Sidebar from './components/Sidebar';
+import Topbar from './components/Topbar';
+import LoginScreen from './components/LoginScreen';
+
+// Page Modules
+import Dashboard from './modules/Dashboard';
+import KanbanView from './modules/KanbanView';
+import GridView from './modules/GridView';
+import DetailTimeline from './modules/DetailTimeline';
+import WhatsAppConsole from './modules/WhatsAppConsole';
+import Analytics from './modules/Analytics';
+import Sandbox from './modules/Sandbox';
+import ConfigSettings from './modules/ConfigSettings';
+
+// Beautiful visual page skeleton shimmer loader
+function ShimmerLoader() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%', padding: '10px' }}>
+      {/* Header Shimmer */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div className="shimmer-placeholder" style={{ width: '220px', height: '24px' }}></div>
+        <div className="shimmer-placeholder" style={{ width: '380px', height: '14px' }}></div>
+      </div>
+      
+      {/* KPI Counters Grid Shimmer */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+        <div className="shimmer-placeholder" style={{ height: '90px' }}></div>
+        <div className="shimmer-placeholder" style={{ height: '90px' }}></div>
+        <div className="shimmer-placeholder" style={{ height: '90px' }}></div>
+        <div className="shimmer-placeholder" style={{ height: '90px' }}></div>
+      </div>
+
+      {/* Main Layout Grid Shimmer */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '20px', minHeight: '360px' }}>
+        <div className="shimmer-placeholder" style={{ flex: 1, minHeight: '320px' }}></div>
+        <div className="shimmer-placeholder" style={{ flex: 1, minHeight: '320px' }}></div>
+      </div>
+    </div>
+  );
+}
+
+function MainAppContent() {
+  const { activeView, isLoggedIn } = useCRM();
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [navigatedView, setNavigatedView] = useState(activeView);
+
+  // Trigger quick shimmer loading state when swapping tabs
+  useEffect(() => {
+    setIsNavigating(true);
+    const timer = setTimeout(() => {
+      setNavigatedView(activeView);
+      setIsNavigating(false);
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [activeView]);
+
+  if (!isLoggedIn) {
+    return <LoginScreen />;
+  }
+
+  // SPA router page switcher
+  const renderView = () => {
+    if (isNavigating) {
+      return <ShimmerLoader />;
+    }
+
+    switch (navigatedView) {
+      case 'dashboard':
+        return <Dashboard />;
+      case 'board':
+        return <KanbanView />;
+      case 'grid':
+        return <GridView />;
+      case 'detail':
+        return <DetailTimeline />;
+      case 'whatsapp':
+        return <WhatsAppConsole />;
+      case 'analytics':
+        return <Analytics />;
+      case 'sandbox':
+        return <Sandbox />;
+      case 'settings':
+        return <ConfigSettings />;
+      default:
+        return <Dashboard />;
+    }
+  };
+
+  return (
+    <div className="app-container">
+      {/* Visual Navigation Sidebar */}
+      <Sidebar />
+      
+      {/* Core main dashboard panel */}
+      <div className="main-wrapper">
+        <Topbar />
+        
+        {/* Responsive Scrolling Canvas */}
+        <main className="content-area">
+          <div className="fade-in">
+            {renderView()}
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <CRMProvider>
+      <MainAppContent />
+    </CRMProvider>
+  );
+}
