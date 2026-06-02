@@ -499,6 +499,27 @@ export const CRMProvider = ({ children }) => {
     root.style.setProperty('--sidebar-font', brand.sidebarFont || 'Inter');
     root.style.setProperty('--sidebar-radius', `${brand.sidebarRadius !== undefined ? brand.sidebarRadius : 8}px`);
     root.style.setProperty('--sidebar-width', brand.sidebarWidth === 'compact' ? '80px' : brand.sidebarWidth === 'wide' ? '280px' : '250px');
+
+    // Dynamically apply sidebar color scheme variables globally to align the entire CRM workspace!
+    const activeColor = brand.sidebarActiveBg || '#2F6BFF';
+    root.style.setProperty('--primary', activeColor);
+    root.style.setProperty('--primary-glow', `${activeColor}14`); // 8% opacity overlay in hex
+    root.style.setProperty('--primary-light', activeColor);
+    root.style.setProperty('--primary-dark', brand.sidebarHoverBg || '#173B7A');
+    root.style.setProperty('--border-color-active', activeColor);
+
+    // Apply custom font-families to root body if set
+    if (brand.sidebarFont) {
+      root.style.setProperty('--font-heading', `'${brand.sidebarFont}', 'Outfit', 'Inter', sans-serif`);
+      root.style.setProperty('--font-body', `'${brand.sidebarFont}', 'Inter', sans-serif`);
+    }
+
+    // Apply general border radius globally if customized!
+    if (brand.sidebarRadius !== undefined) {
+      root.style.setProperty('--radius-sm', `${Math.max(4, brand.sidebarRadius - 2)}px`);
+      root.style.setProperty('--radius-md', `${brand.sidebarRadius}px`);
+      root.style.setProperty('--radius-lg', `${Math.min(18, brand.sidebarRadius + 8)}px`);
+    }
   };
 
   // Triggers alert messages

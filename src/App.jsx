@@ -23,7 +23,7 @@ function ShimmerLoader() {
         <div className="shimmer-placeholder" style={{ width: '220px', height: '24px' }}></div>
         <div className="shimmer-placeholder" style={{ width: '380px', height: '14px' }}></div>
       </div>
-      
+
       {/* KPI Counters Grid Shimmer */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
         <div className="shimmer-placeholder" style={{ height: '90px' }}></div>
@@ -92,11 +92,11 @@ function MainAppContent() {
     <div className="app-container">
       {/* Visual Navigation Sidebar */}
       <Sidebar />
-      
+
       {/* Core main dashboard panel */}
       <div className="main-wrapper">
-        {activeView !== 'dashboard' && <Topbar />}
-        
+        <Topbar />
+
         {/* Responsive Scrolling Canvas */}
         <main className="content-area">
           <div className="fade-in">

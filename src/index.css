@@ -3377,7 +3377,7 @@ textarea.form-control {
 }
 
 /* ==========================================================================
-   GLASSMORPHISM LOGIN SCREEN STYLING
+   GLASSMORPHISM LOGIN SCREEN STYLING (MODERN SAAS SPLIT LAYOUT)
    ========================================================================== */
 .login-screen-wrapper {
   width: 100vw;
@@ -3386,67 +3386,127 @@ textarea.form-control {
   top: 0;
   left: 0;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  background: radial-gradient(circle at 10% 20%, rgba(239, 68, 68, 0.05) 0%, rgba(255, 255, 255, 1) 90%);
+  background: #ffffff;
   z-index: 10000;
   animation: fadeIn 0.4s ease-out;
+  overflow: hidden;
 }
 
-.login-glass-card {
-  width: 440px;
-  max-width: 90vw;
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(12px);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.06);
-  padding: 40px;
+.login-split-layout {
+  display: flex;
+  width: 100%;
+  height: 100%;
+}
+
+.login-brand-panel {
+  flex: 1.1;
   display: flex;
   flex-direction: column;
-  gap: 24px;
-  animation: scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  justify-content: space-between;
+  padding: 60px;
+  background: var(--sidebar-bg, #0A1E44);
+  color: var(--sidebar-text, #ffffff);
+  position: relative;
+  overflow: hidden;
+  box-shadow: inset -20px 0 60px rgba(0, 0, 0, 0.15);
 }
 
-@keyframes scaleIn {
-  from { transform: scale(0.95); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
+.login-brand-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    radial-gradient(circle at 80% 20%, hsla(var(--primary-h), var(--primary-s), var(--primary-l), 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 20% 80%, hsla(var(--secondary-h), var(--secondary-s), var(--secondary-l), 0.05) 0%, transparent 60%);
+  z-index: 1;
 }
 
-.login-brand-header {
+.login-brand-panel > * {
+  position: relative;
+  z-index: 2;
+}
+
+.login-brand-logo-area {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  text-align: center;
 }
 
-.login-logo-orb {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background: rgba(239, 68, 68, 0.08);
-  color: var(--primary);
+.login-brand-hero {
+  max-width: 500px;
+  margin-top: -40px;
+}
+
+.login-badge {
+  display: inline-block;
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  margin-bottom: 24px;
+}
+
+.login-hero-title {
+  font-family: var(--font-heading);
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1.25;
+  margin-bottom: 16px;
+  letter-spacing: -0.5px;
+}
+
+.login-hero-subtitle {
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 400;
+}
+
+.login-brand-footer {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: 500;
+}
+
+.login-form-panel {
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 12px;
-  box-shadow: 0 4px 12px var(--primary-glow);
+  background: #ffffff;
+  padding: 40px;
 }
 
-.login-brand-title {
+.login-form-container {
+  width: 400px;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.login-form-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.login-form-title {
   font-family: var(--font-heading);
-  font-size: 22px;
-  font-weight: 850;
+  font-size: 26px;
+  font-weight: 800;
   color: var(--text-primary);
+  letter-spacing: -0.5px;
 }
 
-.login-brand-subtitle {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  margin-top: 4px;
+.login-form-subtitle {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 500;
 }
 
 .login-form {
@@ -3497,7 +3557,7 @@ textarea.form-control {
 
 .login-demo-grid {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
 
@@ -3519,6 +3579,19 @@ textarea.form-control {
   background: rgba(239, 68, 68, 0.02);
   transform: translateY(-1.5px);
   box-shadow: 0 4px 12px rgba(0,0,0,0.015);
+}
+
+@media (max-width: 900px) {
+  .login-brand-panel {
+    display: none;
+  }
+  .login-form-panel {
+    flex: 1;
+    background: #ffffff;
+  }
+  .login-demo-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ==========================================================================

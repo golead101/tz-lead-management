@@ -225,8 +225,8 @@ export default function Dashboard() {
               <defs>
                 {/* Visual Area Gradient matching mockup */}
                 <linearGradient id="chart-blue-grad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#2563eb" stopOpacity="0.25" />
-                  <stop offset="100%" stopColor="#2563eb" stopOpacity="0.0" />
+                  <stop offset="0%" stopColor="var(--primary, #2563eb)" stopOpacity="0.25" />
+                  <stop offset="100%" stopColor="var(--primary, #2563eb)" stopOpacity="0.0" />
                 </linearGradient>
               </defs>
 
@@ -280,19 +280,19 @@ export default function Dashboard() {
                    C 352.5,50.4 352.5,84.8 385,84.8 
                    C 417.5,84.8 417.5,33.2 450,33.2" 
                 fill="none" 
-                stroke="#2563eb" 
+                stroke="var(--primary, #2563eb)" 
                 strokeWidth="3.5" 
                 strokeLinecap="round" 
               />
 
               {/* Circular Point Markers */}
-              <circle cx="60" cy="166.4" r="5" fill="#ffffff" stroke="#2563eb" strokeWidth="3" />
-              <circle cx="125" cy="137.6" r="5" fill="#ffffff" stroke="#2563eb" strokeWidth="3" />
-              <circle cx="190" cy="110.0" r="5" fill="#ffffff" stroke="#2563eb" strokeWidth="3" />
-              <circle cx="255" cy="84.8" r="5" fill="#ffffff" stroke="#2563eb" strokeWidth="3" />
-              <circle cx="320" cy="50.4" r="5" fill="#ffffff" stroke="#2563eb" strokeWidth="3" />
-              <circle cx="385" cy="84.8" r="5" fill="#ffffff" stroke="#2563eb" strokeWidth="3" />
-              <circle cx="450" cy="33.2" r="5" fill="#ffffff" stroke="#2563eb" strokeWidth="3" />
+              <circle cx="60" cy="166.4" r="5" fill="#ffffff" stroke="var(--primary, #2563eb)" strokeWidth="3" />
+              <circle cx="125" cy="137.6" r="5" fill="#ffffff" stroke="var(--primary, #2563eb)" strokeWidth="3" />
+              <circle cx="190" cy="110.0" r="5" fill="#ffffff" stroke="var(--primary, #2563eb)" strokeWidth="3" />
+              <circle cx="255" cy="84.8" r="5" fill="#ffffff" stroke="var(--primary, #2563eb)" strokeWidth="3" />
+              <circle cx="320" cy="50.4" r="5" fill="#ffffff" stroke="var(--primary, #2563eb)" strokeWidth="3" />
+              <circle cx="385" cy="84.8" r="5" fill="#ffffff" stroke="var(--primary, #2563eb)" strokeWidth="3" />
+              <circle cx="450" cy="33.2" r="5" fill="#ffffff" stroke="var(--primary, #2563eb)" strokeWidth="3" />
 
               {/* X Axis Labels */}
               <text x="60" y="215" fill="#9ca3af" fontSize="10" textAnchor="middle">May 12</text>
