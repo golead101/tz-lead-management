@@ -1,91 +1,141 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useCRM } from '../context/CRMContext';
 
 export default function Sidebar() {
   const { 
     activeView, 
     setActiveView, 
-    branding, 
     activeRole, 
     activeUser,
-    logout
+    logout,
+    branding
   } = useCRM();
 
-  // Define navigation tabs. Settings is only visible to Admin.
+  // Local collapsible state for left navigation sidebar
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  // Define navigation tabs to match the mockup screenshot exactly
   const menuItems = [
     {
       id: 'dashboard',
+      target: 'dashboard',
       label: 'Dashboard',
       icon: (
-        <svg viewBox="0 0 24 24">
-          <rect x="3" y="3" width="7" height="9" rx="1" />
-          <rect x="14" y="3" width="7" height="5" rx="1" />
-          <rect x="14" y="12" width="7" height="9" rx="1" />
-          <rect x="3" y="16" width="7" height="5" rx="1" />
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <rect x="3" y="3" width="7" height="7" rx="1.5" />
+          <rect x="14" y="3" width="7" height="7" rx="1.5" />
+          <rect x="14" y="14" width="7" height="7" rx="1.5" />
+          <rect x="3" y="14" width="7" height="7" rx="1.5" />
         </svg>
       )
     },
     {
-      id: 'board',
-      label: 'Lead Board',
+      id: 'leads',
+      target: 'board',
+      label: 'Leads',
       icon: (
-        <svg viewBox="0 0 24 24">
-          <path d="M4 5a1 1 0 011-1h4a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v8a1 1 0 01-1 1h-4a1 1 0 01-1-1V5z" />
-          <path d="M14 17a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1h-4a1 1 0 01-1-1v-2z" />
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+          <circle cx="12" cy="7" r="4" />
         </svg>
       )
     },
     {
-      id: 'grid',
-      label: 'Lead Grid',
+      id: 'contacts',
+      target: 'grid',
+      label: 'Contacts',
       icon: (
-        <svg viewBox="0 0 24 24">
-          <path d="M3 10h18M3 14h18M3 18h18M3 6h18M3 4h18a2 2 0 012 2v12a2 2 0 01-2 2H3a2 2 0 01-2-2V6a2 2 0 012-2z" />
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
         </svg>
       )
     },
     {
-      id: 'whatsapp',
-      label: 'WhatsApp Chat',
+      id: 'followups',
+      target: 'detail',
+      label: 'Follow Ups',
       icon: (
-        <svg viewBox="0 0 24 24">
-          <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" />
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <circle cx="12" cy="12" r="10" />
+          <polyline points="12 6 12 12 16 14" />
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L21 8" />
+          <path d="M21 3v5h-5" />
         </svg>
       )
     },
     {
-      id: 'analytics',
-      label: 'Analytics',
+      id: 'courses',
+      target: 'sandbox',
+      label: 'Courses',
       icon: (
-        <svg viewBox="0 0 24 24">
-          <path d="M18 20V10M12 20V4M6 20v-6" />
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
         </svg>
       )
     },
     {
-      id: 'sandbox',
-      label: 'Form Sandbox',
+      id: 'tasks',
+      target: 'whatsapp',
+      label: 'Tasks',
       icon: (
-        <svg viewBox="0 0 24 24">
-          <path d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <path d="M9 11l3 3 5-5" />
+        </svg>
+      )
+    },
+    {
+      id: 'reports',
+      target: 'analytics',
+      label: 'Reports',
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <path d="M21.21 15.89A10 10 0 1 1 8 2.83" />
+          <path d="M22 12A10 10 0 0 0 12 2v10z" />
+        </svg>
+      )
+    },
+    {
+      id: 'automation',
+      target: 'whatsapp',
+      label: 'Automation',
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <circle cx="12" cy="12" r="10" />
+          <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
+        </svg>
+      )
+    },
+    {
+      id: 'settings',
+      target: 'settings',
+      label: 'Settings',
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <circle cx="12" cy="12" r="3" />
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
         </svg>
       )
     }
   ];
 
-  // Admin and Manager can see configurations, Counselors are excluded
-  if (activeRole === 'Admin') {
-    menuItems.push({
-      id: 'settings',
-      label: 'System Settings',
-      icon: (
-        <svg viewBox="0 0 24 24">
-          <circle cx="12" cy="12" r="3" />
-          <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
-        </svg>
-      )
-    });
-  }
+  // Helper to check active state based on current context view
+  const isItemActive = (item) => {
+    if (item.id === 'dashboard') return activeView === 'dashboard';
+    if (item.id === 'leads') return activeView === 'board';
+    if (item.id === 'contacts') return activeView === 'grid';
+    if (item.id === 'followups') return activeView === 'detail';
+    if (item.id === 'courses') return activeView === 'sandbox';
+    if (item.id === 'tasks') return false; // styled as inactive fallback
+    if (item.id === 'reports') return activeView === 'analytics';
+    if (item.id === 'automation') return activeView === 'whatsapp';
+    if (item.id === 'settings') return activeView === 'settings';
+    return activeView === item.target;
+  };
 
   // Get user initials for avatar
   const getInitials = (name) => {
@@ -98,44 +148,90 @@ export default function Sidebar() {
       : '';
   };
 
-  return (
-    <aside className="sidebar">
-      {/* Brand Profile section */}
-      <div className="brand-section">
-        <div className="brand-logo">
-          <svg viewBox="0 0 24 24" width="22" height="22">
-            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="#fff" strokeWidth="2.5" fill="none"/>
+  // Modern dynamic logo renderer
+  const renderLogo = () => {
+    if (branding.logoUrl) {
+      return <img src={branding.logoUrl} alt={branding.instituteName} className="brand-logo-img" />;
+    }
+    
+    // Shield icon decoration for TechZone Academy or LeadCRM
+    const showShield = branding.instituteName === 'TechZone Academy' || branding.instituteName === 'LeadCRM';
+    
+    return (
+      <div className="brand-logo">
+        {showShield && (
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ color: 'var(--sidebar-active-bg, #2F6BFF)', marginRight: '4px' }}>
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
           </svg>
-        </div>
-        <div className="brand-info">
-          <h1 className="brand-name">{branding.instituteName}</h1>
-          <span className="brand-tagline">Lead CRM Console</span>
+        )}
+        <h1 className="brand-name">
+          {branding.instituteName === 'TechZone Academy' ? (
+            <>TechZone<span>Academy</span></>
+          ) : branding.instituteName === 'LeadCRM' ? (
+            <>Lead<span>CRM</span></>
+          ) : (
+            branding.instituteName
+          )}
+        </h1>
+      </div>
+    );
+  };
+
+  const isCompact = isCollapsed || branding.sidebarWidth === 'compact';
+
+  return (
+    <aside className={`sidebar ${isCompact ? 'compact-mode' : ''}`}>
+      {/* Brand Profile section */}
+      <div className="brand-section" style={{ justifyContent: isCompact ? 'center' : 'space-between', padding: isCompact ? '24px 0' : '24px 20px' }}>
+        {!isCompact && renderLogo()}
+        <div 
+          className="brand-hamburger" 
+          onClick={() => setIsCollapsed(prev => !prev)} 
+          style={{ cursor: 'pointer', margin: isCompact ? '0 auto' : '0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          title={isCompact ? "Expand Sidebar" : "Collapse Sidebar"}
+        >
+          {isCompact ? (
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          )}
         </div>
       </div>
 
       {/* Main navigation list */}
       <nav className="navigation-menu">
-        {menuItems.map(item => (
-          <button
-            key={item.id}
-            className={`nav-item ${activeView === item.id || (item.id === 'grid' && activeView === 'detail') ? 'active' : ''}`}
-            onClick={() => setActiveView(item.id)}
-          >
-            {item.icon}
-            <span>{item.label}</span>
-          </button>
-        ))}
+        {menuItems.map(item => {
+          // If Counselor and settings tab, exclude it
+          if (item.id === 'settings' && activeRole === 'Counselor') {
+            return null;
+          }
+          return (
+            <button
+              key={item.id}
+              className={`nav-item ${isItemActive(item) ? 'active' : ''}`}
+              onClick={() => setActiveView(item.target)}
+              title={item.label}
+            >
+              {item.icon}
+              <span>{item.label}</span>
+            </button>
+          );
+        })}
       </nav>
 
       {/* Bottom Profile details */}
       <div className="user-profile-section">
-        <div className="user-avatar">
+        <div className="user-avatar" style={{ border: '2px solid var(--sidebar-active-bg, #2F6BFF)' }}>
           {getInitials(activeUser)}
         </div>
         <div className="user-details-wrapper">
           <div className="user-details">
             <span className="user-name">{activeUser}</span>
-            <span className="user-role-badge">{activeRole}</span>
+            <span className="user-role-badge" style={{ color: 'var(--sidebar-active-bg, #2F6BFF)' }}>{activeRole}</span>
           </div>
           <button className="sidebar-logout-btn" onClick={logout}>
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5">

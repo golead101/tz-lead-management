@@ -30,12 +30,24 @@ const DEFAULT_CUSTOM_FIELDS = [
 ];
 
 const DEFAULT_BRANDING = {
-  instituteName: 'Lead Management',
+  instituteName: 'TechZone Academy',
   logoUrl: '',
-  primaryHue: 0,         // Stark Red (Hue 0)
+  
+  // Custom sidebar appearance properties
+  sidebarBg: '#0A1E44',
+  sidebarText: '#ffffff',
+  sidebarActiveBg: '#2F6BFF',
+  sidebarHoverBg: '#173B7A',
+  sidebarBorder: '#1E2A4D',
+  sidebarFont: 'Inter',
+  sidebarRadius: 8,
+  sidebarWidth: 'default',
+  
+  // Legacy color systems
+  primaryHue: 0,
   primarySat: '95%',
   primaryLight: '50%',
-  secondaryHue: 0,       // Stark White (Hue 0, Saturation 0%, Lightness 100%)
+  secondaryHue: 0,
   secondarySat: '0%',
   secondaryLight: '100%'
 };
@@ -471,12 +483,22 @@ export const CRMProvider = ({ children }) => {
   // Helper to trigger branding updates dynamically in styling sheet
   const applyThemeBranding = (brand) => {
     const root = document.documentElement;
-    root.style.setProperty('--primary-h', brand.primaryHue);
-    root.style.setProperty('--primary-s', `${brand.primarySat}`);
-    root.style.setProperty('--primary-l', `${brand.primaryLight}`);
-    root.style.setProperty('--secondary-h', brand.secondaryHue);
-    root.style.setProperty('--secondary-s', `${brand.secondarySat}`);
-    root.style.setProperty('--secondary-l', `${brand.secondaryLight}`);
+    root.style.setProperty('--primary-h', brand.primaryHue || 0);
+    root.style.setProperty('--primary-s', `${brand.primarySat || '95%'}`);
+    root.style.setProperty('--primary-l', `${brand.primaryLight || '50%'}`);
+    root.style.setProperty('--secondary-h', brand.secondaryHue || 0);
+    root.style.setProperty('--secondary-s', `${brand.secondarySat || '0%'}`);
+    root.style.setProperty('--secondary-l', `${brand.secondaryLight || '100%'}`);
+    
+    // Modern SaaS Sidebar style variables
+    root.style.setProperty('--sidebar-bg', brand.sidebarBg || '#0A1E44');
+    root.style.setProperty('--sidebar-text', brand.sidebarText || '#ffffff');
+    root.style.setProperty('--sidebar-active-bg', brand.sidebarActiveBg || '#2F6BFF');
+    root.style.setProperty('--sidebar-hover-bg', brand.sidebarHoverBg || '#173B7A');
+    root.style.setProperty('--sidebar-border', brand.sidebarBorder || '#1E2A4D');
+    root.style.setProperty('--sidebar-font', brand.sidebarFont || 'Inter');
+    root.style.setProperty('--sidebar-radius', `${brand.sidebarRadius !== undefined ? brand.sidebarRadius : 8}px`);
+    root.style.setProperty('--sidebar-width', brand.sidebarWidth === 'compact' ? '80px' : brand.sidebarWidth === 'wide' ? '280px' : '250px');
   };
 
   // Triggers alert messages
