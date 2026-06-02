@@ -95,7 +95,7 @@ function MainAppContent() {
       
       {/* Core main dashboard panel */}
       <div className="main-wrapper">
-        <Topbar />
+        {activeView !== 'dashboard' && <Topbar />}
         
         {/* Responsive Scrolling Canvas */}
         <main className="content-area">

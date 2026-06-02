@@ -1,5 +1,44 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useCRM } from '../context/CRMContext';
+
+function ColorField({ label, desc, value, onChange, icon }) {
+  const pickerRef = useRef(null);
+  return (
+    <div className="branding-item-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div className="branding-item-icon-box" style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb' }}>
+          {icon}
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#1e293b' }}>{label}</span>
+          <span style={{ fontSize: '11px', color: '#64748b' }}>{desc}</span>
+        </div>
+      </div>
+      <div className="custom-picker-field" style={{ width: '220px', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #cbd5e1', borderRadius: '8px', cursor: 'pointer', background: '#fff', position: 'relative' }} onClick={() => pickerRef.current?.click()}>
+        <div className="custom-swatch" style={{ backgroundColor: value || '#ffffff', width: '20px', height: '20px', borderRadius: '4px', border: '1px solid rgba(0,0,0,0.1)' }} />
+        <input 
+          type="text" 
+          className="custom-picker-hex" 
+          value={value} 
+          onChange={(e) => onChange(e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+          style={{ fontSize: '12px', width: '100%', border: 'none', outline: 'none', fontFamily: 'monospace' }}
+        />
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ color: '#94a3b8' }}>
+          <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+          <path d="M18.5 2.5a2.121 2.121 0 113 3L12 15l-4 1 1-4 9.5-9.5z" />
+        </svg>
+        <input 
+          type="color" 
+          ref={pickerRef}
+          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+          value={value && value.startsWith('#') && value.length === 7 ? value : '#ffffff'} 
+          onChange={(e) => onChange(e.target.value)}
+        />
+      </div>
+    </div>
+  );
+}
 
 export default function ConfigSettings() {
   const {
@@ -19,8 +58,11 @@ export default function ConfigSettings() {
 
   // Customizer States
   const [instName, setInstName] = useState(branding.instituteName);
-  const [primaryH, setPrimaryH] = useState(branding.primaryHue);
-  const [secondaryH, setSecondaryH] = useState(branding.secondaryHue);
+  const [logoUrl, setLogoUrl] = useState(branding.logoUrl || '');
+  const [bgCol, setBgCol] = useState(branding.sidebarBg || '#0A1E44');
+  const [textCol, setTextCol] = useState(branding.sidebarText || '#ffffff');
+  const [activeCol, setActiveCol] = useState(branding.sidebarActiveBg || '#2F6BFF');
+  const [hoverCol, setHoverCol] = useState(branding.sidebarHoverBg || '#173B7A');
 
   // New Course State
   const [courseName, setCourseName] = useState('');
@@ -42,7 +84,9 @@ export default function ConfigSettings() {
   if (activeRole !== 'Admin') {
     return (
       <div className="fade-in text-center" style={{ padding: '60px 0', color: 'var(--text-muted)' }}>
-        <svg viewBox="0 0 24 24" width="80" height="80" stroke="currentColor" strokeWidth="1.5" fill="none"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+        <svg viewBox="0 0 24 24" width="80" height="80" stroke="currentColor" strokeWidth="1.5" fill="none">
+          <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+        </svg>
         <h3 style={{ marginTop: '16px', color: 'var(--text-primary)' }}>Access Denied</h3>
         <p style={{ marginTop: '8px' }}>Visual configuration, custom fields registry, and settings are restricted to Administrators only.</p>
       </div>
@@ -50,13 +94,57 @@ export default function ConfigSettings() {
   }
 
   const handleBrandingSave = (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     changeBrandingColors({
       instituteName: instName,
-      primaryHue: Number(primaryH),
-      secondaryHue: Number(secondaryH)
+      logoUrl: logoUrl,
+      sidebarBg: bgCol,
+      sidebarText: textCol,
+      sidebarActiveBg: activeCol,
+      sidebarHoverBg: hoverCol
     });
   };
+
+  const handleResetToDefault = () => {
+    setInstName('TechZone Academy');
+    setLogoUrl('');
+    setBgCol('#0A1E44');
+    setTextCol('#ffffff');
+    setActiveCol('#2F6BFF');
+    setHoverCol('#173B7A');
+  };
+
+  const handleCancelChanges = () => {
+    setInstName(branding.instituteName);
+    setLogoUrl(branding.logoUrl || '');
+    setBgCol(branding.sidebarBg || '#0A1E44');
+    setTextCol(branding.sidebarText || '#ffffff');
+    setActiveCol(branding.sidebarActiveBg || '#2F6BFF');
+    setHoverCol(branding.sidebarHoverBg || '#173B7A');
+  };
+
+  const handleLogoUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        alert('Image is too large. Recommended max size is 2MB.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLogoUrl(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const hasChanges = 
+    instName !== branding.instituteName ||
+    logoUrl !== (branding.logoUrl || '') ||
+    bgCol !== (branding.sidebarBg || '#0A1E44') ||
+    textCol !== (branding.sidebarText || '#ffffff') ||
+    activeCol !== (branding.sidebarActiveBg || '#2F6BFF') ||
+    hoverCol !== (branding.sidebarHoverBg || '#173B7A');
 
   const handleAddCourse = (e) => {
     e.preventDefault();
@@ -97,11 +185,6 @@ export default function ConfigSettings() {
     setFieldOptions('');
     setFieldRequired(false);
   };
-
-  const hasChanges = 
-    instName !== branding.instituteName ||
-    Number(primaryH) !== Number(branding.primaryHue) ||
-    Number(secondaryH) !== Number(branding.secondaryHue);
 
   return (
     <div className="fade-in">
@@ -144,61 +227,311 @@ export default function ConfigSettings() {
         {/* Visual Branding Customizer */}
         {activeTab === 'branding' && (
           <div className="settings-pane active">
-            <div className="dashboard-panel">
-              <h3 className="panel-title mb-4">Branding & Layout Colors</h3>
-              <form onSubmit={handleBrandingSave}>
-                <div className="form-group">
-                  <label className="form-label">Institute Branding Name</label>
-                  <input 
-                    type="text" 
-                    className="form-control" 
-                    required 
-                    value={instName}
-                    onChange={(e) => setInstName(e.target.value)}
+            <div className="branding-settings-grid">
+              
+              {/* Left Column (65%) */}
+              <div className="branding-card-settings" style={{ background: '#fff', border: '1px solid rgba(0,0,0,0.06)', borderRadius: '16px', padding: '32px', boxShadow: '0 4px 20px rgba(0,0,0,0.015)' }}>
+                <h3 style={{ fontSize: '18px', fontWeight: '800', fontFamily: 'var(--font-heading)', color: '#0f172a', marginBottom: '8px' }}>Sidebar Branding & Identity</h3>
+                <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '24px' }}>Customize the appearance of the left navigation sidebar only. These settings will not affect the rest of the application.</p>
+                
+                <form onSubmit={handleBrandingSave}>
+                  {/* Row 1: Institute Name */}
+                  <div className="branding-item-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div className="branding-item-icon-box" style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb' }}>
+                        <span style={{ fontWeight: '750', fontSize: '15px' }}>T</span>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#1e293b' }}>Institute Name</span>
+                        <span style={{ fontSize: '11px', color: '#64748b' }}>This name will be shown in sidebar logo area.</span>
+                      </div>
+                    </div>
+                    <div>
+                      <input 
+                        type="text" 
+                        className="form-control" 
+                        required 
+                        style={{ width: '220px', padding: '8px 12px', fontSize: '12.5px', borderRadius: '8px', border: '1px solid #cbd5e1' }}
+                        value={instName}
+                        onChange={(e) => setInstName(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Row 2: Institute Logo */}
+                  <div className="branding-item-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div className="branding-item-icon-box" style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb' }}>
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                          <circle cx="8.5" cy="8.5" r="1.5"/>
+                          <polyline points="21 15 16 10 5 21"/>
+                        </svg>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#1e293b' }}>Institute Logo</span>
+                        <span style={{ fontSize: '11px', color: '#64748b' }}>Upload your institute logo.</span>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ width: '110px', height: '32px', borderRadius: '6px', background: bgCol || '#0A1E44', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: '4px', border: '1px solid rgba(0,0,0,0.08)' }}>
+                        {logoUrl ? (
+                          <img src={logoUrl} alt="Logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                        ) : (
+                          <span style={{ fontSize: '9px', fontWeight: '700', color: textCol || '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{instName}</span>
+                        )}
+                      </div>
+                      <button 
+                        type="button" 
+                        className="secondary-btn" 
+                        onClick={() => document.getElementById('logo-file-input').click()}
+                        style={{ padding: '6px 12px', fontSize: '11px', borderRadius: '6px' }}
+                      >
+                        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: '4px' }}>
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                          <polyline points="17 8 12 3 7 8"/>
+                          <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                        Upload New
+                      </button>
+                      <input 
+                        type="file" 
+                        id="logo-file-input" 
+                        style={{ display: 'none' }} 
+                        accept="image/*" 
+                        onChange={handleLogoUpload} 
+                      />
+                    </div>
+                  </div>
+
+                  {/* Row 3: Sidebar Background Color */}
+                  <ColorField 
+                    label="Sidebar Background Color" 
+                    desc="Background color of the sidebar." 
+                    value={bgCol} 
+                    onChange={setBgCol} 
+                    icon={(
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/>
+                        <path d="M7.5 10.5c.828 0 1.5-.672 1.5-1.5s-.672-1.5-1.5-1.5-1.5.672-1.5 1.5.672 1.5 1.5 1.5z"/>
+                        <path d="M11.5 7.5c.828 0 1.5-.672 1.5-1.5S11.828 4.5 11 4.5s-1.5.672-1.5 1.5.672 1.5 1.5 1.5z"/>
+                        <path d="M16.5 9.5c.828 0 1.5-.672 1.5-1.5s-.672-1.5-1.5-1.5-1.5.672-1.5 1.5.672 1.5 1.5 1.5z"/>
+                      </svg>
+                    )}
                   />
-                </div>
 
-                <div className="form-group two-col mt-4">
-                  <div>
-                    <label className="form-label">Primary Color Hue (0-360) : {primaryH}°</label>
-                    <input 
-                      type="range" 
-                      min="0" 
-                      max="360" 
-                      className="w-full"
-                      value={primaryH}
-                      onChange={(e) => setPrimaryH(e.target.value)}
-                    />
-                    <div style={{ width: '100%', height: '14px', borderRadius: '4px', marginTop: '6px', background: `HSL(${primaryH}, 90%, 60%)` }} />
+                  {/* Row 4: Sidebar Text & Icon Color */}
+                  <ColorField 
+                    label="Sidebar Text & Icon Color" 
+                    desc="Color for menu text and icons." 
+                    value={textCol} 
+                    onChange={setTextCol} 
+                    icon={(
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <polyline points="4 7 4 4 20 4 20 7" />
+                        <line x1="9" y1="20" x2="15" y2="20" />
+                        <line x1="12" y1="4" x2="12" y2="20" />
+                      </svg>
+                    )}
+                  />
+
+                  {/* Row 5: Sidebar Active Menu Color */}
+                  <ColorField 
+                    label="Sidebar Active Menu Color" 
+                    desc="Background color for active menu." 
+                    value={activeCol} 
+                    onChange={setActiveCol} 
+                    icon={(
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                        <path d="M9 11l3 3 5-5" />
+                      </svg>
+                    )}
+                  />
+
+                  {/* Row 6: Sidebar Hover Color */}
+                  <ColorField 
+                    label="Sidebar Hover Color" 
+                    desc="Background color on menu hover." 
+                    value={hoverCol} 
+                    onChange={setHoverCol} 
+                    icon={(
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <path d="M21 11L3 3l8 18 3-7 7-3z" />
+                      </svg>
+                    )}
+                  />
+
+                  {/* Notice Informational Box */}
+                  <div className="modern-alert-blue" style={{ marginTop: '24px', display: 'flex', gap: '12px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '12px', padding: '16px' }}>
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#2563eb" strokeWidth="2.5" style={{ flexShrink: 0 }}>
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="12" y1="16" x2="12" y2="12" />
+                      <line x1="12" y1="8" x2="12.01" y2="8" />
+                    </svg>
+                    <div style={{ fontSize: '12.5px', color: '#1e3a8a', lineHeight: '1.5' }}>
+                      Branding settings only affect the left navigation sidebar. Dashboard cards, forms, reports, tables, and application components remain unchanged.
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="form-label">Secondary Color Hue (0-360) : {secondaryH}°</label>
-                    <input 
-                      type="range" 
-                      min="0" 
-                      max="360" 
-                      className="w-full"
-                      value={secondaryH}
-                      onChange={(e) => setSecondaryH(e.target.value)}
-                    />
-                    <div style={{ width: '100%', height: '14px', borderRadius: '4px', marginTop: '6px', background: `HSL(${secondaryH}, 85%, 62%)` }} />
+                  {/* Settings Action Buttons */}
+                  <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
+                    <button 
+                      type="submit" 
+                      className="primary-btn" 
+                      disabled={!hasChanges}
+                      style={{ padding: '10px 20px', fontSize: '13px', borderRadius: '8px', opacity: hasChanges ? 1 : 0.5, cursor: hasChanges ? 'pointer' : 'not-allowed' }}
+                    >
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: '6px' }}>
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                        <polyline points="17 21 17 13 7 13 7 21"/>
+                        <polyline points="7 3 7 8 15 8"/>
+                      </svg>
+                      Save Branding
+                    </button>
+                    
+                    <button 
+                      type="button" 
+                      className="secondary-btn" 
+                      onClick={handleResetToDefault}
+                      style={{ padding: '10px 16px', fontSize: '13px', borderRadius: '8px' }}
+                    >
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: '6px' }}>
+                        <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                      </svg>
+                      Reset to Default
+                    </button>
+
+                    <button 
+                      type="button" 
+                      className="ghost-btn-custom" 
+                      onClick={handleCancelChanges}
+                      disabled={!hasChanges}
+                      style={{ padding: '10px 16px', fontSize: '13px', borderRadius: '8px', opacity: hasChanges ? 1 : 0.5, cursor: hasChanges ? 'pointer' : 'not-allowed' }}
+                    >
+                      Cancel Changes
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* Right Column (35%) - Live Sidebar Preview */}
+              <div className="preview-card-outer" style={{ background: '#fff', border: '1px solid rgba(0,0,0,0.05)', borderRadius: '16px', padding: '32px 24px', boxShadow: '0 4px 20px rgba(0,0,0,0.015)', position: 'relative' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ color: '#64748b' }}>
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                  <h4 style={{ fontSize: '14px', fontWeight: '800', color: '#0f172a', margin: 0 }}>Sidebar Preview</h4>
+                </div>
+                <p style={{ fontSize: '11.5px', color: '#64748b', marginBottom: '24px' }}>This is how your sidebar will look.</p>
+
+                {/* Dotted lines & overlay tags */}
+                <div className="preview-callouts-layer">
+                  {/* Background Tag */}
+                  <div className="callout-swatch-tag" style={{ top: '15%', right: '5%', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div className="callout-dot" style={{ backgroundColor: bgCol, width: '8px', height: '8px', borderRadius: '50%' }} />
+                    <span style={{ fontSize: '10.5px', fontWeight: '750' }}>Sidebar Background</span>
+                  </div>
+                  <div className="callout-pointing-line" style={{ top: '18.5%', right: '35%', width: '22%' }} />
+
+                  {/* Active Menu Tag */}
+                  <div className="callout-swatch-tag" style={{ top: '35%', right: '5%', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div className="callout-dot" style={{ backgroundColor: activeCol, width: '8px', height: '8px', borderRadius: '50%' }} />
+                    <span style={{ fontSize: '10.5px', fontWeight: '750' }}>Active Menu Color</span>
+                  </div>
+                  <div className="callout-pointing-line" style={{ top: '38.5%', right: '35%', width: '16%' }} />
+
+                  {/* Text & Icon Tag */}
+                  <div className="callout-swatch-tag" style={{ top: '55%', right: '5%', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div className="callout-dot" style={{ backgroundColor: textCol, width: '8px', height: '8px', borderRadius: '50%' }} />
+                    <span style={{ fontSize: '10.5px', fontWeight: '750' }}>Text & Icon Color</span>
+                  </div>
+                  <div className="callout-pointing-line" style={{ top: '58.5%', right: '35%', width: '20%' }} />
+
+                  {/* Hover Tag */}
+                  <div className="callout-swatch-tag" style={{ top: '75%', right: '5%', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div className="callout-dot" style={{ backgroundColor: hoverCol, width: '8px', height: '8px', borderRadius: '50%' }} />
+                    <span style={{ fontSize: '10.5px', fontWeight: '750' }}>Hover Color</span>
+                  </div>
+                  <div className="callout-pointing-line" style={{ top: '78.5%', right: '35%', width: '20%' }} />
+                </div>
+
+                {/* Sidebar Mockup Frame */}
+                <div className="preview-sidebar-frame" style={{ width: '200px', backgroundColor: bgCol, borderRadius: '12px', height: '480px', display: 'flex', flexDirection: 'column', padding: '16px 12px', zIndex: 1, boxShadow: '0 4px 14px rgba(0,0,0,0.15)' }}>
+                  
+                  {/* Brand Preview */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingBottom: '16px', borderBottom: `1px solid ${hoverCol}33` }}>
+                    {logoUrl ? (
+                      <img src={logoUrl} alt="Logo" style={{ maxHeight: '24px', maxWidth: '80px', objectFit: 'contain' }} />
+                    ) : (
+                      <>
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke={activeCol} strokeWidth="2.5">
+                          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                        </svg>
+                        <span style={{ fontSize: '11px', fontWeight: '800', color: textCol, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{instName}</span>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Navigation list */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '16px', flex: 1 }}>
+                    {/* Dashboard */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', color: textCol, opacity: 0.7, fontSize: '11.5px', borderRadius: '6px' }}>
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg>
+                      <span>Dashboard</span>
+                    </div>
+
+                    {/* Leads - Active */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', backgroundColor: activeCol, color: textCol, fontSize: '11.5px', borderRadius: '6px', fontWeight: '600' }}>
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                      <span>Leads</span>
+                    </div>
+
+                    {/* Contacts - Hovered */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', backgroundColor: hoverCol, color: textCol, fontSize: '11.5px', borderRadius: '6px' }}>
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                      <span>Contacts</span>
+                    </div>
+
+                    {/* Follow Ups */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', color: textCol, opacity: 0.7, fontSize: '11.5px', borderRadius: '6px' }}>
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L21 8"/><path d="M21 3v5h-5"/></svg>
+                      <span>Follow Ups</span>
+                    </div>
+
+                    {/* Courses */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', color: textCol, opacity: 0.7, fontSize: '11.5px', borderRadius: '6px' }}>
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                      <span>Courses</span>
+                    </div>
+                  </div>
+
+                  {/* Bottom section */}
+                  <div style={{ borderTop: `1px solid ${hoverCol}33`, paddingTop: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: `${textCol}22`, color: textCol, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '8px', fontWeight: '700' }}>
+                      SS
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+                      <span style={{ fontSize: '9px', fontWeight: '600', color: textCol, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Stefan Salvatore</span>
+                      <span style={{ fontSize: '7px', color: textCol, opacity: 0.6 }}>Admin</span>
+                    </div>
                   </div>
                 </div>
 
-                <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--glass-border)', padding: '12px 16px', borderRadius: 'var(--radius-md)', marginTop: '20px', fontSize: '12px', color: 'var(--text-secondary)' }}>
-                  <strong>🎨 Instant Color Customization:</strong> Adjusting these sliders updates context state, which instantly alters the Primary / Secondary shades throughout the entire dashboard in real-time. No compilation needed!
+                {/* Bottom Bulb Info Box */}
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '12px', marginTop: '16px', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#eab308" strokeWidth="2.5" style={{ flexShrink: 0 }}>
+                    <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A5.5 5.5 0 0 0 12.5 2.5a5.5 5.5 0 0 0-5.5 5.5c0 1.3.5 2.6 1.5 3.5.8.8 1.3 1.5 1.5 2.5" />
+                    <line x1="9" y1="18" x2="15" y2="18" />
+                    <line x1="10" y1="22" x2="14" y2="22" />
+                  </svg>
+                  <span style={{ fontSize: '11px', color: '#475569', lineHeight: '1.4' }}>
+                    Changes you make on the left will reflect instantly in this preview. Click "Save Branding" to apply them globally.
+                  </span>
                 </div>
+              </div>
 
-                <button 
-                  type="submit" 
-                  className="primary-btn mt-4" 
-                  disabled={!hasChanges}
-                  style={!hasChanges ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
-                >
-                  Apply Branding
-                </button>
-              </form>
             </div>
           </div>
         )}
