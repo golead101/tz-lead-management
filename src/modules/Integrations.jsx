@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useCRM } from '../context/CRMContext';
 
 export default function Integrations() {
-  const { integrations, updateIntegration } = useCRM();
+  const { integrations, updateIntegration, addLead } = useCRM();
 
   // Active configuration drawer state
   const [selectedPlatform, setSelectedPlatform] = useState(null);
@@ -82,6 +82,101 @@ export default function Integrations() {
     });
     
     setSelectedPlatform(null);
+  };
+
+  // Integration Simulator State & Function
+  const [isSimulating, setIsSimulating] = useState(false);
+
+  const triggerSimulatedLead = () => {
+    setIsSimulating(true);
+
+    setTimeout(() => {
+      let mockLead = {};
+      
+      if (selectedPlatform === 'meta') {
+        const firstNames = ['Aditi', 'Rohan', 'Kabir', 'Zoya', 'Tanvi', 'Rohan', 'Dia', 'Ishaan', 'Kavya', 'Yash'];
+        const lastNames = ['Verma', 'Malhotra', 'Sinha', 'Chawla', 'Mehta', 'Kappor', 'Sen', 'Grover', 'Roy', 'Joshi'];
+        const randomName = `${firstNames[Math.floor(Math.random() * firstNames.length)]} ${lastNames[Math.floor(Math.random() * lastNames.length)]}`;
+        const cleanName = randomName.toLowerCase().replace(' ', '.');
+
+        mockLead = {
+          name: randomName,
+          email: `${cleanName}@meta-leads.com`,
+          phone: `+91 98${Math.floor(10000000 + Math.random() * 90000000)}`,
+          location: 'Mumbai',
+          education: 'Undergraduate',
+          course: 'Full-Stack Web Development',
+          source: 'Meta Ads',
+          priority: 'Hot',
+          stage: 'New Lead',
+          customFields: {}
+        };
+      } else if (selectedPlatform === 'google') {
+        const firstNames = ['Neha', 'Vikram', 'Anjali', 'Arjun', 'Priya', 'Rohit', 'Sameer', 'Aanya', 'Preeti', 'Dev'];
+        const lastNames = ['Patel', 'Sen', 'Nair', 'Sharma', 'Grover', 'Verma', 'Malhotra', 'Bose', 'Gupta', 'Dutta'];
+        const randomName = `${firstNames[Math.floor(Math.random() * firstNames.length)]} ${lastNames[Math.floor(Math.random() * lastNames.length)]}`;
+        const cleanName = randomName.toLowerCase().replace(' ', '.');
+
+        mockLead = {
+          name: randomName,
+          email: `${cleanName}@gmail.com`,
+          phone: `+91 97${Math.floor(10000000 + Math.random() * 90000000)}`,
+          location: 'Delhi',
+          education: 'Graduate',
+          course: 'Data Science & Artificial Intelligence',
+          source: 'Google Search',
+          priority: 'Hot',
+          stage: 'New Lead',
+          customFields: {}
+        };
+      } else if (selectedPlatform === 'whatsapp') {
+        const firstNames = ['Pooja', 'Amit', 'Divya', 'Sanjay', 'Meera', 'Ravi', 'Ritu', 'Karan', 'Tarun', 'Shreya'];
+        const lastNames = ['Gupta', 'Trivedi', 'Bose', 'Joshi', 'Reddy', 'Malhotra', 'Sen', 'Johar', 'Verma', 'Nair'];
+        const randomName = `${firstNames[Math.floor(Math.random() * firstNames.length)]} ${lastNames[Math.floor(Math.random() * lastNames.length)]}`;
+        const cleanName = randomName.toLowerCase().replace(' ', '.');
+
+        mockLead = {
+          name: randomName,
+          email: `${cleanName}@wa-inquiries.org`,
+          phone: `+91 95${Math.floor(10000000 + Math.random() * 90000000)}`,
+          location: 'Bangalore',
+          education: 'Working Professional',
+          course: 'UI/UX Product Design',
+          source: 'WhatsApp Inbound',
+          priority: 'Warm',
+          stage: 'New Lead',
+          customFields: {}
+        };
+      } else if (selectedPlatform === 'webhooks') {
+        const firstNames = ['Aarav', 'Sneha', 'Rahul', 'Neha', 'Vikram', 'Rohan', 'Aditya', 'Riya', 'Karan', 'Pooja'];
+        const lastNames = ['Sharma', 'Reddy', 'Verma', 'Patel', 'Malhotra', 'Gupta', 'Roy', 'Sen', 'Johar', 'Reddy'];
+        const randomName = `${firstNames[Math.floor(Math.random() * firstNames.length)]} ${lastNames[Math.floor(Math.random() * lastNames.length)]}`;
+        const cleanName = randomName.toLowerCase().replace(' ', '.');
+
+        mockLead = {
+          name: randomName,
+          email: `${cleanName}@academy-student.in`,
+          phone: `+91 99${Math.floor(10000000 + Math.random() * 90000000)}`,
+          location: 'Pune',
+          education: 'Final Year BCA',
+          course: 'Cyber Security & Ethical Hacking',
+          source: 'Website Form',
+          priority: 'Hot',
+          stage: 'New Lead',
+          customFields: {}
+        };
+      }
+
+      // Add the simulated lead directly into the CRM database!
+      addLead(mockLead);
+
+      // Increment lead count on the integration card!
+      updateIntegration(selectedPlatform, {
+        simulatedLeadsCount: (integrations[selectedPlatform].simulatedLeadsCount || 0) + 1
+      }, true); // Call with silent = true to avoid config toast redundancy!
+
+      setIsSimulating(false);
+    }, 1200);
   };
 
   // Pre-compiled Node.js Firebase Cloud Function scripts
@@ -447,80 +542,6 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
           </div>
         </div>
 
-        {/* Website Webhooks & Embeds Card */}
-        <div className="db-source-card integrations-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', height: '100%', minHeight: '230px', justifyContent: 'space-between' }}>
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-              <div className="db-source-icon-wrap web" style={{ width: '42px', height: '42px', color: '#8b5cf6' }}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="2" y1="12" x2="22" y2="12" />
-                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-                </svg>
-              </div>
-              
-              {/* Toggler Switch */}
-              <div 
-                onClick={() => handleToggle('webhooks')}
-                className={`db-chart-dropdown ${integrations.webhooks.enabled ? 'active-toggle' : ''}`}
-                style={{
-                  cursor: 'pointer',
-                  padding: '4px 10px',
-                  borderRadius: '12px',
-                  fontSize: '11px',
-                  background: integrations.webhooks.enabled ? 'var(--primary-glow, rgba(47,107,255,0.08))' : 'rgba(0,0,0,0.04)',
-                  color: integrations.webhooks.enabled ? 'var(--primary)' : 'var(--text-muted)',
-                  borderColor: integrations.webhooks.enabled ? 'var(--primary)' : 'var(--border-color)',
-                  fontWeight: '700'
-                }}
-              >
-                {integrations.webhooks.enabled ? 'Active ●' : 'Inactive ○'}
-              </div>
-            </div>
-
-            <h3 style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '6px' }}>Webhooks & Website Embeds</h3>
-            <p style={{ fontSize: '11.5px', color: 'var(--text-muted)', lineHeight: '1.4', marginBottom: '12px' }}>
-              Embed branded forms, trigger scripts on active landing pages, or copy public standalone URLs.
-            </p>
-          </div>
-
-          <div>
-            {/* Webhooks status pill */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
-              <span className="db-source-badge" style={{ 
-                background: integrations.webhooks.status === 'Connected' ? 'rgba(139,92,246,0.08)' : integrations.webhooks.status === 'Setup Required' ? 'rgba(249,115,22,0.08)' : 'rgba(239,68,68,0.08)',
-                color: integrations.webhooks.status === 'Connected' ? '#8b5cf6' : integrations.webhooks.status === 'Setup Required' ? '#f97316' : '#ef4444',
-                fontSize: '10px',
-                padding: '2px 8px',
-                borderRadius: '6px',
-                fontWeight: '700'
-              }}>
-                {integrations.webhooks.status}
-              </span>
-              
-              <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>
-                {integrations.webhooks.simulatedLeadsCount.toLocaleString()} leads captured
-              </span>
-            </div>
-
-            <button 
-              className="primary-btn w-full mt-3"
-              onClick={() => setSelectedPlatform('webhooks')}
-              style={{
-                height: '32px',
-                fontSize: '11px',
-                fontWeight: '700',
-                background: 'rgba(255,255,255,0.06)',
-                border: '1px solid var(--border-color)',
-                color: 'var(--text-primary)',
-                cursor: 'pointer'
-              }}
-            >
-              Configure Embeds
-            </button>
-          </div>
-        </div>
-
       </div>
 
       {/* Sleek Centered Configuration Modal Panel (Production-Grade UI) */}
@@ -811,6 +832,50 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                   </div>
                 </div>
               )}
+              {/* Integration Testing Sandbox Section */}
+              <div style={{ marginTop: '24px', borderTop: '1px dashed var(--border-color)', paddingTop: '20px' }}>
+                <style>{`
+                  @keyframes spin {
+                    to { transform: rotate(360deg); }
+                  }
+                `}</style>
+                <h4 style={{ fontSize: '11.5px', fontWeight: '800', color: 'var(--text-primary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  ⚡ Integration Testing Sandbox (Real-time Lead Webhook Simulator)
+                </h4>
+                <p style={{ fontSize: '10.5px', color: 'var(--text-muted)', lineHeight: '1.4', marginBottom: '12px' }}>
+                  Simulate an incoming HTTP webhook POST request from Meta Ads, Google Ads, or WhatsApp API. This writes a fresh student lead record straight into your active CRM state, triggering dashboard updates and notifications.
+                </p>
+                <button
+                  type="button"
+                  disabled={isSimulating}
+                  onClick={triggerSimulatedLead}
+                  className="primary-btn w-full"
+                  style={{
+                    background: isSimulating ? 'rgba(0,0,0,0.04)' : 'rgba(16, 185, 129, 0.08)',
+                    color: isSimulating ? 'var(--text-muted)' : '#059669',
+                    border: isSimulating ? '1px solid var(--border-color)' : '1px solid rgba(16, 185, 129, 0.2)',
+                    fontWeight: '700',
+                    fontSize: '11.5px',
+                    height: '36px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    cursor: isSimulating ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {isSimulating ? (
+                    <>
+                      <div style={{ width: '14px', height: '14px', border: '2px solid rgba(0,0,0,0.1)', borderTopColor: '#059669', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                      <span>Simulating Incoming Webhook...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>⚡ Trigger Simulated {selectedPlatform === 'meta' ? 'Meta Ad' : selectedPlatform === 'google' ? 'Google Ad' : selectedPlatform === 'whatsapp' ? 'WhatsApp' : 'Website'} Webhook Lead</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
 
             {/* Close / Action Row */}

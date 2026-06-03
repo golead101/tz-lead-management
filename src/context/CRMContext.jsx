@@ -1104,7 +1104,7 @@ export const CRMProvider = ({ children }) => {
     showToastMsg('Visual customization saved successfully.');
   };
 
-  const updateIntegration = (platform, configFields) => {
+  const updateIntegration = (platform, configFields, silent = false) => {
     setIntegrations(prev => {
       const updated = {
         ...prev,
@@ -1115,7 +1115,9 @@ export const CRMProvider = ({ children }) => {
       };
       return updated;
     });
-    showToastMsg(`${platform.toUpperCase()} configuration successfully updated!`);
+    if (!silent) {
+      showToastMsg(`${platform.toUpperCase()} configuration successfully updated!`);
+    }
   };
 
   return (
