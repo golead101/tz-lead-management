@@ -77,6 +77,16 @@ export default function Sidebar() {
         </svg>
       )
     },
+    {
+      id: 'integrations',
+      target: 'integrations',
+      label: 'Integrations',
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M18 3v4M6 3v4M12 2v20M20 7H4c0 0 0 4 2 6l2 2v5c0 1 1 2 2 2h4c1 0 2-1 2-2v-5l2-2c2-2 2-6 2-6z" />
+        </svg>
+      )
+    },
 
     {
       id: 'reports',
@@ -120,6 +130,7 @@ export default function Sidebar() {
     if (item.id === 'contacts') return activeView === 'grid';
     if (item.id === 'followups') return activeView === 'detail';
     if (item.id === 'courses') return activeView === 'sandbox';
+    if (item.id === 'integrations') return activeView === 'integrations';
     if (item.id === 'reports') return activeView === 'analytics';
     if (item.id === 'automation') return activeView === 'whatsapp';
     if (item.id === 'settings') return activeView === 'settings';
