@@ -205,10 +205,6 @@ export default function Topbar() {
                     <span>📊 Go to Dashboard Overview</span>
                     <span className="cmd-shortcut">G + D</span>
                   </div>
-                  <div className="cmd-item" onClick={() => { setActiveView('board'); setCmdOpen(false); }}>
-                    <span>📍 Go to Pipeline Grid Board</span>
-                    <span className="cmd-shortcut">G + B</span>
-                  </div>
                   <div className="cmd-item" onClick={() => { setActiveView('grid'); setCmdOpen(false); }}>
                     <span>🗂️ Go to Leads spreadsheet Grid</span>
                     <span className="cmd-shortcut">G + G</span>

@@ -488,14 +488,8 @@ export default function ConfigSettings() {
                       <span>Leads</span>
                     </div>
 
-                    {/* Contacts - Hovered */}
+                    {/* Follow Ups - Hovered */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', backgroundColor: hoverCol, color: textCol, fontSize: '11.5px', borderRadius: '6px' }}>
-                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                      <span>Contacts</span>
-                    </div>
-
-                    {/* Follow Ups */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', color: textCol, opacity: 0.7, fontSize: '11.5px', borderRadius: '6px' }}>
                       <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L21 8"/><path d="M21 3v5h-5"/></svg>
                       <span>Follow Ups</span>
                     </div>
@@ -671,7 +665,7 @@ export default function ConfigSettings() {
                 </div>
 
                 <div style={{ background: 'rgba(139, 92, 246, 0.05)', border: '1px solid rgba(139, 92, 246, 0.15)', padding: '10px 14px', borderRadius: 'var(--radius-sm)', fontSize: '11px', color: '#8b5cf6' }}>
-                  <strong>🔔 Kanban Integration:</strong> Appending custom stages automatically generates a new column on your visual board layout!
+                  <strong>🔔 Stage Integration:</strong> Appending custom stages automatically registers them for lead tracking and list filtering!
                 </div>
 
                 <button type="submit" className="primary-btn mt-4">

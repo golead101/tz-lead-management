@@ -116,7 +116,7 @@ export default function Sandbox() {
         <div className="dashboard-panel">
           <h3 className="panel-title" style={{ marginBottom: '14px' }}>Visual Sandbox Integration Simulator</h3>
           <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '14px' }}>
-            Submit an inquiry through this mock student landing form and watch it instantly propagate inside the pipeline board!
+            Submit an inquiry through this mock student landing form and watch it instantly propagate inside the Leads list!
           </p>
 
           <div className="mock-browser-frame">

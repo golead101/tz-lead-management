@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useCRM } from '../context/CRMContext';
 
-export default function DetailTimeline() {
+export default function DetailTimeline({ onClose, backText = 'Back to Leads', hideTimeline = false }) {
   const {
     leads,
     courses,
@@ -226,16 +226,22 @@ export default function DetailTimeline() {
         <button 
           className="secondary-btn" 
           style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '12px', fontWeight: '600' }}
-          onClick={() => setActiveView('board')}
+          onClick={() => {
+            if (onClose) {
+              onClose();
+            } else {
+              setActiveView('grid');
+            }
+          }}
         >
           <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
           </svg>
-          Back to Pipeline
+          {backText}
         </button>
       </div>
 
-      <div className="lead-detail-layout">
+      <div className="lead-detail-layout" style={hideTimeline ? { gridTemplateColumns: '1fr', maxWidth: '600px', margin: '0 auto' } : {}}>
         {/* ==================================================================
             LEFT COLUMN: PROFILE DETAILS
             ================================================================== */}
@@ -255,6 +261,58 @@ export default function DetailTimeline() {
                   </span>
                 </div>
               </div>
+
+              {hideTimeline && (
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '10px',
+                  padding: '16px 0',
+                  borderTop: '1px solid var(--border-color)',
+                  borderBottom: '1px solid var(--border-color)',
+                  margin: '10px 0 5px 0'
+                }}>
+                  <button 
+                    type="button"
+                    className="primary-btn justify-center" 
+                    style={{ fontSize: '12px', padding: '10px', fontWeight: '600' }} 
+                    onClick={() => setCallModalOpen(true)}
+                  >
+                    <svg viewBox="0 0 24 24" width="14" height="14" style={{ marginRight: '6px' }} fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.94.725l.548 2.2a1 1 0 01-.321.988l-1.305.98a10.582 10.582 0 004.872 4.872l.98-1.305a1 1 0 01.988-.321l2.2.548a1 1 0 01.725.94V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                    Log Call
+                  </button>
+                  <button 
+                    type="button"
+                    className="secondary-btn justify-center" 
+                    style={{ fontSize: '12px', padding: '10px', fontWeight: '600' }} 
+                    onClick={() => setFollowupModalOpen(true)}
+                  >
+                    <svg viewBox="0 0 24 24" width="14" height="14" style={{ marginRight: '6px' }} fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                    Schedule Callback
+                  </button>
+                  <button 
+                    type="button"
+                    className="secondary-btn justify-center" 
+                    style={{ fontSize: '12px', padding: '10px', fontWeight: '600' }} 
+                    onClick={() => setDemoModalOpen(true)}
+                  >
+                    <svg viewBox="0 0 24 24" width="14" height="14" style={{ marginRight: '6px' }} fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 10l5 5-5 5m-6-5h11M4 4v7a4 4 0 004 4h1"/></svg>
+                    Schedule Demo
+                  </button>
+                  <button 
+                    type="button"
+                    className="secondary-btn justify-center" 
+                    style={{ fontSize: '12px', padding: '10px', fontWeight: '600' }} 
+                    onClick={() => {
+                      if (onClose) onClose();
+                      setActiveView('whatsapp');
+                    }}
+                  >
+                    <svg viewBox="0 0 24 24" width="14" height="14" style={{ marginRight: '6px' }} fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
+                    Chat Inbound
+                  </button>
+                </div>
+              )}
 
               <div className="profile-details-list">
                 {/* Contact Section */}
@@ -513,93 +571,98 @@ export default function DetailTimeline() {
         {/* ==================================================================
             RIGHT COLUMN: CHRONOLOGICAL ACTIVITY FEED TIMELINE
             ================================================================== */}
-        <div className="timeline-card">
-          {lead ? (
-            <>
-              {/* Timeline Utility Action bar */}
-              <div className="timeline-action-bar">
-                <button className="primary-btn" onClick={() => setCallModalOpen(true)}>
-                  <svg viewBox="0 0 24 24"><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.94.725l.548 2.2a1 1 0 01-.321.988l-1.305.98a10.582 10.582 0 004.872 4.872l.98-1.305a1 1 0 01.988-.321l2.2.548a1 1 0 01.725.94V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" stroke="currentColor" strokeWidth="2" fill="none"/></svg>
-                  Log Call
-                </button>
-
-                <button className="secondary-btn" onClick={() => setFollowupModalOpen(true)}>
-                  <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2" stroke="currentColor" strokeWidth="2" fill="none"/></svg>
-                  Schedule Callback
-                </button>
-
-                <button className="secondary-btn" onClick={() => setDemoModalOpen(true)}>
-                  <svg viewBox="0 0 24 24"><path d="M15 10l5 5-5 5m-6-5h11M4 4v7a4 4 0 004 4h1" stroke="currentColor" strokeWidth="2" fill="none"/></svg>
-                  Schedule Demo
-                </button>
-
-                <button className="secondary-btn" onClick={() => setActiveView('whatsapp')}>
-                  Chat Inbound
-                </button>
-              </div>
-
-              {/* Timeline logs timeline */}
-              <h3 className="panel-title mb-2">Timeline Interaction Audit Feed</h3>
-              
-              {/* Filter Pills Bar */}
-              <div className="timeline-filter-bar">
-                {['All', 'Calls', 'Chats', 'System', 'Demos'].map(cat => (
-                  <button 
-                    key={cat} 
-                    className={`timeline-filter-pill ${timelineFilter === cat ? 'active' : ''}`}
-                    onClick={() => setTimelineFilter(cat)}
-                  >
-                    {cat}
+        {!hideTimeline && (
+          <div className="timeline-card">
+            {lead ? (
+              <>
+                {/* Timeline Utility Action bar */}
+                <div className="timeline-action-bar">
+                  <button className="primary-btn" onClick={() => setCallModalOpen(true)}>
+                    <svg viewBox="0 0 24 24"><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.94.725l.548 2.2a1 1 0 01-.321.988l-1.305.98a10.582 10.582 0 004.872 4.872l.98-1.305a1 1 0 01.988-.321l2.2.548a1 1 0 01.725.94V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" stroke="currentColor" strokeWidth="2" fill="none"/></svg>
+                    Log Call
                   </button>
-                ))}
-              </div>
 
-              <div className="timeline-stream">
-                {filteredTimeline.slice().reverse().map(node => {
-                  const isCollapsed = collapsedNodeIds.includes(node.id);
-                  return (
-                    <div 
-                      key={node.id} 
-                      className={`timeline-node node-${node.type} timeline-node-collapsible`}
-                      onClick={() => toggleNodeCollapse(node.id)}
+                  <button className="secondary-btn" onClick={() => setFollowupModalOpen(true)}>
+                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2" stroke="currentColor" strokeWidth="2" fill="none"/></svg>
+                    Schedule Callback
+                  </button>
+
+                  <button className="secondary-btn" onClick={() => setDemoModalOpen(true)}>
+                    <svg viewBox="0 0 24 24"><path d="M15 10l5 5-5 5m-6-5h11M4 4v7a4 4 0 004 4h1" stroke="currentColor" strokeWidth="2" fill="none"/></svg>
+                    Schedule Demo
+                  </button>
+
+                  <button className="secondary-btn" onClick={() => {
+                    if (onClose) onClose();
+                    setActiveView('whatsapp');
+                  }}>
+                    Chat Inbound
+                  </button>
+                </div>
+
+                {/* Timeline logs timeline */}
+                <h3 className="panel-title mb-2">Timeline Interaction Audit Feed</h3>
+                
+                {/* Filter Pills Bar */}
+                <div className="timeline-filter-bar">
+                  {['All', 'Calls', 'Chats', 'System', 'Demos'].map(cat => (
+                    <button 
+                      key={cat} 
+                      className={`timeline-filter-pill ${timelineFilter === cat ? 'active' : ''}`}
+                      onClick={() => setTimelineFilter(cat)}
                     >
-                      <div className="timeline-icon-container">
-                        {node.type === 'call' && <svg viewBox="0 0 24 24"><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.94.725l.548 2.2a1 1 0 01-.321.988l-1.305.98a10.582 10.582 0 004.872 4.872l.98-1.305a1 1 0 01.988-.321l2.2.548a1 1 0 01.725.94V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" stroke="currentColor" strokeWidth="3"/></svg>}
-                        {node.type === 'whatsapp' && <svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" stroke="currentColor" strokeWidth="3"/></svg>}
-                        {node.type === 'system' && <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01" stroke="currentColor" strokeWidth="3"/></svg>}
-                        {node.type === 'followup' && <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2" stroke="currentColor" strokeWidth="3"/></svg>}
-                        {node.type === 'demo' && <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2m12-10a4 4 0 11-8 0 4 4 0 018 0z" stroke="currentColor" strokeWidth="3"/></svg>}
-                      </div>
+                      {cat}
+                    </button>
+                  ))}
+                </div>
 
-                      <div className="node-header">
-                        <span className="node-title">{node.title}</span>
-                        <span className="node-timestamp">
-                          {new Date(node.timestamp).toLocaleString()} • {node.user}
-                        </span>
-                      </div>
+                <div className="timeline-stream">
+                  {filteredTimeline.slice().reverse().map(node => {
+                    const isCollapsed = collapsedNodeIds.includes(node.id);
+                    return (
+                      <div 
+                        key={node.id} 
+                        className={`timeline-node node-${node.type} timeline-node-collapsible`}
+                        onClick={() => toggleNodeCollapse(node.id)}
+                      >
+                        <div className="timeline-icon-container">
+                          {node.type === 'call' && <svg viewBox="0 0 24 24"><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.94.725l.548 2.2a1 1 0 01-.321.988l-1.305.98a10.582 10.582 0 004.872 4.872l.98-1.305a1 1 0 01.988-.321l2.2.548a1 1 0 01.725.94V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" stroke="currentColor" strokeWidth="3"/></svg>}
+                          {node.type === 'whatsapp' && <svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" stroke="currentColor" strokeWidth="3"/></svg>}
+                          {node.type === 'system' && <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01" stroke="currentColor" strokeWidth="3"/></svg>}
+                          {node.type === 'followup' && <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2" stroke="currentColor" strokeWidth="3"/></svg>}
+                          {node.type === 'demo' && <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2m12-10a4 4 0 11-8 0 4 4 0 018 0z" stroke="currentColor" strokeWidth="3"/></svg>}
+                        </div>
 
-                      {isCollapsed ? (
-                        <div className="node-collapsed-hint">+ Click to expand details...</div>
-                      ) : (
-                        <div className="node-body">{node.content}</div>
-                      )}
+                        <div className="node-header">
+                          <span className="node-title">{node.title}</span>
+                          <span className="node-timestamp">
+                            {new Date(node.timestamp).toLocaleString()} • {node.user}
+                          </span>
+                        </div>
+
+                        {isCollapsed ? (
+                          <div className="node-collapsed-hint">+ Click to expand details...</div>
+                        ) : (
+                          <div className="node-body">{node.content}</div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {filteredTimeline.length === 0 && (
+                    <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12.5px' }}>
+                      No events in this category yet.
                     </div>
-                  );
-                })}
-                {filteredTimeline.length === 0 && (
-                  <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12.5px' }}>
-                    No events in this category yet.
-                  </div>
-                )}
+                  )}
+                </div>
+              </>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, color: 'var(--text-muted)' }}>
+                <svg viewBox="0 0 24 24" width="60" height="60" stroke="currentColor" strokeWidth="1" fill="none"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2m12-10a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                <p style={{ marginTop: '12px' }}>Fill in details on the left to capture a new student inquiry into the platform.</p>
               </div>
-            </>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, color: 'var(--text-muted)' }}>
-              <svg viewBox="0 0 24 24" width="60" height="60" stroke="currentColor" strokeWidth="1" fill="none"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2m12-10a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
-              <p style={{ marginTop: '12px' }}>Fill in details on the left to capture a new student inquiry into the platform.</p>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ==================================================================

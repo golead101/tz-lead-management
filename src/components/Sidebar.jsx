@@ -29,9 +29,10 @@ export default function Sidebar() {
         </svg>
       )
     },
+
     {
       id: 'leads',
-      target: 'board',
+      target: 'grid',
       label: 'Leads',
       icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -41,21 +42,8 @@ export default function Sidebar() {
       )
     },
     {
-      id: 'contacts',
-      target: 'grid',
-      label: 'Contacts',
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-          <circle cx="9" cy="7" r="4" />
-          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-        </svg>
-      )
-    },
-    {
       id: 'followups',
-      target: 'detail',
+      target: 'followups',
       label: 'Follow Ups',
       icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -126,9 +114,8 @@ export default function Sidebar() {
   // Helper to check active state based on current context view
   const isItemActive = (item) => {
     if (item.id === 'dashboard') return activeView === 'dashboard';
-    if (item.id === 'leads') return activeView === 'board';
-    if (item.id === 'contacts') return activeView === 'grid';
-    if (item.id === 'followups') return activeView === 'detail';
+    if (item.id === 'leads') return activeView === 'grid' || activeView === 'detail';
+    if (item.id === 'followups') return activeView === 'followups';
     if (item.id === 'courses') return activeView === 'sandbox';
     if (item.id === 'integrations') return activeView === 'integrations';
     if (item.id === 'reports') return activeView === 'analytics';

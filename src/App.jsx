@@ -6,7 +6,6 @@ import LoginScreen from './components/LoginScreen';
 
 // Page Modules
 import Dashboard from './modules/Dashboard';
-import KanbanView from './modules/KanbanView';
 import GridView from './modules/GridView';
 import DetailTimeline from './modules/DetailTimeline';
 import WhatsAppConsole from './modules/WhatsAppConsole';
@@ -14,6 +13,7 @@ import Analytics from './modules/Analytics';
 import Sandbox from './modules/Sandbox';
 import ConfigSettings from './modules/ConfigSettings';
 import Integrations from './modules/Integrations';
+import FollowUps from './modules/FollowUps';
 
 // Beautiful visual page skeleton shimmer loader
 function ShimmerLoader() {
@@ -70,12 +70,12 @@ function MainAppContent() {
     switch (navigatedView) {
       case 'dashboard':
         return <Dashboard />;
-      case 'board':
-        return <KanbanView />;
       case 'grid':
         return <GridView />;
       case 'detail':
         return <DetailTimeline />;
+      case 'followups':
+        return <FollowUps />;
       case 'whatsapp':
         return <WhatsAppConsole />;
       case 'analytics':
