@@ -16,11 +16,12 @@ export default function GridView() {
     searchQuery,
     setSelectedLeadId,
     setActiveView,
-    showToastMsg
+    showToastMsg,
+    showDetailModal,
+    setShowDetailModal
   } = useCRM();
 
   // Filter States
-  const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState('All');
   const [selectedStage, setSelectedStage] = useState('All');
   const [selectedCounselor, setSelectedCounselor] = useState(activeRole === 'Counselor' ? activeUser : 'All');

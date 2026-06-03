@@ -12,7 +12,8 @@ export default function Topbar() {
     clearNotifications,
     setActiveView,
     setSelectedLeadId,
-    leads
+    leads,
+    setShowDetailModal
   } = useCRM();
 
   const [notifOpen, setNotifOpen] = useState(false);
@@ -78,7 +79,8 @@ export default function Topbar() {
     );
     if (matchedLead) {
       setSelectedLeadId(matchedLead.id);
-      setActiveView('detail');
+      setShowDetailModal(true);
+      setActiveView('grid');
     }
   };
 
@@ -223,7 +225,7 @@ export default function Topbar() {
                   </div>
 
                   <div className="cmd-section-title">Quick Actions</div>
-                  <div className="cmd-item" onClick={() => { setSelectedLeadId(null); setActiveView('detail'); setCmdOpen(false); }}>
+                  <div className="cmd-item" onClick={() => { setSelectedLeadId(null); setShowDetailModal(true); setActiveView('grid'); setCmdOpen(false); }}>
                     <span>✨ Create New Student Inquiry</span>
                     <span className="cmd-shortcut">/add</span>
                   </div>
@@ -251,7 +253,8 @@ export default function Topbar() {
                         className="cmd-item" 
                         onClick={() => {
                           setSelectedLeadId(l.id);
-                          setActiveView('detail');
+                          setShowDetailModal(true);
+                          setActiveView('grid');
                           setCmdOpen(false);
                         }}
                       >

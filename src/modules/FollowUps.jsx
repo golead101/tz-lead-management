@@ -3,9 +3,8 @@ import { useCRM } from '../context/CRMContext';
 import DetailTimeline from './DetailTimeline';
 
 export default function FollowUps() {
-  const { leads, setSelectedLeadId, setActiveView } = useCRM();
+  const { leads, setSelectedLeadId, setActiveView, showDetailModal, setShowDetailModal } = useCRM();
   const [activeTab, setActiveTab] = useState('overdue'); // Default to overdue as in the mockup
-  const [showDetailModal, setShowDetailModal] = useState(false);
 
   // Filter leads that have followupDate set
   const followUpLeads = leads.filter(lead => lead.followupDate);

@@ -480,6 +480,7 @@ export const CRMProvider = ({ children }) => {
   });
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [showDetailModal, setShowDetailModal] = useState(false);
 
   // Global Toast State
   const [toast, setToast] = useState(null);
@@ -1135,6 +1136,7 @@ export const CRMProvider = ({ children }) => {
       activeView,
       selectedLeadId,
       searchQuery,
+      showDetailModal,
       toast,
       counselors: DEFAULT_COUNSELORS,
       
@@ -1145,6 +1147,7 @@ export const CRMProvider = ({ children }) => {
       setActiveView,
       setSelectedLeadId,
       setSearchQuery,
+      setShowDetailModal,
       addLead,
       updateLead,
       deleteLead,
