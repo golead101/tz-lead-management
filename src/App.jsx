@@ -13,6 +13,7 @@ import WhatsAppConsole from './modules/WhatsAppConsole';
 import Analytics from './modules/Analytics';
 import Sandbox from './modules/Sandbox';
 import ConfigSettings from './modules/ConfigSettings';
+import Integrations from './modules/Integrations';
 
 // Beautiful visual page skeleton shimmer loader
 function ShimmerLoader() {
@@ -81,6 +82,8 @@ function MainAppContent() {
         return <Analytics />;
       case 'sandbox':
         return <Sandbox />;
+      case 'integrations':
+        return <Integrations />;
       case 'settings':
         return <ConfigSettings />;
       default:

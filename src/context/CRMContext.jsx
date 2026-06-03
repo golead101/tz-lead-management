@@ -52,6 +52,43 @@ const DEFAULT_BRANDING = {
   secondaryLight: '100%'
 };
 
+const DEFAULT_INTEGRATIONS = {
+  meta: {
+    enabled: true,
+    status: 'Connected',
+    appId: '1249581023849102',
+    systemToken: 'EAAGy7A_meta_token_secure_xyz',
+    pageId: '109283471029',
+    webhookVerifyToken: 'techzone_secret_verify_2026',
+    simulatedLeadsCount: 1247
+  },
+  google: {
+    enabled: false,
+    status: 'Setup Required',
+    developerToken: '',
+    customerId: '',
+    clientId: '',
+    clientSecret: '',
+    webhookPasskey: 'google_ad_passkey_987',
+    simulatedLeadsCount: 892
+  },
+  whatsapp: {
+    enabled: true,
+    status: 'Connected',
+    phoneNumberId: '102938471',
+    businessAccountId: '982734912',
+    systemToken: 'EAAGy7B_whatsapp_token_secure_987',
+    simulatedLeadsCount: 645
+  },
+  webhooks: {
+    enabled: true,
+    status: 'Connected',
+    securitySecret: 'whsec_tz_83749281',
+    webhookUrlSlug: 'inst_aarav_mumbai_786',
+    simulatedLeadsCount: 612
+  }
+};
+
 const DEFAULT_COUNSELORS = [
   { id: 'coun-elena', name: 'Elena Gilbert', email: 'elena@academy.com', role: 'Counselor' },
   { id: 'coun-damon', name: 'Damon Salvatore', email: 'damon@academy.com', role: 'Counselor' },
@@ -365,6 +402,11 @@ export const CRMProvider = ({ children }) => {
     return DEFAULT_BRANDING;
   });
 
+  const [integrations, setIntegrations] = useState(() => {
+    const local = localStorage.getItem('crm_integrations');
+    return local ? JSON.parse(local) : DEFAULT_INTEGRATIONS;
+  });
+
   // Global Session Roles
   const [activeRole, setActiveRole] = useState(() => {
     const local = localStorage.getItem('crm_active_role');
@@ -463,6 +505,10 @@ export const CRMProvider = ({ children }) => {
     localStorage.setItem('crm_branding', JSON.stringify(branding));
     applyThemeBranding(branding);
   }, [branding]);
+
+  useEffect(() => {
+    localStorage.setItem('crm_integrations', JSON.stringify(integrations));
+  }, [integrations]);
 
   useEffect(() => {
     localStorage.setItem('crm_active_role', JSON.stringify(activeRole));
@@ -1058,6 +1104,22 @@ export const CRMProvider = ({ children }) => {
     showToastMsg('Visual customization saved successfully.');
   };
 
+  const updateIntegration = (platform, configFields, silent = false) => {
+    setIntegrations(prev => {
+      const updated = {
+        ...prev,
+        [platform]: {
+          ...prev[platform],
+          ...configFields
+        }
+      };
+      return updated;
+    });
+    if (!silent) {
+      showToastMsg(`${platform.toUpperCase()} configuration successfully updated!`);
+    }
+  };
+
   return (
     <CRMContext.Provider value={{
       leads,
@@ -1065,6 +1127,7 @@ export const CRMProvider = ({ children }) => {
       pipelineStages,
       customFields,
       branding,
+      integrations,
       activeRole,
       activeUser,
       isLoggedIn,
@@ -1099,7 +1162,8 @@ export const CRMProvider = ({ children }) => {
       addStage,
       clearNotifications,
       changeBrandingColors,
-      showToastMsg
+      showToastMsg,
+      updateIntegration
     }}>
       {children}
       {toast && (
