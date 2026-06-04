@@ -30,14 +30,63 @@ const DEFAULT_CUSTOM_FIELDS = [
 ];
 
 const DEFAULT_BRANDING = {
-  instituteName: 'Lead Management',
+  instituteName: 'TechZone Academy',
   logoUrl: '',
-  primaryHue: 0,         // Stark Red (Hue 0)
+  
+  // Custom sidebar appearance properties
+  sidebarBg: '#0A1E44',
+  sidebarText: '#ffffff',
+  sidebarActiveBg: '#2F6BFF',
+  sidebarHoverBg: '#173B7A',
+  sidebarBorder: '#1E2A4D',
+  sidebarFont: 'Inter',
+  sidebarRadius: 8,
+  sidebarWidth: 'default',
+  
+  // Legacy color systems
+  primaryHue: 0,
   primarySat: '95%',
   primaryLight: '50%',
-  secondaryHue: 0,       // Stark White (Hue 0, Saturation 0%, Lightness 100%)
+  secondaryHue: 0,
   secondarySat: '0%',
   secondaryLight: '100%'
+};
+
+const DEFAULT_INTEGRATIONS = {
+  meta: {
+    enabled: true,
+    status: 'Connected',
+    appId: '1249581023849102',
+    systemToken: 'EAAGy7A_meta_token_secure_xyz',
+    pageId: '109283471029',
+    webhookVerifyToken: 'techzone_secret_verify_2026',
+    simulatedLeadsCount: 1247
+  },
+  google: {
+    enabled: false,
+    status: 'Setup Required',
+    developerToken: '',
+    customerId: '',
+    clientId: '',
+    clientSecret: '',
+    webhookPasskey: 'google_ad_passkey_987',
+    simulatedLeadsCount: 892
+  },
+  whatsapp: {
+    enabled: true,
+    status: 'Connected',
+    phoneNumberId: '102938471',
+    businessAccountId: '982734912',
+    systemToken: 'EAAGy7B_whatsapp_token_secure_987',
+    simulatedLeadsCount: 645
+  },
+  webhooks: {
+    enabled: true,
+    status: 'Connected',
+    securitySecret: 'whsec_tz_83749281',
+    webhookUrlSlug: 'inst_aarav_mumbai_786',
+    simulatedLeadsCount: 612
+  }
 };
 
 const DEFAULT_COUNSELORS = [
@@ -353,6 +402,11 @@ export const CRMProvider = ({ children }) => {
     return DEFAULT_BRANDING;
   });
 
+  const [integrations, setIntegrations] = useState(() => {
+    const local = localStorage.getItem('crm_integrations');
+    return local ? JSON.parse(local) : DEFAULT_INTEGRATIONS;
+  });
+
   // Global Session Roles
   const [activeRole, setActiveRole] = useState(() => {
     const local = localStorage.getItem('crm_active_role');
@@ -426,6 +480,7 @@ export const CRMProvider = ({ children }) => {
   });
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [showDetailModal, setShowDetailModal] = useState(false);
 
   // Global Toast State
   const [toast, setToast] = useState(null);
@@ -453,6 +508,10 @@ export const CRMProvider = ({ children }) => {
   }, [branding]);
 
   useEffect(() => {
+    localStorage.setItem('crm_integrations', JSON.stringify(integrations));
+  }, [integrations]);
+
+  useEffect(() => {
     localStorage.setItem('crm_active_role', JSON.stringify(activeRole));
   }, [activeRole]);
 
@@ -471,12 +530,43 @@ export const CRMProvider = ({ children }) => {
   // Helper to trigger branding updates dynamically in styling sheet
   const applyThemeBranding = (brand) => {
     const root = document.documentElement;
-    root.style.setProperty('--primary-h', brand.primaryHue);
-    root.style.setProperty('--primary-s', `${brand.primarySat}`);
-    root.style.setProperty('--primary-l', `${brand.primaryLight}`);
-    root.style.setProperty('--secondary-h', brand.secondaryHue);
-    root.style.setProperty('--secondary-s', `${brand.secondarySat}`);
-    root.style.setProperty('--secondary-l', `${brand.secondaryLight}`);
+    root.style.setProperty('--primary-h', brand.primaryHue || 0);
+    root.style.setProperty('--primary-s', `${brand.primarySat || '95%'}`);
+    root.style.setProperty('--primary-l', `${brand.primaryLight || '50%'}`);
+    root.style.setProperty('--secondary-h', brand.secondaryHue || 0);
+    root.style.setProperty('--secondary-s', `${brand.secondarySat || '0%'}`);
+    root.style.setProperty('--secondary-l', `${brand.secondaryLight || '100%'}`);
+    
+    // Modern SaaS Sidebar style variables
+    root.style.setProperty('--sidebar-bg', brand.sidebarBg || '#0A1E44');
+    root.style.setProperty('--sidebar-text', brand.sidebarText || '#ffffff');
+    root.style.setProperty('--sidebar-active-bg', brand.sidebarActiveBg || '#2F6BFF');
+    root.style.setProperty('--sidebar-hover-bg', brand.sidebarHoverBg || '#173B7A');
+    root.style.setProperty('--sidebar-border', brand.sidebarBorder || '#1E2A4D');
+    root.style.setProperty('--sidebar-font', brand.sidebarFont || 'Inter');
+    root.style.setProperty('--sidebar-radius', `${brand.sidebarRadius !== undefined ? brand.sidebarRadius : 8}px`);
+    root.style.setProperty('--sidebar-width', brand.sidebarWidth === 'compact' ? '80px' : brand.sidebarWidth === 'wide' ? '280px' : '250px');
+
+    // Dynamically apply sidebar color scheme variables globally to align the entire CRM workspace!
+    const activeColor = brand.sidebarActiveBg || '#2F6BFF';
+    root.style.setProperty('--primary', activeColor);
+    root.style.setProperty('--primary-glow', `${activeColor}14`); // 8% opacity overlay in hex
+    root.style.setProperty('--primary-light', activeColor);
+    root.style.setProperty('--primary-dark', brand.sidebarHoverBg || '#173B7A');
+    root.style.setProperty('--border-color-active', activeColor);
+
+    // Apply custom font-families to root body if set
+    if (brand.sidebarFont) {
+      root.style.setProperty('--font-heading', `'${brand.sidebarFont}', 'Outfit', 'Inter', sans-serif`);
+      root.style.setProperty('--font-body', `'${brand.sidebarFont}', 'Inter', sans-serif`);
+    }
+
+    // Apply general border radius globally if customized!
+    if (brand.sidebarRadius !== undefined) {
+      root.style.setProperty('--radius-sm', `${Math.max(4, brand.sidebarRadius - 2)}px`);
+      root.style.setProperty('--radius-md', `${brand.sidebarRadius}px`);
+      root.style.setProperty('--radius-lg', `${Math.min(18, brand.sidebarRadius + 8)}px`);
+    }
   };
 
   // Triggers alert messages
@@ -1015,6 +1105,22 @@ export const CRMProvider = ({ children }) => {
     showToastMsg('Visual customization saved successfully.');
   };
 
+  const updateIntegration = (platform, configFields, silent = false) => {
+    setIntegrations(prev => {
+      const updated = {
+        ...prev,
+        [platform]: {
+          ...prev[platform],
+          ...configFields
+        }
+      };
+      return updated;
+    });
+    if (!silent) {
+      showToastMsg(`${platform.toUpperCase()} configuration successfully updated!`);
+    }
+  };
+
   return (
     <CRMContext.Provider value={{
       leads,
@@ -1022,6 +1128,7 @@ export const CRMProvider = ({ children }) => {
       pipelineStages,
       customFields,
       branding,
+      integrations,
       activeRole,
       activeUser,
       isLoggedIn,
@@ -1029,6 +1136,7 @@ export const CRMProvider = ({ children }) => {
       activeView,
       selectedLeadId,
       searchQuery,
+      showDetailModal,
       toast,
       counselors: DEFAULT_COUNSELORS,
       
@@ -1039,6 +1147,7 @@ export const CRMProvider = ({ children }) => {
       setActiveView,
       setSelectedLeadId,
       setSearchQuery,
+      setShowDetailModal,
       addLead,
       updateLead,
       deleteLead,
@@ -1056,7 +1165,8 @@ export const CRMProvider = ({ children }) => {
       addStage,
       clearNotifications,
       changeBrandingColors,
-      showToastMsg
+      showToastMsg,
+      updateIntegration
     }}>
       {children}
       {toast && (

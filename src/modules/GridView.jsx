@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useCRM } from '../context/CRMContext';
+import DetailTimeline from './DetailTimeline';
 
 export default function GridView() {
   const {
@@ -15,7 +16,9 @@ export default function GridView() {
     searchQuery,
     setSelectedLeadId,
     setActiveView,
-    showToastMsg
+    showToastMsg,
+    showDetailModal,
+    setShowDetailModal
   } = useCRM();
 
   // Filter States
@@ -178,7 +181,7 @@ export default function GridView() {
 
   const handleRowClick = (leadId) => {
     setSelectedLeadId(leadId);
-    setActiveView('detail');
+    setShowDetailModal(true);
   };
 
   const getInitials = (name) => {
@@ -246,7 +249,7 @@ export default function GridView() {
             <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" stroke="currentColor" strokeWidth="2" fill="none"/></svg>
             Import CSV
           </button>
-          <button className="gv-btn-primary" onClick={() => { setSelectedLeadId(null); setActiveView('detail'); }}>
+          <button className="gv-btn-primary" onClick={() => { setSelectedLeadId(null); setShowDetailModal(true); }}>
             <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19" stroke="currentColor" strokeWidth="2.5"/><line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" strokeWidth="2.5"/></svg>
             Add Lead
           </button>
@@ -665,6 +668,30 @@ export default function GridView() {
                 Parse & Import
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ──────────── LEAD DETAIL MODAL ──────────── */}
+      {showDetailModal && (
+        <div className="lead-detail-modal-overlay" onClick={() => { setSelectedLeadId(null); setShowDetailModal(false); }}>
+          <div className="lead-detail-modal-content" onClick={(e) => e.stopPropagation()}>
+            <button 
+              type="button" 
+              className="lead-detail-modal-close" 
+              onClick={() => { setSelectedLeadId(null); setShowDetailModal(false); }}
+              title="Close Details"
+            >
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+            <DetailTimeline 
+              onClose={() => { setSelectedLeadId(null); setShowDetailModal(false); }} 
+              backText="Back to Leads"
+              hideTimeline={true} 
+            />
           </div>
         </div>
       )}
