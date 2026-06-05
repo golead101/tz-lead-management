@@ -4739,9 +4739,11 @@ textarea.form-control {
 }
 
 .lead-detail-modal-close {
-  position: absolute;
-  top: 20px;
-  right: 20px;
+  position: sticky;
+  top: -10px;
+  float: right;
+  margin-right: -10px;
+  margin-bottom: -20px;
   width: 32px;
   height: 32px;
   border-radius: var(--radius-full);
