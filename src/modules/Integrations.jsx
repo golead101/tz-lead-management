@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useCRM } from '../context/CRMContext';
 
 export default function Integrations() {
-  const { integrations, updateIntegration, addLead } = useCRM();
+  const { integrations, updateIntegration, addLead, showToastMsg } = useCRM();
 
   // Active configuration drawer state
   const [selectedPlatform, setSelectedPlatform] = useState(null);
@@ -44,11 +44,28 @@ export default function Integrations() {
     }
   }, [selectedPlatform, integrations]);
 
+  const hasConfig = (platform) => {
+    const data = integrations[platform];
+    if (platform === 'meta') {
+      return !!(data.appId && data.systemToken);
+    } else if (platform === 'google') {
+      return !!(data.developerToken && data.customerId);
+    } else if (platform === 'whatsapp') {
+      return !!(data.phoneNumberId && data.systemToken);
+    } else if (platform === 'webhooks') {
+      return !!(data.securitySecret);
+    }
+    return false;
+  };
+
   const handleToggle = (platform) => {
+    if (!integrations[platform].enabled && !hasConfig(platform)) {
+      showToastMsg(`Please configure credentials for ${platform.toUpperCase()} before activating this integration.`, 'error');
+      return;
+    }
+
     const nextEnabled = !integrations[platform].enabled;
-    const nextStatus = nextEnabled 
-      ? (platform === 'google' && !integrations.google.developerToken ? 'Setup Required' : 'Connected')
-      : 'Disconnected';
+    const nextStatus = nextEnabled ? 'Connected' : 'Disconnected';
     
     updateIntegration(platform, { 
       enabled: nextEnabled,
@@ -75,9 +92,11 @@ export default function Integrations() {
       if (!webhookFields.securitySecret) activeStatus = 'Setup Required';
     }
 
+    const isSetupValid = activeStatus === 'Connected';
+
     updateIntegration(selectedPlatform, {
       ...fieldsToSave,
-      enabled: true,
+      enabled: isSetupValid,
       status: activeStatus
     });
     
@@ -88,6 +107,10 @@ export default function Integrations() {
   const [isSimulating, setIsSimulating] = useState(false);
 
   const triggerSimulatedLead = () => {
+    if (!integrations[selectedPlatform].enabled) {
+      showToastMsg(`Please configure and activate ${selectedPlatform.toUpperCase()} before triggering simulated leads.`, 'error');
+      return;
+    }
     setIsSimulating(true);
 
     setTimeout(() => {

@@ -50,12 +50,12 @@ const DEFAULT_BRANDING = {
 
 const DEFAULT_INTEGRATIONS = {
   meta: {
-    enabled: true,
-    status: 'Connected',
-    appId: '1249581023849102',
-    systemToken: 'EAAGy7A_meta_token_secure_xyz',
-    pageId: '109283471029',
-    webhookVerifyToken: 'techzone_secret_verify_2026',
+    enabled: false,
+    status: 'Setup Required',
+    appId: '',
+    systemToken: '',
+    pageId: '',
+    webhookVerifyToken: '',
     simulatedLeadsCount: 1247
   },
   google: {
@@ -65,22 +65,22 @@ const DEFAULT_INTEGRATIONS = {
     customerId: '',
     clientId: '',
     clientSecret: '',
-    webhookPasskey: 'google_ad_passkey_987',
+    webhookPasskey: '',
     simulatedLeadsCount: 892
   },
   whatsapp: {
-    enabled: true,
-    status: 'Connected',
-    phoneNumberId: '102938471',
-    businessAccountId: '982734912',
-    systemToken: 'EAAGy7B_whatsapp_token_secure_987',
+    enabled: false,
+    status: 'Setup Required',
+    phoneNumberId: '',
+    businessAccountId: '',
+    systemToken: '',
     simulatedLeadsCount: 645
   },
   webhooks: {
-    enabled: true,
-    status: 'Connected',
-    securitySecret: 'whsec_tz_83749281',
-    webhookUrlSlug: 'inst_aarav_mumbai_786',
+    enabled: false,
+    status: 'Setup Required',
+    securitySecret: '',
+    webhookUrlSlug: '',
     simulatedLeadsCount: 612
   }
 };
@@ -386,6 +386,12 @@ export const CRMProvider = ({ children }) => {
   });
 
   const [integrations, setIntegrations] = useState(() => {
+    const hasReset = localStorage.getItem('crm_integrations_seed_reset_v2');
+    if (!hasReset) {
+      localStorage.setItem('crm_integrations_seed_reset_v2', 'true');
+      localStorage.setItem('crm_integrations', JSON.stringify(DEFAULT_INTEGRATIONS));
+      return DEFAULT_INTEGRATIONS;
+    }
     const local = localStorage.getItem('crm_integrations');
     return local ? JSON.parse(local) : DEFAULT_INTEGRATIONS;
   });

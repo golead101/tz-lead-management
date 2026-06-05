@@ -124,28 +124,7 @@ export default function Analytics() {
         </div>
 
 
-        {/* Acquisition Channel Attribution */}
-        <div className="chart-card">
-          <h3 className="panel-title" style={{ marginBottom: '6px' }}>Acquisition Channel Attribution</h3>
-          <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '16px' }}>
-            Inquiry volume attribution mapped to lead registration source.
-          </p>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {sourceStats.map(stat => (
-              <div key={stat.name} className="funnel-stage-row" style={{ height: 'auto', paddingBottom: '4px' }}>
-                <div className="funnel-stage-label" style={{ width: '130px', fontSize: '12px', fontWeight: '600' }}>{stat.name}</div>
-                <div className="funnel-stage-bar-outer" style={{ height: '8px' }}>
-                  <div 
-                    className="funnel-stage-bar-inner" 
-                    style={{ width: `${stat.pct}%`, background: 'var(--primary)' }}
-                  />
-                </div>
-                <div className="funnel-stage-value" style={{ width: '40px', fontSize: '12px', fontWeight: '700' }}>{stat.count}</div>
-              </div>
-            ))}
-          </div>
-        </div>
 
         {/* Counselor Comparative rankings leaderboard */}
         {activeRole !== 'Counselor' ? (
