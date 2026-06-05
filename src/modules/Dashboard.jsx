@@ -107,18 +107,7 @@ export default function Dashboard() {
             </svg>
           </div>
           
-          <button className="db-bell-btn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-            </svg>
-            <div className="db-bell-badge" />
-          </button>
-          
-          <div className="db-avatar-circle" title={`Logged in as ${activeUser}`}>
-            <svg viewBox="0 0 24 24" fill="currentColor">
-              <path fillRule="evenodd" d="M18.685 19.097A9.723 9.723 0 0021.75 12c0-5.385-4.365-9.75-9.75-9.75S2.25 6.615 2.25 12c0 2.72.186 5.4.54 8.012A1 1 0 003.78 20.8h16.44a1 1 0 00.916-.623 9.695 9.695 0 00-.451-1.08zm-7.653-9.52c0-1.393 1.13-2.523 2.523-2.523s2.523 1.13 2.523 2.523-1.13 2.523-2.523 2.523-2.523-1.13-2.523-2.523zm-3.34 7.64c.244-1.722 1.718-3.05 3.511-3.05h1.996c1.793 0 3.267 1.328 3.51 3.05H7.691z" clipRule="evenodd" />
-            </svg>
-          </div>
+
         </div>
       </div>
 
@@ -128,9 +117,7 @@ export default function Dashboard() {
         <div className="db-source-card">
           <div className="db-source-top">
             <div className="db-source-icon-wrap meta">
-              <svg viewBox="0 0 24 24" fill="currentColor">
-                <path d="M16.924 6c-1.393 0-2.613.626-3.486 1.624L12 9.25 10.562 7.624C9.69 6.626 8.47 6 7.076 6 4.257 6 2 8.243 2 11c0 2.757 2.257 5 5.076 5 1.393 0 2.613-.626 3.486-1.624L12 12.75l1.438 1.626c.873.998 2.093 1.624 3.486 1.624 2.819 0 5.076-2.243 5.076-5 0-2.757-2.257-5-5.076-5zm0 8.5c-1.026 0-1.921-.497-2.522-1.282L12 10.5l-2.402 2.718c-.6.785-1.496 1.282-2.522 1.282-1.677 0-3.076-1.353-3.076-3s1.399-3 3.076-3c1.026 0 1.921.497 2.522 1.282L12 11.5l2.402-2.718c.6-.785 1.496-1.282 2.522-1.282 1.677 0 3.076 1.353 3.076 3s-1.399 3-3.076 3z"/>
-              </svg>
+              <img src="/@fs/d:/Lead-management-project/image-removebg-preview.png" alt="Meta Leads" style={{ width: '40px', height: '40px', objectFit: 'contain' }} />
             </div>
             <div className="db-source-details">
               <span className="db-source-label">Meta Leads</span>
