@@ -218,24 +218,26 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
 
   return (
     <div className="fade-in">
-      <div style={{ marginBottom: '14px', display: 'flex', alignItems: 'center' }}>
-        <button 
-          className="secondary-btn" 
-          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '12px', fontWeight: '600' }}
-          onClick={() => {
-            if (onClose) {
-              onClose();
-            } else {
-              setActiveView('grid');
-            }
-          }}
-        >
-          <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
-          </svg>
-          {backText}
-        </button>
-      </div>
+      {!onClose && (
+        <div style={{ marginBottom: '14px', display: 'flex', alignItems: 'center' }}>
+          <button 
+            className="secondary-btn" 
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '12px', fontWeight: '600' }}
+            onClick={() => {
+              if (onClose) {
+                onClose();
+              } else {
+                setActiveView('grid');
+              }
+            }}
+          >
+            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+            </svg>
+            {backText}
+          </button>
+        </div>
+      )}
 
       <div className="lead-detail-layout" style={hideTimeline ? { gridTemplateColumns: '1fr', maxWidth: '600px', margin: '0 auto' } : {}}>
         {/* ==================================================================
