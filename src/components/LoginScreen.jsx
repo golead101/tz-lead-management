@@ -26,8 +26,8 @@ export default function LoginScreen() {
 
   const demoAccounts = [
     { label: '🔥 Admin (Stefan)', email: 'admin', pass: 'admin', desc: 'Stefan Salvatore • Full access' },
-    { label: '⚡ Manager (Damon)', email: 'manager', pass: 'manager', desc: 'Damon Salvatore • Medium access' },
-    { label: '📞 Counselor (Elena)', email: 'counselor', pass: 'counselor', desc: 'Elena Gilbert • Queue access' }
+    { label: '⚡ Manager (Irfan)', email: 'manager', pass: 'manager', desc: 'Irfan • Medium access' },
+    { label: '📞 Counselor (Maha)', email: 'counselor', pass: 'counselor', desc: 'Maha • Queue access' }
   ];
 
   return (

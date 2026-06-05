@@ -19,7 +19,6 @@ export default function KanbanView() {
   const [selectedStage, setSelectedStage] = useState('New Lead');
   const [selectedCourse, setSelectedCourse] = useState('All');
   const [selectedCounselor, setSelectedCounselor] = useState(activeRole === 'Counselor' ? activeUser : 'All');
-  const [selectedPriority, setSelectedPriority] = useState('All');
   const [selectedSource, setSelectedSource] = useState('All');
 
   // Dynamically extract unique lead sources from database to populate filter list
@@ -42,7 +41,6 @@ export default function KanbanView() {
     // Dropdown filters
     if (selectedCourse !== 'All' && lead.course !== selectedCourse) return false;
     if (selectedCounselor !== 'All' && lead.counselor !== selectedCounselor) return false;
-    if (selectedPriority !== 'All' && lead.priority !== selectedPriority) return false;
     if (selectedSource !== 'All' && lead.source !== selectedSource) return false;
 
     // Search query matches Name, Phone, Email
@@ -147,17 +145,7 @@ export default function KanbanView() {
             </select>
           )}
 
-          {/* Temperature/Priority filter */}
-          <select 
-            value={selectedPriority} 
-            onChange={(e) => setSelectedPriority(e.target.value)}
-            className="filter-select"
-          >
-            <option value="All">All Temperatures</option>
-            <option value="Hot">🔥 Hot</option>
-            <option value="Warm">☀️ Warm</option>
-            <option value="Cold">❄️ Cold</option>
-          </select>
+
 
           {/* Source filter dropdown */}
           <select 
@@ -197,9 +185,6 @@ export default function KanbanView() {
               >
                 <div className="card-top">
                   <span className="card-title" title={lead.name}>{lead.name}</span>
-                  <span className={`card-priority-badge priority-${lead.priority.toLowerCase()}`}>
-                    {lead.priority}
-                  </span>
                 </div>
 
                 <div className="card-course">{lead.course}</div>

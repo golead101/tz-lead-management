@@ -46,9 +46,12 @@ export default function ConfigSettings() {
     pipelineStages,
     customFields,
     branding,
+    counselors,
     addCourse,
     addStage,
     addCustomField,
+    addCounselor,
+    removeCounselor,
     changeBrandingColors,
     activeRole
   } = useCRM();
@@ -80,6 +83,11 @@ export default function ConfigSettings() {
   const [fieldType, setFieldType] = useState('text');
   const [fieldOptions, setFieldOptions] = useState('');
   const [fieldRequired, setFieldRequired] = useState(false);
+
+  // New Counselor State
+  const [cName, setCName] = useState('');
+  const [cEmail, setCEmail] = useState('');
+  const [cPassword, setCPassword] = useState('');
 
   if (activeRole !== 'Admin') {
     return (
@@ -186,6 +194,19 @@ export default function ConfigSettings() {
     setFieldRequired(false);
   };
 
+  const handleAddCounselor = (e) => {
+    e.preventDefault();
+    if (!cName.trim() || !cEmail.trim()) return;
+    addCounselor({
+      name: cName,
+      email: cEmail,
+      password: cPassword
+    });
+    setCName('');
+    setCEmail('');
+    setCPassword('');
+  };
+
   return (
     <div className="fade-in">
       <div className="welcome-header">
@@ -218,6 +239,12 @@ export default function ConfigSettings() {
           onClick={() => setActiveTab('fields')}
         >
           Custom Fields Registry
+        </button>
+        <button 
+          className={`settings-tab-btn ${activeTab === 'counselors' ? 'active' : ''}`}
+          onClick={() => setActiveTab('counselors')}
+        >
+          Team Counselors
         </button>
       </div>
 
@@ -754,6 +781,97 @@ export default function ConfigSettings() {
 
                 <button type="submit" className="primary-btn mt-4">
                   Add Custom Field
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Counselors Manager */}
+        {activeTab === 'counselors' && (
+          <div className="settings-pane active sandbox-split">
+            {/* List of active counselors */}
+            <div className="dashboard-panel">
+              <h3 className="panel-title mb-4">Team Counselors Directory</h3>
+              <div style={{ maxHeight: '350px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {counselors.map(c => (
+                  <div key={c.id} className="config-list-item" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div className="card-counselor-avatar" style={{ width: '36px', height: '36px', fontSize: '13px', fontWeight: '700', borderRadius: '50%', background: 'var(--primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {c.name.split(' ').map(n=>n[0]).join('').toUpperCase()}
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontWeight: '700', color: 'var(--text-primary)', fontSize: '13.5px' }}>{c.name}</span>
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{c.email}</span>
+                      </div>
+                    </div>
+                    {/* Only show delete button if we have more than 1 counselor to prevent locking out all assignments */}
+                    {counselors.length > 1 && (
+                      <button 
+                        onClick={() => removeCounselor(c.id)}
+                        className="ghost-btn-custom" 
+                        style={{ color: '#ef4444', border: 'none', background: 'transparent', cursor: 'pointer', padding: '6px' }}
+                        title="Remove Counselor"
+                      >
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                          <line x1="10" y1="11" x2="10" y2="17" />
+                          <line x1="14" y1="11" x2="14" y2="17" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Creator form */}
+            <div className="dashboard-panel">
+              <h3 className="panel-title mb-4">Add Team Counselor</h3>
+              <form onSubmit={handleAddCounselor}>
+                <div className="form-group">
+                  <label className="form-label">Full Name</label>
+                  <input 
+                    type="text" 
+                    className="form-control" 
+                    required 
+                    placeholder="e.g. Elena Gilbert"
+                    value={cName}
+                    onChange={(e) => setCName(e.target.value)}
+                  />
+                </div>
+                
+                <div className="form-group">
+                  <label className="form-label">Email Address</label>
+                  <input 
+                    type="email" 
+                    className="form-control" 
+                    required 
+                    placeholder="e.g. elena@academy.com"
+                    value={cEmail}
+                    onChange={(e) => setCEmail(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Password</label>
+                  <input 
+                    type="password" 
+                    className="form-control" 
+                    required 
+                    placeholder="Enter password for login"
+                    value={cPassword}
+                    onChange={(e) => setCPassword(e.target.value)}
+                  />
+                </div>
+
+                <div style={{ background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.15)', padding: '10px 14px', borderRadius: 'var(--radius-sm)', fontSize: '11px', color: '#3b82f6', marginTop: '16px' }}>
+                  <strong>🔔 Agent Assignment:</strong> Creating a new counselor automatically registers them inside the CRM. They will immediately become assignable to student inquiries.
+                </div>
+
+                <button type="submit" className="primary-btn mt-4">
+                  Add Counselor Agent
                 </button>
               </form>
             </div>

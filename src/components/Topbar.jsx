@@ -54,11 +54,11 @@ export default function Topbar() {
     const newRole = e.target.value;
     setActiveRole(newRole);
     if (newRole === 'Counselor') {
-      setActiveUser('Elena Gilbert'); //Elena is default Counselor
+      setActiveUser(counselors[0]?.name || 'Maha');
     } else if (newRole === 'Manager') {
-      setActiveUser('Damon Salvatore'); //Damon is default Manager
+      setActiveUser('Irfan');
     } else {
-      setActiveUser('Stefan Salvatore'); //Stefan is Admin
+      setActiveUser('Stefan Salvatore');
     }
   };
 

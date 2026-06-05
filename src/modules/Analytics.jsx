@@ -2,7 +2,7 @@ import React from 'react';
 import { useCRM } from '../context/CRMContext';
 
 export default function Analytics() {
-  const { leads, pipelineStages, activeRole, activeUser } = useCRM();
+  const { leads, pipelineStages, activeRole, activeUser, counselors } = useCRM();
 
   // Filter leads based on counselor permissions
   const visibleLeads = leads.filter(lead => {
@@ -22,10 +22,6 @@ export default function Analytics() {
     !['Converted', 'Closed', 'Not Interested'].includes(l.stage)
   ).length;
 
-  const hotCount = visibleLeads.filter(l => l.priority === 'Hot').length;
-  const warmCount = visibleLeads.filter(l => l.priority === 'Warm').length;
-  const coldCount = visibleLeads.filter(l => l.priority === 'Cold').length;
-
   // 2. Funnel stage calculations
   const getStageCount = (stageName) => visibleLeads.filter(l => l.stage === stageName).length;
   
@@ -40,14 +36,6 @@ export default function Analytics() {
 
   const maxFunnelCount = Math.max(...funnelStages.map(s => s.count), 1);
 
-  // 3. SVG Donut chart circle geometry calculations
-  // Circle radius = 40, Circumference = 2 * PI * 40 = 251.32
-  const totalTemp = (hotCount + warmCount + coldCount) || 1;
-  const hotPct = (hotCount / totalTemp) * 100;
-  const warmPct = (warmCount / totalTemp) * 100;
-  const coldPct = (coldCount / totalTemp) * 100;
-  const dashArrayMax = 251.32;
-
   // 4. Source acquisition statistics
   const sourcesList = ['Meta Ads', 'Google Search', 'Website Form', 'WhatsApp Inbound', 'Walk-in', 'Student Referral'];
   const sourceStats = sourcesList.map(source => {
@@ -57,7 +45,7 @@ export default function Analytics() {
   }).sort((a, b) => b.count - a.count);
 
   // 5. Counselor comparative rankings
-  const counselorsList = ['Elena Gilbert', 'Damon Salvatore', 'Stefan Salvatore'];
+  const counselorsList = counselors ? counselors.map(c => c.name) : ['Maha', 'Irfan'];
   const counselorPerformance = counselorsList.map(name => {
     const counselorLeads = leads.filter(l => l.counselor === name);
     const converted = counselorLeads.filter(l => l.stage === 'Converted').length;
@@ -97,12 +85,6 @@ export default function Analytics() {
             <div style={{ height: '100%', width: `${conversionRate}%`, background: '#10b981' }} />
           </div>
         </div>
-
-        <div className="kpi-card kpi-primary">
-          <span className="kpi-label">High-Priority (Hot)</span>
-          <span className="kpi-value" style={{ color: '#f43f5e' }}>{hotCount} 🔥</span>
-          <span className="kpi-subtext">Leads flagged with hot temperature</span>
-        </div>
       </div>
 
       {/* ==================================================================
@@ -141,105 +123,7 @@ export default function Analytics() {
           </div>
         </div>
 
-        {/* Temperature Donut Chart */}
-        <div className="chart-card" style={{ display: 'flex', flexDirection: 'column' }}>
-          <h3 className="panel-title" style={{ marginBottom: '6px' }}>Inquiries Temperature Ratio</h3>
-          <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '16px' }}>
-            Proportions of Hot (red), Warm (amber), and Cold (blue) leads.
-          </p>
 
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '24px', flex: 1, padding: '10px' }}>
-            {/* SVG Donut Chart */}
-            <div style={{ width: '130px', height: '130px', position: 'relative' }}>
-              <svg width="130" height="130" viewBox="0 0 120 120" style={{ transform: 'rotate(-90deg)', transformOrigin: '60px 60px' }}>
-                {/* Background track circle */}
-                <circle cx="60" cy="60" r="40" fill="transparent" stroke="rgba(0,0,0,0.03)" strokeWidth="12" />
-
-                {/* Cold Segment */}
-                {coldCount > 0 && (
-                  <circle
-                    cx="60"
-                    cy="60"
-                    r="40"
-                    fill="transparent"
-                    stroke="#3b82f6"
-                    strokeWidth="12"
-                    strokeDasharray={`${(coldPct / 100) * dashArrayMax} ${dashArrayMax}`}
-                    strokeDashoffset={`-${((hotPct + warmPct) / 100) * dashArrayMax}`}
-                    strokeLinecap="round"
-                    style={{ transition: 'stroke-dasharray 0.5s ease' }}
-                  />
-                )}
-
-                {/* Warm Segment */}
-                {warmCount > 0 && (
-                  <circle
-                    cx="60"
-                    cy="60"
-                    r="40"
-                    fill="transparent"
-                    stroke="#f59e0b"
-                    strokeWidth="12"
-                    strokeDasharray={`${(warmPct / 100) * dashArrayMax} ${dashArrayMax}`}
-                    strokeDashoffset={`-${(hotPct / 100) * dashArrayMax}`}
-                    strokeLinecap="round"
-                    style={{ transition: 'stroke-dasharray 0.5s ease' }}
-                  />
-                )}
-
-                {/* Hot Segment */}
-                {hotCount > 0 && (
-                  <circle
-                    cx="60"
-                    cy="60"
-                    r="40"
-                    fill="transparent"
-                    stroke="#f43f5e"
-                    strokeWidth="12"
-                    strokeDasharray={`${(hotPct / 100) * dashArrayMax} ${dashArrayMax}`}
-                    strokeDashoffset="0"
-                    strokeLinecap="round"
-                    style={{ transition: 'stroke-dasharray 0.5s ease' }}
-                  />
-                )}
-
-                {/* Center text rotated back to upright */}
-                <g style={{ transform: 'rotate(90deg)', transformOrigin: '60px 60px' }}>
-                  <text x="60" y="56" textAnchor="middle" fill="var(--text-muted)" fontSize="8" fontWeight="700" letterSpacing="0.5">LEADS</text>
-                  <text x="60" y="76" textAnchor="middle" fill="var(--text-primary)" fontSize="18" fontWeight="800">{totalLeads}</text>
-                </g>
-              </svg>
-            </div>
-
-            {/* Custom Interactive Legend */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '11.5px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f43f5e' }} />
-                <span style={{ fontWeight: '600', width: '50px' }}>Hot</span>
-                <span style={{ color: 'var(--text-secondary)', fontWeight: '700' }}>{hotCount}</span>
-                <span style={{ color: 'var(--text-muted)', fontSize: '10px' }}>({totalLeads > 0 ? Math.round(hotPct) : 0}%)</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b' }} />
-                <span style={{ fontWeight: '600', width: '50px' }}>Warm</span>
-                <span style={{ color: 'var(--text-secondary)', fontWeight: '700' }}>{warmCount}</span>
-                <span style={{ color: 'var(--text-muted)', fontSize: '10px' }}>({totalLeads > 0 ? Math.round(warmPct) : 0}%)</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#3b82f6' }} />
-                <span style={{ fontWeight: '600', width: '50px' }}>Cold</span>
-                <span style={{ color: 'var(--text-secondary)', fontWeight: '700' }}>{coldCount}</span>
-                <span style={{ color: 'var(--text-muted)', fontSize: '10px' }}>({totalLeads > 0 ? Math.round(coldPct) : 0}%)</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ==================================================================
-          CHARTS ROW 2: CHANNEL ATTRIBUTION & LEADERBOARD RANKINGS
-          ================================================================== */}
-      <div className="analytics-grid" style={{ marginTop: '20px' }}>
         {/* Acquisition Channel Attribution */}
         <div className="chart-card">
           <h3 className="panel-title" style={{ marginBottom: '6px' }}>Acquisition Channel Attribution</h3>

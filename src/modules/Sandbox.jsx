@@ -24,8 +24,7 @@ export default function Sandbox() {
       phone: sbPhone,
       location: sbLocation,
       course: sbCourse,
-      source: sbSource,
-      priority: 'Hot' // Website submissions are marked Hot by default
+      source: sbSource
     });
 
     setSubmitted(true);

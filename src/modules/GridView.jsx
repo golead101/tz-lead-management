@@ -25,7 +25,7 @@ export default function GridView() {
   const [selectedCourse, setSelectedCourse] = useState('All');
   const [selectedStage, setSelectedStage] = useState('All');
   const [selectedCounselor, setSelectedCounselor] = useState(activeRole === 'Counselor' ? activeUser : 'All');
-  const [selectedPriority, setSelectedPriority] = useState('All');
+  const [selectedSource, setSelectedSource] = useState('All');
 
   // Sorting State
   const [sortBy, setSortBy] = useState('createdDate');
@@ -54,7 +54,18 @@ export default function GridView() {
     if (selectedCourse !== 'All' && lead.course !== selectedCourse) return false;
     if (selectedStage !== 'All' && lead.stage !== selectedStage) return false;
     if (selectedCounselor !== 'All' && lead.counselor !== selectedCounselor) return false;
-    if (selectedPriority !== 'All' && lead.priority !== selectedPriority) return false;
+    if (selectedSource !== 'All') {
+      const srcLower = (lead.source || '').toLowerCase();
+      if (selectedSource === 'Meta') {
+        if (!srcLower.includes('meta')) return false;
+      } else if (selectedSource === 'Google Ads') {
+        if (!srcLower.includes('google')) return false;
+      } else if (selectedSource === 'Website') {
+        if (!srcLower.includes('website')) return false;
+      } else {
+        if (lead.source !== selectedSource) return false;
+      }
+    }
 
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -162,8 +173,7 @@ export default function GridView() {
           course: course || courses[0]?.name,
           source: source || 'CSV Import',
           counselor: activeUser,
-          stage: 'New Lead',
-          priority: 'Warm'
+          stage: 'New Lead'
         });
         addedCount++;
       }
@@ -194,9 +204,8 @@ export default function GridView() {
 
   // Quick stats
   const totalAll = leads.filter(l => activeRole !== 'Counselor' || l.counselor === activeUser).length;
-  const hotCount = filteredLeads.filter(l => l.priority === 'Hot').length;
   const convertedCount = filteredLeads.filter(l => l.stage === 'Converted').length;
-  const activeFiltersCount = [selectedCourse, selectedStage, selectedCounselor, selectedPriority].filter(f => f !== 'All').length;
+  const activeFiltersCount = [selectedCourse, selectedStage, selectedCounselor, selectedSource].filter(f => f !== 'All').length;
 
   // Get relative time string
   const getRelativeTime = (dateStr) => {
@@ -208,13 +217,6 @@ export default function GridView() {
     const days = Math.floor(hours / 24);
     if (days < 7) return `${days}d ago`;
     return new Date(dateStr).toLocaleDateString([], { month: 'short', day: 'numeric' });
-  };
-
-  // Priority config
-  const priorityConfig = {
-    Hot: { icon: '🔥', color: '#ef4444', bg: 'rgba(239,68,68,0.08)' },
-    Warm: { icon: '☀️', color: '#d97706', bg: 'rgba(217,119,6,0.08)' },
-    Cold: { icon: '❄️', color: '#3b82f6', bg: 'rgba(59,130,246,0.08)' }
   };
 
   // Generate page numbers for pagination
@@ -264,12 +266,7 @@ export default function GridView() {
             {filteredLeads.length === totalAll ? 'Total Leads' : `of ${totalAll} Leads`}
           </span>
         </div>
-        <div className="gv-stat-divider" />
-        <div className="gv-stat-chip">
-          <span className="gv-stat-dot" style={{ background: '#ef4444' }} />
-          <span className="gv-stat-number" style={{ color: '#ef4444' }}>{hotCount}</span>
-          <span className="gv-stat-label">Hot</span>
-        </div>
+
         <div className="gv-stat-chip">
           <span className="gv-stat-dot" style={{ background: '#059669' }} />
           <span className="gv-stat-number" style={{ color: '#059669' }}>{convertedCount}</span>
@@ -281,7 +278,7 @@ export default function GridView() {
             <span style={{ color: 'var(--primary)', fontWeight: 600 }}>{activeFiltersCount} filter{activeFiltersCount > 1 ? 's' : ''} active</span>
             <button
               className="gv-clear-filters"
-              onClick={() => { setSelectedCourse('All'); setSelectedStage('All'); setSelectedCounselor('All'); setSelectedPriority('All'); setCurrentPage(1); }}
+              onClick={() => { setSelectedCourse('All'); setSelectedStage('All'); setSelectedCounselor('All'); setSelectedSource('All'); setCurrentPage(1); }}
             >Clear</button>
           </div>
         )}
@@ -344,18 +341,18 @@ export default function GridView() {
 
         <div className="gv-filter-group">
           <label className="gv-filter-label">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-            Priority
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            Source
           </label>
           <select
-            value={selectedPriority}
-            onChange={(e) => { setSelectedPriority(e.target.value); setCurrentPage(1); }}
+            value={selectedSource}
+            onChange={(e) => { setSelectedSource(e.target.value); setCurrentPage(1); }}
             className="gv-filter-select"
           >
-            <option value="All">All Priorities</option>
-            <option value="Hot">🔥 Hot</option>
-            <option value="Warm">☀️ Warm</option>
-            <option value="Cold">❄️ Cold</option>
+            <option value="All">All Sources</option>
+            <option value="Meta">Meta</option>
+            <option value="Google Ads">Google Ads</option>
+            <option value="Website">Website</option>
           </select>
         </div>
       </div>
@@ -436,10 +433,6 @@ export default function GridView() {
                   <span>Status</span>
                   <span className="gv-sort-icon">{getSortIcon('stage')}</span>
                 </th>
-                <th className="gv-th-sortable" onClick={() => handleSort('priority')}>
-                  <span>Priority</span>
-                  <span className="gv-sort-icon">{getSortIcon('priority')}</span>
-                </th>
                 <th className="gv-th-sortable" onClick={() => handleSort('source')}>
                   <span>Source</span>
                   <span className="gv-sort-icon">{getSortIcon('source')}</span>
@@ -458,7 +451,7 @@ export default function GridView() {
             <tbody>
               {paginatedLeads.length === 0 ? (
                 <tr>
-                  <td colSpan="9">
+                  <td colSpan="8">
                     <div className="gv-empty-state">
                       <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="1.2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 3a4 4 0 100 8 4 4 0 000-8z"/></svg>
                       <h4>No leads found</h4>
@@ -469,7 +462,6 @@ export default function GridView() {
               ) : (
                 paginatedLeads.map((lead, idx) => {
                   const isChecked = selectedIds.includes(lead.id);
-                  const pc = priorityConfig[lead.priority] || priorityConfig.Warm;
                   const isOverdue = lead.followupDate && new Date(lead.followupDate) < new Date();
 
                   return (
@@ -514,14 +506,6 @@ export default function GridView() {
                       <td>
                         <span className={`gv-status-badge status-${lead.stage.toLowerCase().replace(/ /g, '-')}`}>
                           {lead.stage}
-                        </span>
-                      </td>
-
-                      {/* Priority */}
-                      <td>
-                        <span className="gv-priority-pill" style={{ background: pc.bg, color: pc.color }}>
-                          <span>{pc.icon}</span>
-                          {lead.priority}
                         </span>
                       </td>
 
