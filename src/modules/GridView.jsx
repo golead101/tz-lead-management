@@ -14,6 +14,7 @@ export default function GridView() {
     bulkUpdateStage,
     addLead,
     searchQuery,
+    selectedLeadId,
     setSelectedLeadId,
     setActiveView,
     showToastMsg,
@@ -659,7 +660,7 @@ export default function GridView() {
       {/* ──────────── LEAD DETAIL MODAL ──────────── */}
       {showDetailModal && (
         <div className="lead-detail-modal-overlay" onClick={() => { setSelectedLeadId(null); setShowDetailModal(false); }}>
-          <div className="lead-detail-modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="lead-detail-modal-content" style={{ maxWidth: '600px' }} onClick={(e) => e.stopPropagation()}>
             <button 
               type="button" 
               className="lead-detail-modal-close" 
