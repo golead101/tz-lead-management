@@ -107,7 +107,6 @@ export default function Integrations() {
           education: 'Undergraduate',
           course: 'Full-Stack Web Development',
           source: 'Meta Ads',
-          priority: 'Hot',
           stage: 'New Lead',
           customFields: {}
         };
@@ -125,7 +124,6 @@ export default function Integrations() {
           education: 'Graduate',
           course: 'Data Science & Artificial Intelligence',
           source: 'Google Search',
-          priority: 'Hot',
           stage: 'New Lead',
           customFields: {}
         };
@@ -143,7 +141,6 @@ export default function Integrations() {
           education: 'Working Professional',
           course: 'UI/UX Product Design',
           source: 'WhatsApp Inbound',
-          priority: 'Warm',
           stage: 'New Lead',
           customFields: {}
         };
@@ -161,7 +158,6 @@ export default function Integrations() {
           education: 'Final Year BCA',
           course: 'Cyber Security & Ethical Hacking',
           source: 'Website Form',
-          priority: 'Hot',
           stage: 'New Lead',
           customFields: {}
         };
@@ -209,7 +205,6 @@ exports.captureGoogleAdsLead = functions.https.onRequest(async (req, res) => {
       phone: columns.find(c => c.column_id === 'PHONE_NUMBER')?.string_value || '',
       course: 'Data Science & Artificial Intelligence',
       source: 'Google Ads',
-      priority: 'Hot',
       createdDate: new Date().toISOString(),
       stage: 'New Lead',
       timeline: [{
@@ -281,7 +276,6 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
           phone: fields.phone_number || '',
           source: 'Meta Ads',
           course: 'Full-Stack Web Development',
-          priority: 'Hot',
           createdDate: new Date().toISOString(),
           stage: 'New Lead',
           timeline: [{
@@ -475,8 +469,8 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
               <div className="db-source-icon-wrap whatsapp" style={{ width: '42px', height: '42px' }}>
-                <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
-                  <path d="M12.012 2c-5.506 0-9.988 4.482-9.988 9.988 0 1.758.459 3.475 1.332 4.988L2 22l5.148-1.351a9.92 9.92 0 0 0 4.864 1.263h.005c5.502 0 9.985-4.482 9.985-9.988C22 6.482 17.518 2 12.012 2zm6.985 14.156c-.287.808-1.442 1.48-1.996 1.583-.497.094-1.127.151-3.238-.724-2.699-1.118-4.42-3.861-4.554-4.041-.135-.179-1.094-1.455-1.094-2.776 0-1.321.696-1.968.966-2.238.27-.27.584-.337.785-.337.202 0 .404.004.584.012.187.008.438-.072.686.526.254.61.87 2.122.946 2.274.075.152.126.331.025.531-.101.2-.152.33-.3.504-.15.174-.316.388-.451.52-.152.149-.311.312-.134.615.176.302.784 1.293 1.684 2.094.757.674 1.397.881 1.734 1.05.337.169.539.141.741-.093.202-.234.87-1.012 1.106-1.36.236-.348.472-.292.798-.174.326.118 2.072 1.002 2.426 1.183.354.181.59.27.674.417.085.147.085.852-.202 1.66z" />
+                <svg viewBox="0 0 16 16" fill="currentColor" width="20" height="20">
+                  <path d="M13.601 2.326A7.85 7.85 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.9 7.9 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.9 7.9 0 0 0 13.6 2.326zM7.994 14.521a6.6 6.6 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.56 6.56 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592m3.615-4.934c-.197-.099-1.17-.578-1.353-.646-.182-.065-.315-.099-.445.099-.133.197-.513.646-.627.775-.114.133-.232.148-.43.05-.197-.1-.836-.308-1.592-.985-.59-.525-.985-1.175-1.103-1.372-.114-.198-.011-.304.088-.403.087-.088.197-.232.296-.346.1-.114.133-.198.198-.33.065-.134.034-.248-.015-.347-.05-.099-.445-1.076-.612-1.47-.16-.389-.323-.335-.445-.34-.114-.007-.247-.007-.38-.007a.73.73 0 0 0-.529.247c-.182.198-.691.677-.691 1.654s.71 1.916.81 2.049c.098.133 1.394 2.132 3.383 2.992.47.205.84.326 1.129.418.475.152.904.129 1.246.08.38-.058 1.171-.48 1.338-.943.164-.464.164-.86.114-.943-.049-.084-.182-.133-.38-.232" />
                 </svg>
               </div>
               

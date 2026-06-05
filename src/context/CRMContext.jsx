@@ -23,11 +23,7 @@ const DEFAULT_STAGES = [
   { id: 'st-closed', name: 'Closed', color: '--color-closed', description: 'No further action' }
 ];
 
-const DEFAULT_CUSTOM_FIELDS = [
-  { id: 'cf-blood', name: 'Blood Group', type: 'select', options: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'], required: false },
-  { id: 'cf-transport', name: 'Transport Required', type: 'select', options: ['Yes', 'No'], required: false },
-  { id: 'cf-prior-coding', name: 'Prior Coding Experience', type: 'select', options: ['None', 'Basic', 'Intermediate', 'Professional'], required: false }
-];
+const DEFAULT_CUSTOM_FIELDS = [];
 
 const DEFAULT_BRANDING = {
   instituteName: 'TechZone Academy',
@@ -90,12 +86,11 @@ const DEFAULT_INTEGRATIONS = {
 };
 
 const DEFAULT_COUNSELORS = [
-  { id: 'coun-elena', name: 'Elena Gilbert', email: 'elena@academy.com', role: 'Counselor' },
-  { id: 'coun-damon', name: 'Damon Salvatore', email: 'damon@academy.com', role: 'Counselor' },
-  { id: 'coun-stefan', name: 'Stefan Salvatore', email: 'stefan@academy.com', role: 'Counselor' }
+  { id: 'coun-maha', name: 'Maha', email: 'maha@academy.com', password: 'maha123', role: 'Counselor' },
+  { id: 'coun-irfan', name: 'Irfan', email: 'irfan@academy.com', password: 'irfan123', role: 'Counselor' }
 ];
 
-// Rich Seed Data of 15 Leads
+// Rich Seed Data of 12 Leads
 const SEED_LEADS = [
   {
     id: 'lead-1',
@@ -106,12 +101,11 @@ const SEED_LEADS = [
     education: 'Final Year B.Tech',
     course: 'Full-Stack Web Development',
     source: 'Meta Ads',
-    counselor: 'Elena Gilbert',
+    counselor: 'Maha',
     stage: 'New Lead',
-    priority: 'Hot',
     createdDate: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
     lastContacted: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    customFields: { 'cf-blood': 'O+', 'cf-transport': 'Yes', 'cf-prior-coding': 'None' },
+    customFields: {},
     timeline: [
       { id: 'log-1-1', type: 'system', title: 'Lead Captured', content: 'Lead created automatically via Facebook Lead Ads webhook.', timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), user: 'System' }
     ],
@@ -128,15 +122,14 @@ const SEED_LEADS = [
     education: 'Graduate (B.Sc Computer Science)',
     course: 'Data Science & Artificial Intelligence',
     source: 'Google Search',
-    counselor: 'Damon Salvatore',
+    counselor: 'Irfan',
     stage: 'New Lead',
-    priority: 'Warm',
     createdDate: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // 1 day ago
     lastContacted: new Date(Date.now() - 18 * 60 * 60 * 1000).toISOString(),
-    customFields: { 'cf-blood': 'A+', 'cf-transport': 'No', 'cf-prior-coding': 'Basic' },
+    customFields: {},
     timeline: [
       { id: 'log-2-1', type: 'system', title: 'Lead Captured', content: 'Form submission completed via website contact page.', timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), user: 'System' },
-      { id: 'log-2-2', type: 'call', title: 'Outbound Call - Connected', content: 'Spoke with Neha. She wants to shift careers from general science to AI. Sent details and course brochure to her email.', timestamp: new Date(Date.now() - 18 * 60 * 60 * 1000).toISOString(), user: 'Damon Salvatore' }
+      { id: 'log-2-2', type: 'call', title: 'Outbound Call - Connected', content: 'Spoke with Neha. She wants to shift careers from general science to AI. Sent details and course brochure to her email.', timestamp: new Date(Date.now() - 18 * 60 * 60 * 1000).toISOString(), user: 'Irfan' }
     ],
     whatsappMessages: [
       { id: 'msg-2-1', sender: 'counselor', text: 'Hello Neha! Thank you for inquiring about our Data Science & AI program. Here is our detailed brochure.', time: '02:30 PM' },
@@ -152,16 +145,15 @@ const SEED_LEADS = [
     education: 'Working Professional (Sales)',
     course: 'UI/UX Product Design',
     source: 'Website Form',
-    counselor: 'Elena Gilbert',
+    counselor: 'Maha',
     stage: 'New Lead',
-    priority: 'Hot',
     createdDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
     lastContacted: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
-    customFields: { 'cf-blood': 'B+', 'cf-transport': 'No', 'cf-prior-coding': 'None' },
+    customFields: {},
     timeline: [
       { id: 'log-3-1', type: 'system', title: 'Lead Captured', content: 'Google Landing Page form inquiry received.', timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), user: 'System' },
-      { id: 'log-3-2', type: 'call', title: 'Intro Call - Interested', content: 'Highly enthusiastic about UI/UX. Currently in digital sales, wants to shift to design. Discussed fees and batches.', timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), user: 'Elena Gilbert' },
-      { id: 'log-3-3', type: 'whatsapp', title: 'WhatsApp Sent', content: 'Sent Figma syllabus presentation link via WhatsApp.', timestamp: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(), user: 'Elena Gilbert' }
+      { id: 'log-3-2', type: 'call', title: 'Intro Call - Interested', content: 'Highly enthusiastic about UI/UX. Currently in digital sales, wants to shift to design. Discussed fees and batches.', timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), user: 'Maha' },
+      { id: 'log-3-3', type: 'whatsapp', title: 'WhatsApp Sent', content: 'Sent Figma syllabus presentation link via WhatsApp.', timestamp: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(), user: 'Maha' }
     ],
     whatsappMessages: [
       { id: 'msg-3-1', sender: 'counselor', text: 'Hey Rahul, as discussed on call, here is the syllabus layout for UI/UX. Let me know what you think!', time: '11:15 AM' },
@@ -178,15 +170,14 @@ const SEED_LEADS = [
     education: '12th Standard Completed',
     course: 'Full-Stack Web Development',
     source: 'Walk-in',
-    counselor: 'Stefan Salvatore',
+    counselor: 'Maha',
     stage: 'New Lead',
-    priority: 'Hot',
     createdDate: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
     lastContacted: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-    customFields: { 'cf-blood': 'O-', 'cf-transport': 'Yes', 'cf-prior-coding': 'Basic' },
+    customFields: {},
     timeline: [
-      { id: 'log-4-1', type: 'system', title: 'Walk-In Profile Created', content: 'Sneha visited the institute location with her parents.', timestamp: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(), user: 'Stefan Salvatore' },
-      { id: 'log-4-2', type: 'demo', title: 'Demo Classroom Scheduled', content: 'Scheduled demo session for Web Dev on Tuesday at 4:00 PM.', timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), user: 'Stefan Salvatore' }
+      { id: 'log-4-1', type: 'system', title: 'Walk-In Profile Created', content: 'Sneha visited the institute location with her parents.', timestamp: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(), user: 'Maha' },
+      { id: 'log-4-2', type: 'demo', title: 'Demo Classroom Scheduled', content: 'Scheduled demo session for Web Dev on Tuesday at 4:00 PM.', timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), user: 'Maha' }
     ],
     whatsappMessages: []
   },
@@ -199,15 +190,14 @@ const SEED_LEADS = [
     education: 'BBA Completed',
     course: 'Digital Marketing',
     source: 'Student Referral',
-    counselor: 'Elena Gilbert',
+    counselor: 'Maha',
     stage: 'New Lead',
-    priority: 'Warm',
     createdDate: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(),
     lastContacted: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    customFields: { 'cf-blood': 'AB+', 'cf-transport': 'No', 'cf-prior-coding': 'None' },
+    customFields: {},
     timeline: [
       { id: 'log-5-1', type: 'system', title: 'Referred Lead Logged', content: 'Referred by active student Rohan Malhotra.', timestamp: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(), user: 'System' },
-      { id: 'log-5-2', type: 'demo', title: 'Demo Classroom Attended', content: 'Attended the Digital Marketing SEO overview class. Feedback was excellent.', timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), user: 'Elena Gilbert' }
+      { id: 'log-5-2', type: 'demo', title: 'Demo Classroom Attended', content: 'Attended the Digital Marketing SEO overview class. Feedback was excellent.', timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), user: 'Maha' }
     ],
     whatsappMessages: []
   },
@@ -220,15 +210,14 @@ const SEED_LEADS = [
     education: 'Final Year BCA',
     course: 'Cyber Security & Ethical Hacking',
     source: 'Google Search',
-    counselor: 'Damon Salvatore',
+    counselor: 'Irfan',
     stage: 'New Lead',
-    priority: 'Warm',
     createdDate: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(),
     lastContacted: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-    customFields: { 'cf-blood': 'A-', 'cf-transport': 'No', 'cf-prior-coding': 'Intermediate' },
+    customFields: {},
     timeline: [
       { id: 'log-6-1', type: 'system', title: 'Lead Captured', content: 'Form submission completed via website contact page.', timestamp: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(), user: 'System' },
-      { id: 'log-6-2', type: 'call', title: 'Intro Call - Connected', content: 'Discussed Ethical Hacking career path. Ananya wants to enroll but has exams until the end of the month. Requested a call back next Monday.', timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), user: 'Damon Salvatore' }
+      { id: 'log-6-2', type: 'call', title: 'Intro Call - Connected', content: 'Discussed Ethical Hacking career path. Ananya wants to enroll but has exams until the end of the month. Requested a call back next Monday.', timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), user: 'Irfan' }
     ],
     whatsappMessages: [],
     followupDate: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(), // 1 hour ago (OVERDUE!)
@@ -243,16 +232,15 @@ const SEED_LEADS = [
     education: 'B.Tech Graduate',
     course: 'Cloud & DevOps Engineering',
     source: 'Meta Ads',
-    counselor: 'Stefan Salvatore',
+    counselor: 'Maha',
     stage: 'Converted',
-    priority: 'Hot',
     createdDate: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
     lastContacted: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-    customFields: { 'cf-blood': 'B-', 'cf-transport': 'No', 'cf-prior-coding': 'Intermediate' },
+    customFields: {},
     timeline: [
       { id: 'log-7-1', type: 'system', title: 'Lead Captured', content: 'Instagram Lead Form inquiry.', timestamp: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(), user: 'System' },
-      { id: 'log-7-2', type: 'call', title: 'Discussed AWS Path', content: 'Highly focused on AWS/Kubernetes. Eager to join immediate batch.', timestamp: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).toISOString(), user: 'Stefan Salvatore' },
-      { id: 'log-7-3', type: 'demo', title: 'Demo Classroom Attended', content: 'Attended the Docker live seminar.', timestamp: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(), user: 'Stefan Salvatore' },
+      { id: 'log-7-2', type: 'call', title: 'Discussed AWS Path', content: 'Highly focused on AWS/Kubernetes. Eager to join immediate batch.', timestamp: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).toISOString(), user: 'Maha' },
+      { id: 'log-7-3', type: 'demo', title: 'Demo Classroom Attended', content: 'Attended the Docker live seminar.', timestamp: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(), user: 'Maha' },
       { id: 'log-7-4', type: 'system', title: 'Fees Paid - Converted', content: 'Paid booking amount of ₹25,000. Registration generated.', timestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), user: 'System' }
     ],
     whatsappMessages: []
@@ -266,15 +254,14 @@ const SEED_LEADS = [
     education: 'B.Com Completed',
     course: 'Digital Marketing',
     source: 'Walk-in',
-    counselor: 'Elena Gilbert',
+    counselor: 'Maha',
     stage: 'Not Interested',
-    priority: 'Cold',
     createdDate: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
     lastContacted: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(),
-    customFields: { 'cf-blood': 'O+', 'cf-transport': 'No', 'cf-prior-coding': 'None' },
+    customFields: {},
     timeline: [
-      { id: 'log-8-1', type: 'system', title: 'In-person Entry Created', content: 'Manual Walk-In card logged.', timestamp: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(), user: 'Elena Gilbert' },
-      { id: 'log-8-2', type: 'call', title: 'Follow-up Call - Declined', content: 'She decided to pursue an MBA in marketing instead of a diploma course. Marked as Not Interested.', timestamp: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(), user: 'Elena Gilbert' }
+      { id: 'log-8-1', type: 'system', title: 'In-person Entry Created', content: 'Manual Walk-In card logged.', timestamp: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(), user: 'Maha' },
+      { id: 'log-8-2', type: 'call', title: 'Follow-up Call - Declined', content: 'She decided to pursue an MBA in marketing instead of a diploma course. Marked as Not Interested.', timestamp: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(), user: 'Maha' }
     ],
     whatsappMessages: []
   },
@@ -287,15 +274,14 @@ const SEED_LEADS = [
     education: 'Working Professional (HR)',
     course: 'UI/UX Product Design',
     source: 'Meta Ads',
-    counselor: 'Damon Salvatore',
+    counselor: 'Irfan',
     stage: 'Interested',
-    priority: 'Warm',
     createdDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
     lastContacted: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-    customFields: { 'cf-blood': 'AB-', 'cf-transport': 'No', 'cf-prior-coding': 'None' },
+    customFields: {},
     timeline: [
       { id: 'log-9-1', type: 'system', title: 'Lead Captured', content: 'Facebook inquiry details synced.', timestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), user: 'System' },
-      { id: 'log-9-2', type: 'call', title: 'Call Connected', content: 'Karan is curious about shifting to UX research. Sent curriculum link.', timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), user: 'Damon Salvatore' }
+      { id: 'log-9-2', type: 'call', title: 'Call Connected', content: 'Karan is curious about shifting to UX research. Sent curriculum link.', timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), user: 'Irfan' }
     ],
     whatsappMessages: []
   },
@@ -308,15 +294,14 @@ const SEED_LEADS = [
     education: 'B.Sc Graduate',
     course: 'Data Science & Artificial Intelligence',
     source: 'Website Form',
-    counselor: 'Stefan Salvatore',
+    counselor: 'Maha',
     stage: 'Demo Scheduled',
-    priority: 'Hot',
     createdDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
     lastContacted: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-    customFields: { 'cf-blood': 'O+', 'cf-transport': 'Yes', 'cf-prior-coding': 'None' },
+    customFields: {},
     timeline: [
       { id: 'log-10-1', type: 'system', title: 'Lead Captured', content: 'Landing Page submission.', timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), user: 'System' },
-      { id: 'log-10-2', type: 'demo', title: 'Demo Classroom Scheduled', content: 'Demo scheduled for today at 5:30 PM.', timestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), user: 'Stefan Salvatore' }
+      { id: 'log-10-2', type: 'demo', title: 'Demo Classroom Scheduled', content: 'Demo scheduled for today at 5:30 PM.', timestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), user: 'Maha' }
     ],
     whatsappMessages: []
   },
@@ -329,12 +314,11 @@ const SEED_LEADS = [
     education: 'Working Professional (Admin)',
     course: 'Cyber Security & Ethical Hacking',
     source: 'Student Referral',
-    counselor: 'Elena Gilbert',
+    counselor: 'Maha',
     stage: 'Follow-up Pending',
-    priority: 'Hot',
     createdDate: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).toISOString(),
     lastContacted: new Date(Date.now() - 4 * 60 * 1000).toISOString(),
-    customFields: { 'cf-blood': 'B+', 'cf-transport': 'No', 'cf-prior-coding': 'Basic' },
+    customFields: {},
     timeline: [
       { id: 'log-11-1', type: 'system', title: 'Lead Captured', content: 'Logged as referral.', timestamp: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).toISOString(), user: 'System' }
     ],
@@ -351,12 +335,11 @@ const SEED_LEADS = [
     education: 'Final Year B.Tech IT',
     course: 'Full-Stack Web Development',
     source: 'Google Search',
-    counselor: 'Stefan Salvatore',
+    counselor: 'Irfan',
     stage: 'Converted',
-    priority: 'Hot',
     createdDate: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
     lastContacted: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-    customFields: { 'cf-blood': 'A+', 'cf-transport': 'No', 'cf-prior-coding': 'Intermediate' },
+    customFields: {},
     timeline: [
       { id: 'log-12-1', type: 'system', title: 'Lead Created', content: 'Search lead.', timestamp: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(), user: 'System' },
       { id: 'log-12-2', type: 'system', title: 'Full Fees Paid', content: 'Paid full admission amount ₹75,000. Registration completed.', timestamp: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(), user: 'System' }
@@ -368,9 +351,9 @@ const SEED_LEADS = [
 export const CRMProvider = ({ children }) => {
   // Database States
   const [leads, setLeads] = useState(() => {
-    const hasResetSeeds = localStorage.getItem('crm_leads_seed_reset_v4');
+    const hasResetSeeds = localStorage.getItem('crm_leads_seed_reset_v7');
     if (!hasResetSeeds) {
-      localStorage.setItem('crm_leads_seed_reset_v4', 'true');
+      localStorage.setItem('crm_leads_seed_reset_v7', 'true');
       localStorage.setItem('crm_leads', JSON.stringify(SEED_LEADS));
       return SEED_LEADS;
     }
@@ -389,7 +372,7 @@ export const CRMProvider = ({ children }) => {
   });
 
   const [customFields, setCustomFields] = useState(() => {
-    const local = localStorage.getItem('crm_custom_fields');
+    const local = localStorage.getItem('crm_custom_fields_v2');
     return local ? JSON.parse(local) : DEFAULT_CUSTOM_FIELDS;
   });
 
@@ -407,6 +390,11 @@ export const CRMProvider = ({ children }) => {
     return local ? JSON.parse(local) : DEFAULT_INTEGRATIONS;
   });
 
+  const [counselors, setCounselors] = useState(() => {
+    const local = localStorage.getItem('crm_counselors');
+    return local ? JSON.parse(local) : DEFAULT_COUNSELORS;
+  });
+
   // Global Session Roles
   const [activeRole, setActiveRole] = useState(() => {
     const local = localStorage.getItem('crm_active_role');
@@ -415,7 +403,11 @@ export const CRMProvider = ({ children }) => {
 
   const [activeUser, setActiveUser] = useState(() => {
     const local = localStorage.getItem('crm_active_user');
-    return local ? JSON.parse(local) : 'Elena Gilbert'; // Matches seed counselor
+    const parsed = local ? JSON.parse(local) : 'Maha';
+    if (parsed === 'Elena Gilbert' || parsed === 'Damon Salvatore') {
+      return 'Maha';
+    }
+    return parsed;
   });
 
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
@@ -433,21 +425,36 @@ export const CRMProvider = ({ children }) => {
         showToastMsg('Logged in as Admin: Stefan Salvatore', 'success');
         return true;
       }
-    } else if (formattedEmail === 'manager' || formattedEmail === 'damon@academy.com') {
-      if (password === 'manager' || password === 'damon123') {
+    } else if (formattedEmail === 'manager' || formattedEmail === 'damon@academy.com' || formattedEmail === 'irfan@academy.com') {
+      if (password === 'manager' || password === 'damon123' || password === 'irfan123') {
         setActiveRole('Manager');
-        setActiveUser('Damon Salvatore');
+        setActiveUser('Irfan');
         setIsLoggedIn(true);
-        showToastMsg('Logged in as Manager: Damon Salvatore', 'success');
+        showToastMsg('Logged in as Manager: Irfan', 'success');
         return true;
       }
-    } else if (formattedEmail === 'counselor' || formattedEmail === 'elena@academy.com') {
-      if (password === 'counselor' || password === 'elena123') {
-        setActiveRole('Counselor');
-        setActiveUser('Elena Gilbert');
-        setIsLoggedIn(true);
-        showToastMsg('Logged in as Counselor: Elena Gilbert', 'success');
-        return true;
+    } else {
+      // Dynamic counselor lookup
+      const foundCounselor = counselors.find(c => c.email.toLowerCase() === formattedEmail);
+      if (foundCounselor) {
+        if (password === foundCounselor.password || password.toLowerCase() === 'counselor' || password.toLowerCase() === `${foundCounselor.name.split(' ')[0].toLowerCase()}123`) {
+          setActiveRole('Counselor');
+          setActiveUser(foundCounselor.name);
+          setIsLoggedIn(true);
+          showToastMsg(`Logged in as Counselor: ${foundCounselor.name}`, 'success');
+          return true;
+        }
+      }
+      
+      // Fallback static accounts
+      if (formattedEmail === 'counselor' || formattedEmail === 'elena@academy.com' || formattedEmail === 'maha@academy.com') {
+        if (password === 'counselor' || password === 'elena123' || password === 'maha123') {
+          setActiveRole('Counselor');
+          setActiveUser('Maha');
+          setIsLoggedIn(true);
+          showToastMsg('Logged in as Counselor: Maha', 'success');
+          return true;
+        }
       }
     }
     return false;
@@ -499,7 +506,7 @@ export const CRMProvider = ({ children }) => {
   }, [pipelineStages]);
 
   useEffect(() => {
-    localStorage.setItem('crm_custom_fields', JSON.stringify(customFields));
+    localStorage.setItem('crm_custom_fields_v2', JSON.stringify(customFields));
   }, [customFields]);
 
   useEffect(() => {
@@ -510,6 +517,10 @@ export const CRMProvider = ({ children }) => {
   useEffect(() => {
     localStorage.setItem('crm_integrations', JSON.stringify(integrations));
   }, [integrations]);
+
+  useEffect(() => {
+    localStorage.setItem('crm_counselors', JSON.stringify(counselors));
+  }, [counselors]);
 
   useEffect(() => {
     localStorage.setItem('crm_active_role', JSON.stringify(activeRole));
@@ -594,7 +605,6 @@ export const CRMProvider = ({ children }) => {
       source: leadData.source || 'Website Form',
       counselor: leadData.counselor || activeUser,
       stage: leadData.stage || 'New Lead',
-      priority: leadData.priority || 'Warm',
       createdDate: new Date().toISOString(),
       lastContacted: new Date().toISOString(),
       customFields: leadData.customFields || {},
@@ -1091,6 +1101,28 @@ export const CRMProvider = ({ children }) => {
     showToastMsg(`Pipeline stage "${stageData.name}" created!`);
   };
 
+  // Counselor Adder
+  const addCounselor = (counselorData) => {
+    const name = counselorData.name.trim();
+    const email = counselorData.email ? counselorData.email.trim() : `${name.toLowerCase().replace(/ /g, '.')}@academy.com`;
+    const password = counselorData.password ? counselorData.password.trim() : 'counselor';
+    const newCounselor = {
+      id: `coun-${Date.now()}`,
+      name: name,
+      email: email,
+      password: password,
+      role: 'Counselor'
+    };
+    setCounselors(prev => [...prev, newCounselor]);
+    showToastMsg(`Counselor "${name}" added successfully.`);
+  };
+
+  // Counselor Remover
+  const removeCounselor = (counselorId) => {
+    setCounselors(prev => prev.filter(c => c.id !== counselorId));
+    showToastMsg('Counselor removed successfully.', 'error');
+  };
+
   // Clear Notifications
   const clearNotifications = () => {
     setNotifications([]);
@@ -1138,7 +1170,9 @@ export const CRMProvider = ({ children }) => {
       searchQuery,
       showDetailModal,
       toast,
-      counselors: DEFAULT_COUNSELORS,
+      counselors,
+      addCounselor,
+      removeCounselor,
       
       login,
       logout,

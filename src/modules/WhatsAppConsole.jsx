@@ -173,7 +173,6 @@ export default function WhatsAppConsole() {
                   <h4 className="chat-pane-title">{activeLead.name}</h4>
                   <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{activeLead.phone} | Assigned: {activeLead.counselor}</span>
                 </div>
-                <div className="chat-pane-badge">{activeLead.priority} Lead</div>
               </div>
 
               {/* Chat message bubbles stream */}

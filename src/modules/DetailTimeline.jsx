@@ -57,7 +57,6 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
   const [formSource, setFormSource] = useState(lead ? lead.source : 'Walk-in');
   const [formCounselor, setFormCounselor] = useState(lead ? lead.counselor : activeUser);
   const [formStage, setFormStage] = useState(lead ? lead.stage : 'New Lead');
-  const [formPriority, setFormPriority] = useState(lead ? lead.priority : 'Warm');
   
   // Custom Fields form data
   const [formCustomFields, setFormCustomFields] = useState(() => {
@@ -116,7 +115,6 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
       setFormSource(lead.source);
       setFormCounselor(lead.counselor);
       setFormStage(lead.stage);
-      setFormPriority(lead.priority);
       setFormCustomFields(lead.customFields || {});
       setIsEditMode(false);
     } else {
@@ -129,7 +127,6 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
       setFormSource('Walk-in');
       setFormCounselor(activeUser);
       setFormStage('New Lead');
-      setFormPriority('Warm');
       setFormCustomFields({});
       setIsEditMode(true);
     }
@@ -148,7 +145,6 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
       source: formSource,
       counselor: formCounselor,
       stage: formStage,
-      priority: formPriority,
       customFields: formCustomFields
     };
 
@@ -255,9 +251,6 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
                 <div className="profile-meta-chips">
                   <span className={`status-badge status-${lead.stage.toLowerCase().replace(/ /g, '-')}`}>
                     {lead.stage}
-                  </span>
-                  <span className={`card-priority-badge priority-${lead.priority.toLowerCase()}`}>
-                    {lead.priority}
                   </span>
                 </div>
               </div>
@@ -423,16 +416,7 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
                 />
               </div>
 
-              <div className="form-group">
-                <label className="form-label">Email Address</label>
-                <input 
-                  type="email" 
-                  className="form-control" 
-                  required
-                  value={formEmail}
-                  onChange={(e) => setFormEmail(e.target.value)}
-                />
-              </div>
+
 
               <div className="form-group">
                 <label className="form-label">Phone Number</label>
@@ -445,15 +429,7 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
                 />
               </div>
 
-              <div className="form-group">
-                <label className="form-label">Current City</label>
-                <input 
-                  type="text" 
-                  className="form-control" 
-                  value={formLocation}
-                  onChange={(e) => setFormLocation(e.target.value)}
-                />
-              </div>
+
 
               <div className="form-group">
                 <label className="form-label">Education/Experience</label>
@@ -506,29 +482,15 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
                 </div>
               )}
 
-              <div className="form-group two-col">
-                <div>
-                  <label className="form-label">Priority</label>
-                  <select 
-                    className="form-control"
-                    value={formPriority}
-                    onChange={(e) => setFormPriority(e.target.value)}
-                  >
-                    <option value="Hot">🔥 Hot</option>
-                    <option value="Warm">☀️ Warm</option>
-                    <option value="Cold">❄️ Cold</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="form-label">Stage</label>
-                  <select 
-                    className="form-control"
-                    value={formStage}
-                    onChange={(e) => setFormStage(e.target.value)}
-                  >
-                    {pipelineStages.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
-                  </select>
-                </div>
+              <div className="form-group">
+                <label className="form-label">Stage</label>
+                <select 
+                  className="form-control"
+                  value={formStage}
+                  onChange={(e) => setFormStage(e.target.value)}
+                >
+                  {pipelineStages.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                </select>
               </div>
 
               {/* Custom field entries inside forms */}
