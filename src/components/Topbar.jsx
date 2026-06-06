@@ -13,7 +13,8 @@ export default function Topbar() {
     setActiveView,
     setSelectedLeadId,
     leads,
-    setShowDetailModal
+    setShowDetailModal,
+    isFirebaseEnabled
   } = useCRM();
 
   const [notifOpen, setNotifOpen] = useState(false);
@@ -103,6 +104,30 @@ export default function Topbar() {
 
       {/* Dynamic Actions */}
       <div className="topbar-actions">
+        {/* Firebase Connection Status Badge */}
+        <div className="firebase-status-badge" style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          padding: '6px 12px',
+          borderRadius: '20px',
+          fontSize: '11px',
+          fontWeight: '600',
+          background: isFirebaseEnabled ? 'rgba(16, 185, 129, 0.1)' : 'rgba(107, 114, 128, 0.1)',
+          color: isFirebaseEnabled ? '#10B981' : '#6B7280',
+          border: isFirebaseEnabled ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid rgba(107, 114, 128, 0.2)',
+          marginRight: '12px'
+        }}>
+          <span style={{
+            width: '6px',
+            height: '6px',
+            borderRadius: '50%',
+            background: isFirebaseEnabled ? '#10B981' : '#6B7280',
+            boxShadow: isFirebaseEnabled ? '0 0 8px #10B981' : 'none'
+          }} />
+          {isFirebaseEnabled ? 'Firestore Live' : 'Offline Mode (Local Cache)'}
+        </div>
+
         {/* Simulated Session Control */}
         <div className="role-switcher-container">
           <span className="role-switcher-label">Role:</span>

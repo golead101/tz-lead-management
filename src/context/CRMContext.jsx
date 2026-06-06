@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { db } from '../firebase';
+import { collection, doc, setDoc, deleteDoc, onSnapshot, writeBatch } from 'firebase/firestore';
 
 const CRMContext = createContext();
 
@@ -50,12 +52,12 @@ const DEFAULT_BRANDING = {
 
 const DEFAULT_INTEGRATIONS = {
   meta: {
-    enabled: true,
-    status: 'Connected',
-    appId: '1249581023849102',
-    systemToken: 'EAAGy7A_meta_token_secure_xyz',
-    pageId: '109283471029',
-    webhookVerifyToken: 'techzone_secret_verify_2026',
+    enabled: false,
+    status: 'Setup Required',
+    appId: '',
+    systemToken: '',
+    pageId: '',
+    webhookVerifyToken: '',
     simulatedLeadsCount: 1247
   },
   google: {
@@ -65,29 +67,29 @@ const DEFAULT_INTEGRATIONS = {
     customerId: '',
     clientId: '',
     clientSecret: '',
-    webhookPasskey: 'google_ad_passkey_987',
+    webhookPasskey: '',
     simulatedLeadsCount: 892
   },
   whatsapp: {
-    enabled: true,
-    status: 'Connected',
-    phoneNumberId: '102938471',
-    businessAccountId: '982734912',
-    systemToken: 'EAAGy7B_whatsapp_token_secure_987',
+    enabled: false,
+    status: 'Setup Required',
+    phoneNumberId: '',
+    businessAccountId: '',
+    systemToken: '',
     simulatedLeadsCount: 645
   },
   webhooks: {
-    enabled: true,
-    status: 'Connected',
-    securitySecret: 'whsec_tz_83749281',
-    webhookUrlSlug: 'inst_aarav_mumbai_786',
+    enabled: false,
+    status: 'Setup Required',
+    securitySecret: '',
+    webhookUrlSlug: '',
     simulatedLeadsCount: 612
   }
 };
 
 const DEFAULT_COUNSELORS = [
-  { id: 'coun-maha', name: 'Maha', email: 'maha@academy.com', password: 'maha123', role: 'Counselor' },
-  { id: 'coun-irfan', name: 'Irfan', email: 'irfan@academy.com', password: 'irfan123', role: 'Counselor' }
+  { id: 'coun-maha', name: 'Maha', email: 'maha@academy.com', password: 'maha123', role: 'Counselor', status: 'Active' },
+  { id: 'coun-irfan', name: 'Irfan', email: 'irfan@academy.com', password: 'irfan123', role: 'Counselor', status: 'Active' }
 ];
 
 // Rich Seed Data of 12 Leads
@@ -386,6 +388,12 @@ export const CRMProvider = ({ children }) => {
   });
 
   const [integrations, setIntegrations] = useState(() => {
+    const hasReset = localStorage.getItem('crm_integrations_seed_reset_v2');
+    if (!hasReset) {
+      localStorage.setItem('crm_integrations_seed_reset_v2', 'true');
+      localStorage.setItem('crm_integrations', JSON.stringify(DEFAULT_INTEGRATIONS));
+      return DEFAULT_INTEGRATIONS;
+    }
     const local = localStorage.getItem('crm_integrations');
     return local ? JSON.parse(local) : DEFAULT_INTEGRATIONS;
   });
@@ -415,15 +423,35 @@ export const CRMProvider = ({ children }) => {
     return local === 'true';
   });
 
+  const [isFirebaseEnabled, setIsFirebaseEnabled] = useState(false);
+
   const login = (email, password) => {
     const formattedEmail = email.toLowerCase().trim();
+    
+    // Check if the counselor is deactivated first
+    const counselorByEmail = counselors.find(c => c.email.toLowerCase() === formattedEmail);
+    if (counselorByEmail && counselorByEmail.status === 'Deactivated') {
+      showToastMsg('This account has been deactivated. Please contact an Admin.', 'error');
+      return { success: false, reason: 'deactivated' };
+    }
+    
+    // Check static fallback accounts for deactivation
+    if (formattedEmail === 'counselor' || formattedEmail === 'elena@academy.com' || formattedEmail === 'maha@academy.com') {
+      const nameToFind = (formattedEmail === 'maha@academy.com' || formattedEmail === 'counselor') ? 'Maha' : 'Elena Gilbert';
+      const found = counselors.find(c => c.name === nameToFind || c.email.toLowerCase() === formattedEmail);
+      if (found && found.status === 'Deactivated') {
+        showToastMsg('This account has been deactivated. Please contact an Admin.', 'error');
+        return { success: false, reason: 'deactivated' };
+      }
+    }
+
     if (formattedEmail === 'admin' || formattedEmail === 'stefan@academy.com') {
       if (password === 'admin' || password === 'stefan123') {
         setActiveRole('Admin');
         setActiveUser('Stefan Salvatore');
         setIsLoggedIn(true);
         showToastMsg('Logged in as Admin: Stefan Salvatore', 'success');
-        return true;
+        return { success: true };
       }
     } else if (formattedEmail === 'manager' || formattedEmail === 'damon@academy.com' || formattedEmail === 'irfan@academy.com') {
       if (password === 'manager' || password === 'damon123' || password === 'irfan123') {
@@ -431,18 +459,17 @@ export const CRMProvider = ({ children }) => {
         setActiveUser('Irfan');
         setIsLoggedIn(true);
         showToastMsg('Logged in as Manager: Irfan', 'success');
-        return true;
+        return { success: true };
       }
     } else {
       // Dynamic counselor lookup
-      const foundCounselor = counselors.find(c => c.email.toLowerCase() === formattedEmail);
-      if (foundCounselor) {
-        if (password === foundCounselor.password || password.toLowerCase() === 'counselor' || password.toLowerCase() === `${foundCounselor.name.split(' ')[0].toLowerCase()}123`) {
+      if (counselorByEmail) {
+        if (password === counselorByEmail.password || password.toLowerCase() === 'counselor' || password.toLowerCase() === `${counselorByEmail.name.split(' ')[0].toLowerCase()}123`) {
           setActiveRole('Counselor');
-          setActiveUser(foundCounselor.name);
+          setActiveUser(counselorByEmail.name);
           setIsLoggedIn(true);
-          showToastMsg(`Logged in as Counselor: ${foundCounselor.name}`, 'success');
-          return true;
+          showToastMsg(`Logged in as Counselor: ${counselorByEmail.name}`, 'success');
+          return { success: true };
         }
       }
       
@@ -453,11 +480,11 @@ export const CRMProvider = ({ children }) => {
           setActiveUser('Maha');
           setIsLoggedIn(true);
           showToastMsg('Logged in as Counselor: Maha', 'success');
-          return true;
+          return { success: true };
         }
       }
     }
-    return false;
+    return { success: false, reason: 'invalid' };
   };
 
   const logout = () => {
@@ -491,6 +518,160 @@ export const CRMProvider = ({ children }) => {
 
   // Global Toast State
   const [toast, setToast] = useState(null);
+
+  // Firestore Sync Effect
+  useEffect(() => {
+    let active = true;
+    let leadsUnsub = null;
+    let coursesUnsub = null;
+    let stagesUnsub = null;
+    let customFieldsUnsub = null;
+    let counselorsUnsub = null;
+    let brandingUnsub = null;
+    let integrationsUnsub = null;
+
+    try {
+      // 1. Leads
+      leadsUnsub = onSnapshot(collection(db, 'leads'), (snapshot) => {
+        if (!active) return;
+        if (snapshot.empty) {
+          console.log("Firestore leads collection is empty. Seeding with DEFAULT leads...");
+          const batch = writeBatch(db);
+          SEED_LEADS.forEach((lead) => {
+            batch.set(doc(db, 'leads', lead.id), lead);
+          });
+          batch.commit()
+            .then(() => console.log("Firestore leads successfully seeded."))
+            .catch(err => console.error("Firestore leads seeding failed:", err));
+        } else {
+          const leadsData = snapshot.docs.map(doc => doc.data());
+          leadsData.sort((a, b) => new Date(b.createdDate) - new Date(a.createdDate));
+          setLeads(leadsData);
+          setIsFirebaseEnabled(true);
+        }
+      }, (err) => {
+        console.error("Firestore leads subscription error:", err);
+        setIsFirebaseEnabled(false);
+      });
+
+      // 2. Courses
+      coursesUnsub = onSnapshot(collection(db, 'courses'), (snapshot) => {
+        if (!active) return;
+        if (snapshot.empty) {
+          console.log("Firestore courses collection is empty. Seeding with DEFAULT courses...");
+          const batch = writeBatch(db);
+          DEFAULT_COURSES.forEach((course) => {
+            batch.set(doc(db, 'courses', course.id), course);
+          });
+          batch.commit().catch(err => console.error("Firestore seeding courses failed:", err));
+        } else {
+          const coursesData = snapshot.docs.map(doc => doc.data());
+          setCourses(coursesData);
+        }
+      }, (err) => {
+        console.error("Firestore courses subscription error:", err);
+      });
+
+      // 3. Pipeline Stages
+      stagesUnsub = onSnapshot(collection(db, 'pipelineStages'), (snapshot) => {
+        if (!active) return;
+        if (snapshot.empty) {
+          console.log("Firestore stages collection is empty. Seeding with DEFAULT stages...");
+          const batch = writeBatch(db);
+          DEFAULT_STAGES.forEach((stage, idx) => {
+            batch.set(doc(db, 'pipelineStages', stage.id), { ...stage, order: idx });
+          });
+          batch.commit().catch(err => console.error("Firestore seeding stages failed:", err));
+        } else {
+          const orderMap = {
+            'st-new': 0, 'st-contact': 1, 'st-interest': 2, 'st-demosched': 3,
+            'st-demoattend': 4, 'st-followup': 5, 'st-notinterest': 6,
+            'st-converted': 7, 'st-closed': 8
+          };
+          const stagesData = snapshot.docs.map(doc => doc.data());
+          stagesData.sort((a, b) => {
+            const aIndex = a.order !== undefined ? a.order : (orderMap[a.id] !== undefined ? orderMap[a.id] : 999);
+            const bIndex = b.order !== undefined ? b.order : (orderMap[b.id] !== undefined ? orderMap[b.id] : 999);
+            return aIndex - bIndex;
+          });
+          setPipelineStages(stagesData);
+        }
+      }, (err) => {
+        console.error("Firestore stages subscription error:", err);
+      });
+
+      // 4. Custom Fields
+      customFieldsUnsub = onSnapshot(collection(db, 'customFields'), (snapshot) => {
+        if (!active) return;
+        const fieldsData = snapshot.docs.map(doc => doc.data());
+        setCustomFields(fieldsData);
+      }, (err) => {
+        console.error("Firestore customFields subscription error:", err);
+      });
+
+      // 5. Counselors
+      counselorsUnsub = onSnapshot(collection(db, 'counselors'), (snapshot) => {
+        if (!active) return;
+        if (snapshot.empty) {
+          console.log("Firestore counselors collection is empty. Seeding with DEFAULT counselors...");
+          const batch = writeBatch(db);
+          DEFAULT_COUNSELORS.forEach((counselor) => {
+            batch.set(doc(db, 'counselors', counselor.id), counselor);
+          });
+          batch.commit().catch(err => console.error("Firestore seeding counselors failed:", err));
+        } else {
+          const counselorsData = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return { status: 'Active', ...data };
+          });
+          setCounselors(counselorsData);
+        }
+      }, (err) => {
+        console.error("Firestore counselors subscription error:", err);
+      });
+
+      // 6. Branding
+      brandingUnsub = onSnapshot(doc(db, 'settings', 'branding'), (snapshot) => {
+        if (!active) return;
+        if (snapshot.exists()) {
+          setBranding(snapshot.data());
+        } else {
+          setDoc(doc(db, 'settings', 'branding'), DEFAULT_BRANDING)
+            .catch(err => console.error("Firestore settings/branding initialization failed:", err));
+        }
+      }, (err) => {
+        console.error("Firestore branding subscription error:", err);
+      });
+
+      // 7. Integrations
+      integrationsUnsub = onSnapshot(doc(db, 'settings', 'integrations'), (snapshot) => {
+        if (!active) return;
+        if (snapshot.exists()) {
+          setIntegrations(snapshot.data());
+        } else {
+          setDoc(doc(db, 'settings', 'integrations'), DEFAULT_INTEGRATIONS)
+            .catch(err => console.error("Firestore settings/integrations initialization failed:", err));
+        }
+      }, (err) => {
+        console.error("Firestore integrations subscription error:", err);
+      });
+
+    } catch (e) {
+      console.error("Firestore subscription setup error:", e);
+      setIsFirebaseEnabled(false);
+    }
+
+    return () => {
+      active = false;
+      if (leadsUnsub) leadsUnsub();
+      if (coursesUnsub) coursesUnsub();
+      if (stagesUnsub) stagesUnsub();
+      if (customFieldsUnsub) customFieldsUnsub();
+      if (counselorsUnsub) counselorsUnsub();
+      if (brandingUnsub) brandingUnsub();
+      if (integrationsUnsub) integrationsUnsub();
+    };
+  }, []);
 
   // Persistence hooks
   useEffect(() => {
@@ -621,7 +802,15 @@ export const CRMProvider = ({ children }) => {
       whatsappMessages: []
     };
 
-    setLeads(prev => [newLead, ...prev]);
+    if (isFirebaseEnabled) {
+      setDoc(doc(db, 'leads', newLead.id), newLead)
+        .catch(err => {
+          console.error("Firestore addLead failed, falling back to local update:", err);
+          setLeads(prev => [newLead, ...prev]);
+        });
+    } else {
+      setLeads(prev => [newLead, ...prev]);
+    }
 
     // Create dynamic in-app notification if assigned to active user
     if (newLead.counselor === activeUser) {
@@ -643,7 +832,8 @@ export const CRMProvider = ({ children }) => {
 
   // Editing lead variables
   const updateLead = (leadId, updatedFields) => {
-    setLeads(prev => prev.map(lead => {
+    let updatedLead = null;
+    const nextLeads = leads.map(lead => {
       if (lead.id === leadId) {
         // Generate an audit log entry for changes
         const auditLogs = [];
@@ -660,21 +850,40 @@ export const CRMProvider = ({ children }) => {
           }
         });
 
-        return {
+        updatedLead = {
           ...lead,
           ...updatedFields,
           lastContacted: new Date().toISOString(),
           timeline: [...(lead.timeline || []), ...auditLogs]
         };
+        return updatedLead;
       }
       return lead;
-    }));
+    });
+
+    if (isFirebaseEnabled && updatedLead) {
+      setDoc(doc(db, 'leads', leadId), updatedLead)
+        .catch(err => {
+          console.error("Firestore updateLead failed, falling back to local update:", err);
+          setLeads(nextLeads);
+        });
+    } else {
+      setLeads(nextLeads);
+    }
     showToastMsg('Student profile successfully updated.');
   };
 
   // Delete Lead
   const deleteLead = (leadId) => {
-    setLeads(prev => prev.filter(l => l.id !== leadId));
+    if (isFirebaseEnabled) {
+      deleteDoc(doc(db, 'leads', leadId))
+        .catch(err => {
+          console.error("Firestore deleteLead failed, falling back to local delete:", err);
+          setLeads(prev => prev.filter(l => l.id !== leadId));
+        });
+    } else {
+      setLeads(prev => prev.filter(l => l.id !== leadId));
+    }
     showToastMsg('Inquiry removed from CRM database.', 'error');
     if (selectedLeadId === leadId) {
       setSelectedLeadId(null);
@@ -684,7 +893,8 @@ export const CRMProvider = ({ children }) => {
 
   // Direct Lead Stage update (Kanban Drag and Drop outcome)
   const updateLeadStage = (leadId, nextStage, stageChangeNote = '') => {
-    setLeads(prev => prev.map(lead => {
+    let updatedLead = null;
+    const nextLeads = leads.map(lead => {
       if (lead.id === leadId) {
         if (lead.stage === nextStage) return lead;
         
@@ -725,32 +935,43 @@ export const CRMProvider = ({ children }) => {
           });
         }
 
-        return {
+        updatedLead = {
           ...lead,
           stage: nextStage,
           lastContacted: new Date().toISOString(),
           timeline: logs,
           whatsappMessages: whatsappHistory
         };
+        return updatedLead;
       }
       return lead;
-    }));
+    });
+
+    if (isFirebaseEnabled && updatedLead) {
+      setDoc(doc(db, 'leads', leadId), updatedLead)
+        .catch(err => {
+          console.error("Firestore updateLeadStage failed, falling back to local update:", err);
+          setLeads(nextLeads);
+        });
+    } else {
+      setLeads(nextLeads);
+    }
     showToastMsg(`Lead status updated to ${nextStage}`);
   };
 
   // Logging interaction call logs
   const logCall = (leadId, callDetails) => {
-    const callLog = {
-      id: `log-call-${Date.now()}`,
-      type: 'call',
-      title: `Call Logged: ${callDetails.status}`,
-      content: `Interest Level: ${callDetails.interest}. outcome: ${callDetails.notes}. Questions asked: ${callDetails.questions.length ? callDetails.questions.join(', ') : 'None'}.`,
-      timestamp: new Date().toISOString(),
-      user: activeUser
-    };
-
-    setLeads(prev => prev.map(lead => {
+    let updatedLead = null;
+    const nextLeads = leads.map(lead => {
       if (lead.id === leadId) {
+        const callLog = {
+          id: `log-call-${Date.now()}`,
+          type: 'call',
+          title: `Call Logged: ${callDetails.status}`,
+          content: `Interest Level: ${callDetails.interest}. outcome: ${callDetails.notes}. Questions asked: ${callDetails.questions.length ? callDetails.questions.join(', ') : 'None'}.`,
+          timestamp: new Date().toISOString(),
+          user: activeUser
+        };
         const nextTimeline = [...(lead.timeline || []), callLog];
         let nextStage = lead.stage;
         let nextFollowupDate = lead.followupDate;
@@ -771,7 +992,7 @@ export const CRMProvider = ({ children }) => {
 
         // Setup dynamic follow-up inside lead profile if scheduled
         if (callDetails.scheduleFollowup && callDetails.followupDate) {
-          nextFollowupDate = new Date(callDetails.followupDate).toISOString();
+          nextFollowupDate = new Date(callDetails.scheduleFollowup && callDetails.followupDate).toISOString();
           nextFollowupReason = callDetails.followupReason || 'Scheduled callback';
           nextTimeline.push({
             id: `log-sched-${Date.now()}`,
@@ -783,7 +1004,7 @@ export const CRMProvider = ({ children }) => {
           });
         }
 
-        return {
+        updatedLead = {
           ...lead,
           stage: nextStage,
           followupDate: nextFollowupDate,
@@ -791,19 +1012,30 @@ export const CRMProvider = ({ children }) => {
           lastContacted: new Date().toISOString(),
           timeline: nextTimeline
         };
+        return updatedLead;
       }
       return lead;
-    }));
+    });
 
+    if (isFirebaseEnabled && updatedLead) {
+      setDoc(doc(db, 'leads', leadId), updatedLead)
+        .catch(err => {
+          console.error("Firestore logCall failed, falling back to local update:", err);
+          setLeads(nextLeads);
+        });
+    } else {
+      setLeads(nextLeads);
+    }
     showToastMsg('Call history logged successfully.');
   };
 
   // Directly schedule/postpone a follow-up date
   const scheduleFollowup = (leadId, dateStr, reason) => {
     const schedDate = new Date(dateStr).toISOString();
-    setLeads(prev => prev.map(lead => {
+    let updatedLead = null;
+    const nextLeads = leads.map(lead => {
       if (lead.id === leadId) {
-        return {
+        updatedLead = {
           ...lead,
           followupDate: schedDate,
           followupReason: reason,
@@ -820,17 +1052,29 @@ export const CRMProvider = ({ children }) => {
             }
           ]
         };
+        return updatedLead;
       }
       return lead;
-    }));
+    });
+
+    if (isFirebaseEnabled && updatedLead) {
+      setDoc(doc(db, 'leads', leadId), updatedLead)
+        .catch(err => {
+          console.error("Firestore scheduleFollowup failed:", err);
+          setLeads(nextLeads);
+        });
+    } else {
+      setLeads(nextLeads);
+    }
     showToastMsg('Follow-up scheduled.');
   };
 
   // Completed follow-up callback clearing
   const completeFollowup = (leadId) => {
-    setLeads(prev => prev.map(lead => {
+    let updatedLead = null;
+    const nextLeads = leads.map(lead => {
       if (lead.id === leadId) {
-        return {
+        updatedLead = {
           ...lead,
           followupDate: null,
           followupReason: null,
@@ -846,20 +1090,32 @@ export const CRMProvider = ({ children }) => {
             }
           ]
         };
+        return updatedLead;
       }
       return lead;
-    }));
+    });
+
+    if (isFirebaseEnabled && updatedLead) {
+      setDoc(doc(db, 'leads', leadId), updatedLead)
+        .catch(err => {
+          console.error("Firestore completeFollowup failed:", err);
+          setLeads(nextLeads);
+        });
+    } else {
+      setLeads(nextLeads);
+    }
     showToastMsg('Follow-up task marked completed.');
   };
 
   // Directly schedule a demo
   const scheduleDemo = (leadId, demoDetails) => {
     const demoDate = new Date(`${demoDetails.date}T${demoDetails.time}`).toISOString();
-    setLeads(prev => prev.map(lead => {
+    let updatedLead = null;
+    const nextLeads = leads.map(lead => {
       if (lead.id === leadId) {
         const title = `Demo Scheduled (${demoDetails.mode})`;
         const desc = `Trainer: ${demoDetails.trainer}. Class link/room: ${demoDetails.locationLink}. Timings: ${new Date(demoDate).toLocaleString()}`;
-        return {
+        updatedLead = {
           ...lead,
           stage: 'Demo Scheduled',
           demoInfo: {
@@ -881,18 +1137,30 @@ export const CRMProvider = ({ children }) => {
             }
           ]
         };
+        return updatedLead;
       }
       return lead;
-    }));
+    });
+
+    if (isFirebaseEnabled && updatedLead) {
+      setDoc(doc(db, 'leads', leadId), updatedLead)
+        .catch(err => {
+          console.error("Firestore scheduleDemo failed:", err);
+          setLeads(nextLeads);
+        });
+    } else {
+      setLeads(nextLeads);
+    }
     showToastMsg('Class/Demo scheduled successfully.');
   };
 
   // Mark Demo Attendance
   const logDemoAttendance = (leadId, attendanceStatus) => {
-    setLeads(prev => prev.map(lead => {
+    let updatedLead = null;
+    const nextLeads = leads.map(lead => {
       if (lead.id === leadId) {
         const nextStage = attendanceStatus === 'Attended' ? 'Demo Attended' : lead.stage;
-        return {
+        updatedLead = {
           ...lead,
           stage: nextStage,
           demoInfo: {
@@ -911,9 +1179,20 @@ export const CRMProvider = ({ children }) => {
             }
           ]
         };
+        return updatedLead;
       }
       return lead;
-    }));
+    });
+
+    if (isFirebaseEnabled && updatedLead) {
+      setDoc(doc(db, 'leads', leadId), updatedLead)
+        .catch(err => {
+          console.error("Firestore logDemoAttendance failed:", err);
+          setLeads(nextLeads);
+        });
+    } else {
+      setLeads(nextLeads);
+    }
     showToastMsg(`Attendance logged: ${attendanceStatus}`);
   };
 
@@ -928,7 +1207,8 @@ export const CRMProvider = ({ children }) => {
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
 
-    setLeads(prev => prev.map(lead => {
+    let updatedLead = null;
+    const nextLeads = leads.map(lead => {
       if (lead.id === leadId) {
         const updatedChat = [...(lead.whatsappMessages || []), outgoingMsg];
         const nextTimeline = [...(lead.timeline || []), {
@@ -940,19 +1220,30 @@ export const CRMProvider = ({ children }) => {
           user: activeUser
         }];
 
-        // Simulate a smart automated inbound response after 3 seconds!
-        setTimeout(() => {
-          triggerSimulatedBotReply(leadId, lead.name, messageText);
-        }, 3000);
-
-        return {
+        updatedLead = {
           ...lead,
           whatsappMessages: updatedChat,
           timeline: nextTimeline
         };
+        return updatedLead;
       }
       return lead;
-    }));
+    });
+
+    if (isFirebaseEnabled && updatedLead) {
+      setDoc(doc(db, 'leads', leadId), updatedLead)
+        .catch(err => {
+          console.error("Firestore sendWhatsAppMsg failed, falling back to local update:", err);
+          setLeads(nextLeads);
+        });
+    } else {
+      setLeads(nextLeads);
+    }
+
+    // Simulate a smart automated inbound response after 3 seconds!
+    setTimeout(() => {
+      triggerSimulatedBotReply(leadId, updatedLead?.name || 'Student', messageText);
+    }, 3000);
   };
 
   const triggerSimulatedBotReply = (leadId, studentName, outgoingText) => {
@@ -973,9 +1264,10 @@ export const CRMProvider = ({ children }) => {
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
 
-    setLeads(prev => prev.map(lead => {
+    let updatedLead = null;
+    const nextLeads = leads.map(lead => {
       if (lead.id === leadId) {
-        return {
+        updatedLead = {
           ...lead,
           whatsappMessages: [...(lead.whatsappMessages || []), inboundMsg],
           timeline: [
@@ -990,9 +1282,20 @@ export const CRMProvider = ({ children }) => {
             }
           ]
         };
+        return updatedLead;
       }
       return lead;
-    }));
+    });
+
+    if (isFirebaseEnabled && updatedLead) {
+      setDoc(doc(db, 'leads', leadId), updatedLead)
+        .catch(err => {
+          console.error("Firestore triggerSimulatedBotReply failed, falling back to local update:", err);
+          setLeads(nextLeads);
+        });
+    } else {
+      setLeads(nextLeads);
+    }
 
     // Trigger local alert
     setNotifications(prev => [
@@ -1009,7 +1312,7 @@ export const CRMProvider = ({ children }) => {
 
   // Bulk Reassignment of leads to another counselor
   const bulkReassignLeads = (leadIds, newCounselor) => {
-    setLeads(prev => prev.map(lead => {
+    const nextLeads = leads.map(lead => {
       if (leadIds.includes(lead.id)) {
         return {
           ...lead,
@@ -1028,13 +1331,28 @@ export const CRMProvider = ({ children }) => {
         };
       }
       return lead;
-    }));
+    });
+
+    if (isFirebaseEnabled) {
+      const batch = writeBatch(db);
+      nextLeads.forEach(lead => {
+        if (leadIds.includes(lead.id)) {
+          batch.set(doc(db, 'leads', lead.id), lead);
+        }
+      });
+      batch.commit().catch(err => {
+        console.error("Firestore bulkReassignLeads failed, falling back to local update:", err);
+        setLeads(nextLeads);
+      });
+    } else {
+      setLeads(nextLeads);
+    }
     showToastMsg(`Bulk reassigned ${leadIds.length} inquiries to ${newCounselor}`);
   };
 
   // Bulk Stage shift
   const bulkUpdateStage = (leadIds, nextStage) => {
-    setLeads(prev => prev.map(lead => {
+    const nextLeads = leads.map(lead => {
       if (leadIds.includes(lead.id)) {
         return {
           ...lead,
@@ -1053,7 +1371,22 @@ export const CRMProvider = ({ children }) => {
         };
       }
       return lead;
-    }));
+    });
+
+    if (isFirebaseEnabled) {
+      const batch = writeBatch(db);
+      nextLeads.forEach(lead => {
+        if (leadIds.includes(lead.id)) {
+          batch.set(doc(db, 'leads', lead.id), lead);
+        }
+      });
+      batch.commit().catch(err => {
+        console.error("Firestore bulkUpdateStage failed, falling back to local update:", err);
+        setLeads(nextLeads);
+      });
+    } else {
+      setLeads(nextLeads);
+    }
     showToastMsg(`Bulk shifted ${leadIds.length} inquiries to ${nextStage}`);
   };
 
@@ -1066,7 +1399,16 @@ export const CRMProvider = ({ children }) => {
       options: field.options || [],
       required: field.required || false
     };
-    setCustomFields(prev => [...prev, newField]);
+
+    if (isFirebaseEnabled) {
+      setDoc(doc(db, 'customFields', newField.id), newField)
+        .catch(err => {
+          console.error("Firestore addCustomField failed:", err);
+          setCustomFields(prev => [...prev, newField]);
+        });
+    } else {
+      setCustomFields(prev => [...prev, newField]);
+    }
     showToastMsg(`Custom field "${field.name}" added successfully.`);
   };
 
@@ -1080,7 +1422,16 @@ export const CRMProvider = ({ children }) => {
       fee: courseData.fee,
       description: courseData.description || ''
     };
-    setCourses(prev => [...prev, newCourse]);
+
+    if (isFirebaseEnabled) {
+      setDoc(doc(db, 'courses', newCourse.id), newCourse)
+        .catch(err => {
+          console.error("Firestore addCourse failed:", err);
+          setCourses(prev => [...prev, newCourse]);
+        });
+    } else {
+      setCourses(prev => [...prev, newCourse]);
+    }
     showToastMsg(`Course "${courseData.name}" added to list.`);
   };
 
@@ -1100,10 +1451,19 @@ export const CRMProvider = ({ children }) => {
       id: nextVal,
       name: stageData.name,
       color: randomColor,
-      description: stageData.description || ''
+      description: stageData.description || '',
+      order: pipelineStages.length
     };
 
-    setPipelineStages(prev => [...prev, newStage]);
+    if (isFirebaseEnabled) {
+      setDoc(doc(db, 'pipelineStages', newStage.id), newStage)
+        .catch(err => {
+          console.error("Firestore addStage failed:", err);
+          setPipelineStages(prev => [...prev, newStage]);
+        });
+    } else {
+      setPipelineStages(prev => [...prev, newStage]);
+    }
     showToastMsg(`Pipeline stage "${stageData.name}" created!`);
   };
 
@@ -1117,16 +1477,54 @@ export const CRMProvider = ({ children }) => {
       name: name,
       email: email,
       password: password,
-      role: 'Counselor'
+      role: 'Counselor',
+      status: 'Active'
     };
-    setCounselors(prev => [...prev, newCounselor]);
+
+    if (isFirebaseEnabled) {
+      setDoc(doc(db, 'counselors', newCounselor.id), newCounselor)
+        .catch(err => {
+          console.error("Firestore addCounselor failed:", err);
+          setCounselors(prev => [...prev, newCounselor]);
+        });
+    } else {
+      setCounselors(prev => [...prev, newCounselor]);
+    }
     showToastMsg(`Counselor "${name}" added successfully.`);
   };
 
   // Counselor Remover
   const removeCounselor = (counselorId) => {
-    setCounselors(prev => prev.filter(c => c.id !== counselorId));
+    if (isFirebaseEnabled) {
+      deleteDoc(doc(db, 'counselors', counselorId))
+        .catch(err => {
+          console.error("Firestore removeCounselor failed:", err);
+          setCounselors(prev => prev.filter(c => c.id !== counselorId));
+        });
+    } else {
+      setCounselors(prev => prev.filter(c => c.id !== counselorId));
+    }
     showToastMsg('Counselor removed successfully.', 'error');
+  };
+
+  const updateCounselorStatus = (counselorId, status) => {
+    const nextCounselors = counselors.map(c => {
+      if (c.id === counselorId) {
+        return { ...c, status };
+      }
+      return c;
+    });
+
+    if (isFirebaseEnabled) {
+      setDoc(doc(db, 'counselors', counselorId), { status }, { merge: true })
+        .catch(err => {
+          console.error("Firestore updateCounselorStatus failed, falling back to local update:", err);
+          setCounselors(nextCounselors);
+        });
+    } else {
+      setCounselors(nextCounselors);
+    }
+    showToastMsg(`Counselor status updated to ${status}.`);
   };
 
   // Clear Notifications
@@ -1136,24 +1534,42 @@ export const CRMProvider = ({ children }) => {
 
   // Dynamic branding visual updates
   const changeBrandingColors = (brandingProps) => {
-    setBranding(prev => ({
-      ...prev,
+    const nextBranding = {
+      ...branding,
       ...brandingProps
-    }));
+    };
+
+    if (isFirebaseEnabled) {
+      setDoc(doc(db, 'settings', 'branding'), nextBranding)
+        .catch(err => {
+          console.error("Firestore save branding failed:", err);
+          setBranding(nextBranding);
+        });
+    } else {
+      setBranding(nextBranding);
+    }
     showToastMsg('Visual customization saved successfully.');
   };
 
   const updateIntegration = (platform, configFields, silent = false) => {
-    setIntegrations(prev => {
-      const updated = {
-        ...prev,
-        [platform]: {
-          ...prev[platform],
-          ...configFields
-        }
-      };
-      return updated;
-    });
+    const nextIntegrations = {
+      ...integrations,
+      [platform]: {
+        ...integrations[platform],
+        ...configFields
+      }
+    };
+
+    if (isFirebaseEnabled) {
+      setDoc(doc(db, 'settings', 'integrations'), nextIntegrations)
+        .catch(err => {
+          console.error("Firestore save integrations failed:", err);
+          setIntegrations(nextIntegrations);
+        });
+    } else {
+      setIntegrations(nextIntegrations);
+    }
+
     if (!silent) {
       showToastMsg(`${platform.toUpperCase()} configuration successfully updated!`);
     }
@@ -1170,6 +1586,7 @@ export const CRMProvider = ({ children }) => {
       activeRole,
       activeUser,
       isLoggedIn,
+      isFirebaseEnabled,
       notifications,
       activeView,
       selectedLeadId,
@@ -1180,6 +1597,7 @@ export const CRMProvider = ({ children }) => {
       addCounselor,
       removeCounselor,
       removeCourse,
+      updateCounselorStatus,
       
       login,
       logout,
