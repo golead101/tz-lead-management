@@ -42,8 +42,15 @@ export default function GridView() {
   // Bulk operation popovers
   const [bulkReassignOpen, setBulkReassignOpen] = useState(false);
   const [bulkStageOpen, setBulkStageOpen] = useState(false);
-  const [bulkCounselorName, setBulkCounselorName] = useState(counselors[0]?.name || '');
+  const [bulkCounselorName, setBulkCounselorName] = useState(counselors.filter(c => c.status === 'Active')[0]?.name || '');
   const [bulkStageName, setBulkStageName] = useState('Contacted');
+
+  React.useEffect(() => {
+    const activeCouns = counselors.filter(c => c.status === 'Active');
+    if (activeCouns.length > 0 && !activeCouns.find(c => c.name === bulkCounselorName)) {
+      setBulkCounselorName(activeCouns[0].name);
+    }
+  }, [counselors]);
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -334,7 +341,9 @@ export default function GridView() {
             >
               <option value="All">All Counselors</option>
               {counselors.map(c => (
-                <option key={c.id} value={c.name}>{c.name}</option>
+                <option key={c.id} value={c.name}>
+                  {c.name} {c.status === 'Deactivated' ? '(Deactivated)' : ''}
+                </option>
               ))}
             </select>
           </div>
@@ -375,7 +384,7 @@ export default function GridView() {
                 <div className="gv-popover">
                   <label className="form-label" style={{ fontSize: '11px' }}>Assign to Counselor</label>
                   <select className="gv-filter-select" style={{ width: '100%' }} value={bulkCounselorName} onChange={(e) => setBulkCounselorName(e.target.value)}>
-                    {counselors.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                    {counselors.filter(c => c.status === 'Active').map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                   </select>
                   <button className="gv-btn-primary gv-btn-sm" style={{ width: '100%', marginTop: '8px', justifyContent: 'center' }} onClick={executeBulkReassign}>Apply</button>
                 </div>

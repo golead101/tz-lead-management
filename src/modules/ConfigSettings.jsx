@@ -51,7 +51,7 @@ export default function ConfigSettings() {
     addStage,
     addCustomField,
     addCounselor,
-    removeCounselor,
+    updateCounselorStatus,
     changeBrandingColors,
     activeRole
   } = useCRM();
@@ -794,35 +794,81 @@ export default function ConfigSettings() {
             <div className="dashboard-panel">
               <h3 className="panel-title mb-4">Team Counselors Directory</h3>
               <div style={{ maxHeight: '350px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {counselors.map(c => (
-                  <div key={c.id} className="config-list-item" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <div className="card-counselor-avatar" style={{ width: '36px', height: '36px', fontSize: '13px', fontWeight: '700', borderRadius: '50%', background: 'var(--primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {c.name.split(' ').map(n=>n[0]).join('').toUpperCase()}
+                {counselors.map(c => {
+                  const status = c.status || 'Active';
+                  const isActive = status === 'Active';
+                  
+                  const handleToggleStatus = () => {
+                    if (isActive) {
+                      const confirmDeactivate = window.confirm(
+                        "Are you sure you want to deactivate this account? The user will no longer be able to log in until an Admin reactivates the account."
+                      );
+                      if (confirmDeactivate) {
+                        updateCounselorStatus(c.id, 'Deactivated');
+                      }
+                    } else {
+                      updateCounselorStatus(c.id, 'Active');
+                    }
+                  };
+
+                  return (
+                    <div key={c.id} className="config-list-item" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div className="card-counselor-avatar" style={{ width: '36px', height: '36px', fontSize: '13px', fontWeight: '700', borderRadius: '50%', background: isActive ? 'var(--primary)' : '#94a3b8', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {c.name.split(' ').map(n=>n[0]).join('').toUpperCase()}
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontWeight: '700', color: 'var(--text-primary)', fontSize: '13.5px' }}>{c.name}</span>
+                            {isActive ? (
+                              <span style={{ background: '#ecfdf5', color: '#059669', fontSize: '10px', fontWeight: '700', padding: '2px 8px', borderRadius: '12px', border: '1px solid #a7f3d0' }}>
+                                Active
+                              </span>
+                            ) : (
+                              <span style={{ background: '#fef2f2', color: '#dc2626', fontSize: '10px', fontWeight: '700', padding: '2px 8px', borderRadius: '12px', border: '1px solid #fecaca' }}>
+                                Deactivated
+                              </span>
+                            )}
+                          </div>
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{c.email}</span>
+                        </div>
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontWeight: '700', color: 'var(--text-primary)', fontSize: '13.5px' }}>{c.name}</span>
-                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{c.email}</span>
-                      </div>
+                      
+                      {activeRole === 'Admin' && (
+                        <label className="status-toggle-switch" style={{ position: 'relative', display: 'inline-block', width: '36px', height: '20px', margin: 0 }}>
+                          <input 
+                            type="checkbox" 
+                            checked={isActive} 
+                            onChange={handleToggleStatus}
+                            style={{ opacity: 0, width: 0, height: 0 }}
+                          />
+                          <span className="status-toggle-slider" style={{
+                            position: 'absolute',
+                            cursor: 'pointer',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            backgroundColor: isActive ? 'var(--primary, #2F6BFF)' : '#cbd5e1',
+                            transition: '0.3s',
+                            borderRadius: '20px'
+                          }}>
+                            <span className="status-toggle-knob" style={{
+                              position: 'absolute',
+                              height: '14px',
+                              width: '14px',
+                              left: isActive ? '18px' : '4px',
+                              bottom: '3px',
+                              backgroundColor: 'white',
+                              transition: '0.3s',
+                              borderRadius: '50%'
+                            }} />
+                          </span>
+                        </label>
+                      )}
                     </div>
-                    {/* Only show delete button if we have more than 1 counselor to prevent locking out all assignments */}
-                    {counselors.length > 1 && (
-                      <button 
-                        onClick={() => removeCounselor(c.id)}
-                        className="ghost-btn-custom" 
-                        style={{ color: '#ef4444', border: 'none', background: 'transparent', cursor: 'pointer', padding: '6px' }}
-                        title="Remove Counselor"
-                      >
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5">
-                          <polyline points="3 6 5 6 21 6" />
-                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                          <line x1="10" y1="11" x2="10" y2="17" />
-                          <line x1="14" y1="11" x2="14" y2="17" />
-                        </svg>
-                      </button>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
