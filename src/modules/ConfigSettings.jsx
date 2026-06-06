@@ -48,6 +48,7 @@ export default function ConfigSettings() {
     branding,
     counselors,
     addCourse,
+    removeCourse,
     addStage,
     addCustomField,
     addCounselor,
@@ -563,13 +564,28 @@ export default function ConfigSettings() {
             {/* List */}
             <div className="dashboard-panel">
               <h3 className="panel-title mb-4">Offered Program Directory</h3>
-              <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
+              <div style={{ maxHeight: '350px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {courses.map(course => (
-                  <div key={course.id} className="config-list-item">
+                  <div key={course.id} className="config-list-item" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
                     <div>
                       <span style={{ fontWeight: '700', color: 'var(--text-primary)' }}>[{course.code}] {course.name}</span>
                       <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Duration: {course.duration} | Tuition Fee: {course.fee}</div>
                     </div>
+                    {courses.length > 1 && (
+                      <button 
+                        onClick={() => removeCourse(course.id)}
+                        className="ghost-btn-custom" 
+                        style={{ color: '#ef4444', border: 'none', background: 'transparent', cursor: 'pointer', padding: '6px' }}
+                        title="Remove Program"
+                      >
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                          <line x1="10" y1="11" x2="10" y2="17" />
+                          <line x1="14" y1="11" x2="14" y2="17" />
+                        </svg>
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>

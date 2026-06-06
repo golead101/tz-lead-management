@@ -1084,6 +1084,12 @@ export const CRMProvider = ({ children }) => {
     showToastMsg(`Course "${courseData.name}" added to list.`);
   };
 
+  // Course Remover
+  const removeCourse = (courseId) => {
+    setCourses(prev => prev.filter(c => c.id !== courseId));
+    showToastMsg('Course removed successfully.', 'error');
+  };
+
   // Stage Adder
   const addStage = (stageData) => {
     const nextVal = `st-${Date.now()}`;
@@ -1173,6 +1179,7 @@ export const CRMProvider = ({ children }) => {
       counselors,
       addCounselor,
       removeCounselor,
+      removeCourse,
       
       login,
       logout,
