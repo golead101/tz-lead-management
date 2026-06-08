@@ -43,19 +43,31 @@ function ShimmerLoader() {
 }
 
 function MainAppContent() {
-  const { activeView, isLoggedIn } = useCRM();
+  const { activeView, isLoggedIn, activeRole, setActiveView } = useCRM();
   const [isNavigating, setIsNavigating] = useState(false);
   const [navigatedView, setNavigatedView] = useState(activeView);
 
-  // Trigger quick shimmer loading state when swapping tabs
+  // Trigger quick shimmer loading state when swapping tabs or when role changes and view needs redirection
   useEffect(() => {
+    // Guard check: redirect if role tries to access a restricted view
+    const isCounselor = activeRole === 'Counselor';
+    const isManager = activeRole === 'Manager';
+
+    const isCounselorRestricted = isCounselor && ['analytics', 'sandbox', 'settings'].includes(activeView);
+    const isManagerRestricted = isManager && ['sandbox', 'settings'].includes(activeView);
+
+    if (isCounselorRestricted || isManagerRestricted) {
+      setActiveView('dashboard');
+      return;
+    }
+
     setIsNavigating(true);
     const timer = setTimeout(() => {
       setNavigatedView(activeView);
       setIsNavigating(false);
     }, 150);
     return () => clearTimeout(timer);
-  }, [activeView]);
+  }, [activeView, activeRole, setActiveView]);
 
   if (!isLoggedIn) {
     return <LoginScreen />;

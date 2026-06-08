@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useCRM } from '../context/CRMContext';
 
 export default function Dashboard() {
@@ -9,6 +9,88 @@ export default function Dashboard() {
   const [hoveredPoint, setHoveredPoint] = useState(null);
   const [timeRange, setTimeRange] = useState('7days'); // '7days', '1month', '1year'
 
+  // Date Picker States
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [dateRange, setDateRange] = useState({
+    label: 'All Time',
+    startDate: null,
+    endDate: null
+  });
+
+  const datePickerRef = useRef(null);
+
+  // Close date picker dropdown on clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (datePickerRef.current && !datePickerRef.current.contains(event.target)) {
+        setIsDatePickerOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const formatDateRangeText = () => {
+    if (dateRange.label !== 'Custom Range') {
+      const end = new Date();
+      let start = new Date();
+      if (dateRange.label === 'Last 7 Days') {
+        start.setDate(end.getDate() - 7);
+      } else if (dateRange.label === 'Last 30 Days') {
+        start.setDate(end.getDate() - 30);
+      } else if (dateRange.label === 'This Month') {
+        start.setDate(1);
+      } else {
+        // All Time
+        if (leads.length === 0) return 'All Time';
+        const dates = leads.map(l => new Date(l.createdDate)).filter(d => !isNaN(d));
+        if (dates.length === 0) return 'All Time';
+        const minDate = new Date(Math.min(...dates));
+        const maxDate = new Date(Math.max(...dates));
+        return `${minDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${maxDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+      }
+      return `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+    } else {
+      if (dateRange.startDate && dateRange.endDate) {
+        const start = new Date(dateRange.startDate);
+        const end = new Date(dateRange.endDate);
+        return `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+      }
+      return 'Select Dates';
+    }
+  };
+
+  // Filter leads based on selected date range
+  const filteredLeads = (() => {
+    if (dateRange.label === 'All Time') return leads;
+
+    const end = dateRange.endDate ? new Date(dateRange.endDate) : new Date();
+    end.setHours(23, 59, 59, 999);
+
+    let start = new Date();
+    if (dateRange.label === 'Last 7 Days') {
+      start.setDate(end.getDate() - 7);
+      start.setHours(0, 0, 0, 0);
+    } else if (dateRange.label === 'Last 30 Days') {
+      start.setDate(end.getDate() - 30);
+      start.setHours(0, 0, 0, 0);
+    } else if (dateRange.label === 'This Month') {
+      start.setDate(1);
+      start.setHours(0, 0, 0, 0);
+    } else if (dateRange.label === 'Custom Range' && dateRange.startDate) {
+      start = new Date(dateRange.startDate);
+      start.setHours(0, 0, 0, 0);
+    } else {
+      return leads;
+    }
+
+    return leads.filter(l => {
+      if (!l.createdDate) return false;
+      const created = new Date(l.createdDate);
+      return created >= start && created <= end;
+    });
+  })();
+
   // 1. Exact Mockup Data representing the provided image
   const mockupStats = {
     // Source metrics
@@ -17,6 +99,7 @@ export default function Dashboard() {
     whatsappLeads: 645,
     websiteLeads: 523,
     callLeads: 380,
+    walkinLeads: 165,
     
     // Bottom status cards
     totalLeads: 3307,
@@ -33,24 +116,27 @@ export default function Dashboard() {
 
   // 2. Compute dynamic live stats from the CRM Context leads list for interactive toggling
   const liveStats = (() => {
-    const total = leads.length || 1;
-    const metaCount = leads.filter(l => l.source === 'Meta Ads' || l.source === 'Meta').length;
-    const googleCount = leads.filter(l => l.source === 'Google Search' || l.source === 'Google Ads' || l.source === 'Google').length;
-    const whatsappCount = leads.filter(l => l.source === 'WhatsApp Inbound' || l.source === 'WhatsApp').length;
-    const websiteCount = leads.filter(l => l.source === 'Website Form' || l.source === 'Website').length;
-    const callCount = leads.filter(l => l.source === 'Call' || l.source === 'Inbound Call' || l.source === 'Outbound Call' || l.source === 'Phone' || l.source === 'Walk-in' || l.source === 'Student Referral').length;
+    const activeLeads = filteredLeads;
+    const total = activeLeads.length || 1;
+    const metaCount = activeLeads.filter(l => l.source === 'Meta Ads' || l.source === 'Meta').length;
+    const googleCount = activeLeads.filter(l => l.source === 'Google Search' || l.source === 'Google Ads' || l.source === 'Google').length;
+    const whatsappCount = activeLeads.filter(l => l.source === 'WhatsApp Inbound' || l.source === 'WhatsApp').length;
+    const websiteCount = activeLeads.filter(l => l.source === 'Website Form' || l.source === 'Website').length;
+    const callCount = activeLeads.filter(l => l.source === 'Call' || l.source === 'Inbound Call' || l.source === 'Outbound Call' || l.source === 'Phone' || l.source === 'Student Referral').length;
+    const walkinCount = activeLeads.filter(l => l.source === 'Walk-in').length;
     
-    const contactedCount = leads.filter(l => ['Contacted', 'Interested', 'Demo Scheduled', 'Demo Attended'].includes(l.stage)).length;
-    const followUpsCount = leads.filter(l => l.followupDate || l.stage === 'Follow-up Pending').length;
-    const convertedCount = leads.filter(l => l.stage === 'Converted').length;
+    const contactedCount = activeLeads.filter(l => ['Contacted', 'Interested', 'Demo Scheduled', 'Demo Attended'].includes(l.stage)).length;
+    const followUpsCount = activeLeads.filter(l => l.followupDate || l.stage === 'Follow-up Pending').length;
+    const convertedCount = activeLeads.filter(l => l.stage === 'Converted').length;
 
     return {
-      metaLeads: metaCount || 3, // fallback to small non-zero
-      googleLeads: googleCount || 2,
-      whatsappLeads: whatsappCount || 2,
-      websiteLeads: websiteCount || 1,
-      callLeads: callCount || 4,
-      totalLeads: leads.length,
+      metaLeads: metaCount,
+      googleLeads: googleCount,
+      whatsappLeads: whatsappCount,
+      websiteLeads: websiteCount,
+      callLeads: callCount,
+      walkinLeads: walkinCount,
+      totalLeads: activeLeads.length,
       contacted: contactedCount,
       followUps: followUpsCount,
       converted: convertedCount,
@@ -129,14 +215,134 @@ export default function Dashboard() {
         <h2 className="db-title">Dashboard</h2>
         <div className="db-header-actions">
 
-          <div className="db-date-picker">
-            May 12 – May 18, 2024
+          <div 
+            ref={datePickerRef}
+            className="db-date-picker" 
+            style={{ position: 'relative', cursor: 'pointer', userSelect: 'none' }}
+            onClick={() => setIsDatePickerOpen(prev => !prev)}
+          >
+            {formatDateRangeText()}
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
               <line x1="16" y1="2" x2="16" y2="6" />
               <line x1="8" y1="2" x2="8" y2="6" />
               <line x1="3" y1="10" x2="21" y2="10" />
             </svg>
+
+            {/* Dropdown Calendar / Date Range Selector Popup */}
+            {isDatePickerOpen && (
+              <div 
+                className="date-picker-dropdown" 
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  marginTop: '8px',
+                  background: '#ffffff',
+                  border: '1px solid rgba(0, 0, 0, 0.08)',
+                  borderRadius: '12px',
+                  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+                  zIndex: 100,
+                  width: '240px',
+                  padding: '12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '4px'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {['All Time', 'Last 7 Days', 'Last 30 Days', 'This Month', 'Custom Range'].map(opt => (
+                  <div
+                    key={opt}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                      fontWeight: dateRange.label === opt ? '700' : '500',
+                      color: dateRange.label === opt ? 'var(--primary, #2563eb)' : '#374151',
+                      background: dateRange.label === opt ? 'rgba(37, 99, 235, 0.05)' : 'transparent',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }}
+                    onClick={() => {
+                      if (opt !== 'Custom Range') {
+                        setDateRange({ label: opt, startDate: null, endDate: null });
+                        setIsDatePickerOpen(false);
+                      } else {
+                        setDateRange(prev => ({ ...prev, label: opt }));
+                      }
+                    }}
+                  >
+                    <span>{opt}</span>
+                    {dateRange.label === opt && (
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
+                  </div>
+                ))}
+
+                {/* Custom Date Inputs if Custom Range is active */}
+                {dateRange.label === 'Custom Range' && (
+                  <div style={{
+                    borderTop: '1px solid rgba(0, 0, 0, 0.06)',
+                    paddingTop: '8px',
+                    marginTop: '4px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px'
+                  }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <span style={{ fontSize: '10px', color: '#9ca3af', fontWeight: 'bold', textAlign: 'left' }}>START DATE</span>
+                      <input 
+                        type="date" 
+                        value={dateRange.startDate || ''}
+                        onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          padding: '6px',
+                          border: '1px solid rgba(0,0,0,0.12)',
+                          borderRadius: '6px',
+                          fontSize: '12px',
+                          outline: 'none',
+                          width: '100%',
+                          color: '#374151'
+                        }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <span style={{ fontSize: '10px', color: '#9ca3af', fontWeight: 'bold', textAlign: 'left' }}>END DATE</span>
+                      <input 
+                        type="date" 
+                        value={dateRange.endDate || ''}
+                        onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          padding: '6px',
+                          border: '1px solid rgba(0,0,0,0.12)',
+                          borderRadius: '6px',
+                          fontSize: '12px',
+                          outline: 'none',
+                          width: '100%',
+                          color: '#374151'
+                        }}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      className="primary-btn justify-center"
+                      style={{ fontSize: '11px', padding: '8px', width: '100%', fontWeight: '700' }}
+                      onClick={() => setIsDatePickerOpen(false)}
+                      disabled={!dateRange.startDate || !dateRange.endDate}
+                    >
+                      Apply Range
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           
 
@@ -221,6 +427,24 @@ export default function Dashboard() {
             <div className="db-source-details">
               <span className="db-source-label">Call Leads</span>
               <span className="db-source-value">{activeStats.callLeads.toLocaleString()}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Walk-in Leads Card */}
+        <div className="db-source-card">
+          <div className="db-source-top">
+            <div className="db-source-icon-wrap walkin" style={{ color: '#db2777' }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '28px', height: '28px' }}>
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
+            </div>
+            <div className="db-source-details">
+              <span className="db-source-label">Walk-in Leads</span>
+              <span className="db-source-value">{activeStats.walkinLeads.toLocaleString()}</span>
             </div>
           </div>
         </div>

@@ -164,18 +164,23 @@ export default function Topbar() {
                     <span>🗂️ Go to Leads spreadsheet Grid</span>
                     <span className="cmd-shortcut">G + G</span>
                   </div>
-                  <div className="cmd-item" onClick={() => { setActiveView('analytics'); setCmdOpen(false); }}>
-                    <span>📈 Go to Visual Analytics Report</span>
-                    <span className="cmd-shortcut">G + A</span>
-                  </div>
+                  {activeRole !== 'Counselor' && (
+                    <div className="cmd-item" onClick={() => { setActiveView('analytics'); setCmdOpen(false); }}>
+                      <span>📈 Go to Visual Analytics Report</span>
+                      <span className="cmd-shortcut">G + A</span>
+                    </div>
+                  )}
                   <div className="cmd-item" onClick={() => { setActiveView('whatsapp'); setCmdOpen(false); }}>
                     <span>💬 Go to WhatsApp Chat Console</span>
                     <span className="cmd-shortcut">G + W</span>
                   </div>
-                  <div className="cmd-item" onClick={() => { setActiveView('settings'); setCmdOpen(false); }}>
-                    <span>⚙️ Go to System Configurations</span>
-                    <span className="cmd-shortcut">G + S</span>
-                  </div>
+                  {activeRole === 'Admin' && (
+                    <div className="cmd-item" onClick={() => { setActiveView('settings'); setCmdOpen(false); }}>
+                      <span>⚙️ Go to System Configurations</span>
+                      <span className="cmd-shortcut">G + S</span>
+                    </div>
+                  )}
+
 
                   <div className="cmd-section-title">Quick Actions</div>
                   <div className="cmd-item" onClick={() => { setSelectedLeadId(null); setShowDetailModal(true); setActiveView('grid'); setCmdOpen(false); }}>

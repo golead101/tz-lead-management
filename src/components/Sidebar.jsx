@@ -192,10 +192,14 @@ export default function Sidebar() {
       {/* Main navigation list */}
       <nav className="navigation-menu">
         {menuItems.map(item => {
-          // If Counselor and settings tab, exclude it
-          if (item.id === 'settings' && activeRole === 'Counselor') {
+          // Role-based tab exclusions
+          if (activeRole === 'Counselor' && (item.id === 'settings' || item.id === 'reports' || item.id === 'courses')) {
             return null;
           }
+          if (activeRole === 'Manager' && (item.id === 'settings' || item.id === 'courses')) {
+            return null;
+          }
+          // Admin has all tabs access, no exclusions
           return (
             <button
               key={item.id}

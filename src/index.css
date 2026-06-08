@@ -3694,7 +3694,7 @@ textarea.form-control {
 /* Source KPIs Row (Top Row) */
 .db-source-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 20px;
   margin-bottom: 24px;
 }
