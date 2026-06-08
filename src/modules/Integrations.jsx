@@ -2,7 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { useCRM } from '../context/CRMContext';
 
 export default function Integrations() {
-  const { integrations, updateIntegration, addLead, showToastMsg } = useCRM();
+  const { leads, integrations, updateIntegration, addLead, showToastMsg } = useCRM();
+
+  const getCapturedCount = (platform) => {
+    let sourceNames = [];
+    if (platform === 'meta') sourceNames = ['Meta Ads', 'Meta'];
+    else if (platform === 'google') sourceNames = ['Google Search', 'Google Ads', 'Google'];
+    else if (platform === 'whatsapp') sourceNames = ['WhatsApp Inbound', 'WhatsApp'];
+    else if (platform === 'webhooks') sourceNames = ['Website Form', 'Website'];
+    
+    return leads.filter(l => sourceNames.includes(l.source)).length;
+  };
 
   // Active configuration drawer state
   const [selectedPlatform, setSelectedPlatform] = useState(null);
@@ -390,7 +400,7 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
               </span>
               
               <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>
-                {integrations.meta.simulatedLeadsCount.toLocaleString()} leads captured
+                {getCapturedCount('meta').toLocaleString()} leads captured
               </span>
             </div>
 
@@ -465,7 +475,7 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
               </span>
               
               <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>
-                {integrations.google.simulatedLeadsCount.toLocaleString()} leads captured
+                {getCapturedCount('google').toLocaleString()} leads captured
               </span>
             </div>
 
@@ -537,7 +547,7 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
               </span>
               
               <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>
-                {integrations.whatsapp.simulatedLeadsCount.toLocaleString()} leads captured
+                {getCapturedCount('whatsapp').toLocaleString()} leads captured
               </span>
             </div>
 

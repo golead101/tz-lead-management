@@ -5,7 +5,7 @@ export default function Dashboard() {
   const { leads, activeUser } = useCRM();
 
   // Mode to toggle between exact mockup visual matches and live dynamic CRM computations!
-  const [dataSource, setDataSource] = useState('mockup'); // 'mockup' or 'live'
+  const [dataSource, setDataSource] = useState('live'); // 'mockup' or 'live'
 
   // 1. Exact Mockup Data representing the provided image
   const mockupStats = {
