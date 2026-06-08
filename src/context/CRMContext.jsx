@@ -88,8 +88,8 @@ const DEFAULT_INTEGRATIONS = {
 };
 
 const DEFAULT_COUNSELORS = [
-  { id: 'coun-maha', name: 'Maha', email: 'maha@academy.com', password: 'maha123', role: 'Counselor' },
-  { id: 'coun-irfan', name: 'Irfan', email: 'irfan@academy.com', password: 'irfan123', role: 'Counselor' }
+  { id: 'coun-maha', name: 'Maha', email: 'maha@academy.com', password: 'maha123', role: 'Counselor', status: 'Active' },
+  { id: 'coun-irfan', name: 'Irfan', email: 'irfan@academy.com', password: 'irfan123', role: 'Counselor', status: 'Active' }
 ];
 
 // Rich Seed Data of 12 Leads
@@ -427,13 +427,31 @@ export const CRMProvider = ({ children }) => {
 
   const login = (email, password) => {
     const formattedEmail = email.toLowerCase().trim();
+    
+    // Check if the counselor is deactivated first
+    const counselorByEmail = counselors.find(c => c.email.toLowerCase() === formattedEmail);
+    if (counselorByEmail && counselorByEmail.status === 'Deactivated') {
+      showToastMsg('This account has been deactivated. Please contact an Admin.', 'error');
+      return { success: false, reason: 'deactivated' };
+    }
+    
+    // Check static fallback accounts for deactivation
+    if (formattedEmail === 'counselor' || formattedEmail === 'elena@academy.com' || formattedEmail === 'maha@academy.com') {
+      const nameToFind = (formattedEmail === 'maha@academy.com' || formattedEmail === 'counselor') ? 'Maha' : 'Elena Gilbert';
+      const found = counselors.find(c => c.name === nameToFind || c.email.toLowerCase() === formattedEmail);
+      if (found && found.status === 'Deactivated') {
+        showToastMsg('This account has been deactivated. Please contact an Admin.', 'error');
+        return { success: false, reason: 'deactivated' };
+      }
+    }
+
     if (formattedEmail === 'admin' || formattedEmail === 'stefan@academy.com') {
       if (password === 'admin' || password === 'stefan123') {
         setActiveRole('Admin');
         setActiveUser('Stefan Salvatore');
         setIsLoggedIn(true);
         showToastMsg('Logged in as Admin: Stefan Salvatore', 'success');
-        return true;
+        return { success: true };
       }
     } else if (formattedEmail === 'manager' || formattedEmail === 'damon@academy.com' || formattedEmail === 'irfan@academy.com') {
       if (password === 'manager' || password === 'damon123' || password === 'irfan123') {
@@ -441,18 +459,17 @@ export const CRMProvider = ({ children }) => {
         setActiveUser('Irfan');
         setIsLoggedIn(true);
         showToastMsg('Logged in as Manager: Irfan', 'success');
-        return true;
+        return { success: true };
       }
     } else {
       // Dynamic counselor lookup
-      const foundCounselor = counselors.find(c => c.email.toLowerCase() === formattedEmail);
-      if (foundCounselor) {
-        if (password === foundCounselor.password || password.toLowerCase() === 'counselor' || password.toLowerCase() === `${foundCounselor.name.split(' ')[0].toLowerCase()}123`) {
+      if (counselorByEmail) {
+        if (password === counselorByEmail.password || password.toLowerCase() === 'counselor' || password.toLowerCase() === `${counselorByEmail.name.split(' ')[0].toLowerCase()}123`) {
           setActiveRole('Counselor');
-          setActiveUser(foundCounselor.name);
+          setActiveUser(counselorByEmail.name);
           setIsLoggedIn(true);
-          showToastMsg(`Logged in as Counselor: ${foundCounselor.name}`, 'success');
-          return true;
+          showToastMsg(`Logged in as Counselor: ${counselorByEmail.name}`, 'success');
+          return { success: true };
         }
       }
       
@@ -463,11 +480,11 @@ export const CRMProvider = ({ children }) => {
           setActiveUser('Maha');
           setIsLoggedIn(true);
           showToastMsg('Logged in as Counselor: Maha', 'success');
-          return true;
+          return { success: true };
         }
       }
     }
-    return false;
+    return { success: false, reason: 'invalid' };
   };
 
   const logout = () => {
@@ -603,7 +620,10 @@ export const CRMProvider = ({ children }) => {
           });
           batch.commit().catch(err => console.error("Firestore seeding counselors failed:", err));
         } else {
-          const counselorsData = snapshot.docs.map(doc => doc.data());
+          const counselorsData = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return { status: 'Active', ...data };
+          });
           setCounselors(counselorsData);
         }
       }, (err) => {
@@ -1415,6 +1435,12 @@ export const CRMProvider = ({ children }) => {
     showToastMsg(`Course "${courseData.name}" added to list.`);
   };
 
+  // Course Remover
+  const removeCourse = (courseId) => {
+    setCourses(prev => prev.filter(c => c.id !== courseId));
+    showToastMsg('Course removed successfully.', 'error');
+  };
+
   // Stage Adder
   const addStage = (stageData) => {
     const nextVal = `st-${Date.now()}`;
@@ -1451,7 +1477,8 @@ export const CRMProvider = ({ children }) => {
       name: name,
       email: email,
       password: password,
-      role: 'Counselor'
+      role: 'Counselor',
+      status: 'Active'
     };
 
     if (isFirebaseEnabled) {
@@ -1478,6 +1505,26 @@ export const CRMProvider = ({ children }) => {
       setCounselors(prev => prev.filter(c => c.id !== counselorId));
     }
     showToastMsg('Counselor removed successfully.', 'error');
+  };
+
+  const updateCounselorStatus = (counselorId, status) => {
+    const nextCounselors = counselors.map(c => {
+      if (c.id === counselorId) {
+        return { ...c, status };
+      }
+      return c;
+    });
+
+    if (isFirebaseEnabled) {
+      setDoc(doc(db, 'counselors', counselorId), { status }, { merge: true })
+        .catch(err => {
+          console.error("Firestore updateCounselorStatus failed, falling back to local update:", err);
+          setCounselors(nextCounselors);
+        });
+    } else {
+      setCounselors(nextCounselors);
+    }
+    showToastMsg(`Counselor status updated to ${status}.`);
   };
 
   // Clear Notifications
@@ -1549,6 +1596,8 @@ export const CRMProvider = ({ children }) => {
       counselors,
       addCounselor,
       removeCounselor,
+      removeCourse,
+      updateCounselorStatus,
       
       login,
       logout,

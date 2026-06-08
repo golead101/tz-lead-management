@@ -140,7 +140,9 @@ export default function KanbanView() {
             >
               <option value="All">All Counselors</option>
               {counselors.map(c => (
-                <option key={c.id} value={c.name}>{c.name}</option>
+                <option key={c.id} value={c.name}>
+                  {c.name} {c.status === 'Deactivated' ? '(Deactivated)' : ''}
+                </option>
               ))}
             </select>
           )}

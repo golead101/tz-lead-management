@@ -104,29 +104,6 @@ export default function Topbar() {
 
       {/* Dynamic Actions */}
       <div className="topbar-actions">
-        {/* Firebase Connection Status Badge */}
-        <div className="firebase-status-badge" style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          padding: '6px 12px',
-          borderRadius: '20px',
-          fontSize: '11px',
-          fontWeight: '600',
-          background: isFirebaseEnabled ? 'rgba(16, 185, 129, 0.1)' : 'rgba(107, 114, 128, 0.1)',
-          color: isFirebaseEnabled ? '#10B981' : '#6B7280',
-          border: isFirebaseEnabled ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid rgba(107, 114, 128, 0.2)',
-          marginRight: '12px'
-        }}>
-          <span style={{
-            width: '6px',
-            height: '6px',
-            borderRadius: '50%',
-            background: isFirebaseEnabled ? '#10B981' : '#6B7280',
-            boxShadow: isFirebaseEnabled ? '0 0 8px #10B981' : 'none'
-          }} />
-          {isFirebaseEnabled ? 'Firestore Live' : 'Offline Mode (Local Cache)'}
-        </div>
 
         {/* Simulated Session Control */}
         <div className="role-switcher-container">
@@ -157,56 +134,7 @@ export default function Topbar() {
           </div>
         )}
 
-        {/* Notifications feed */}
-        <div style={{ position: 'relative' }}>
-          <button 
-            className="notification-bell-btn"
-            onClick={() => setNotifOpen(!notifOpen)}
-          >
-            <svg viewBox="0 0 24 24">
-              <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" />
-            </svg>
-            {unreadCount > 0 && <div className="notification-badge" />}
-          </button>
 
-          {notifOpen && (
-            <div className="notification-dropdown">
-              <div className="notification-header">
-                <span>Alerts Feed ({unreadCount})</span>
-                {notifications.length > 0 && (
-                  <button 
-                    className="notification-clear-btn"
-                    onClick={clearNotifications}
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-              <div className="notification-list">
-                {notifications.length === 0 ? (
-                  <div className="text-center" style={{ padding: '20px 0', color: 'var(--text-muted)' }}>
-                    No pending alarms.
-                  </div>
-                ) : (
-                  notifications.map(n => (
-                    <div 
-                      key={n.id} 
-                      className="notification-item"
-                      onClick={() => handleNotifClick(n)}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <span className="notification-item-title">{n.title}</span>
-                      <span style={{ color: 'var(--text-secondary)' }}>{n.content}</span>
-                      <span className="notification-item-time">
-                        {new Date(n.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          )}
-        </div>
       </div>
 
       {/* ==================================================================

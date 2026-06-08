@@ -479,7 +479,13 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
                     value={formCounselor}
                     onChange={(e) => setFormCounselor(e.target.value)}
                   >
-                    {counselors.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                    {counselors
+                      .filter(c => c.status === 'Active' || c.name === formCounselor)
+                      .map(c => (
+                        <option key={c.id} value={c.name}>
+                          {c.name} {c.status === 'Deactivated' ? '(Deactivated)' : ''}
+                        </option>
+                      ))}
                   </select>
                 </div>
               )}
@@ -839,7 +845,13 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
                     value={demoTrainer}
                     onChange={(e) => setDemoTrainer(e.target.value)}
                   >
-                    {counselors.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                    {counselors
+                      .filter(c => c.status === 'Active' || c.name === demoTrainer)
+                      .map(c => (
+                        <option key={c.id} value={c.name}>
+                          {c.name} {c.status === 'Deactivated' ? '(Deactivated)' : ''}
+                        </option>
+                      ))}
                   </select>
                 </div>
                 <div>

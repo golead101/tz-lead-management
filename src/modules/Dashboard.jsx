@@ -6,6 +6,8 @@ export default function Dashboard() {
 
   // Mode to toggle between exact mockup visual matches and live dynamic CRM computations!
   const [dataSource, setDataSource] = useState('live'); // 'mockup' or 'live'
+  const [hoveredPoint, setHoveredPoint] = useState(null);
+  const [timeRange, setTimeRange] = useState('7days'); // '7days', '1month', '1year'
 
   // 1. Exact Mockup Data representing the provided image
   const mockupStats = {
@@ -75,6 +77,50 @@ export default function Dashboard() {
   const whatsappOffset = -(metaStroke + googleStroke);
   const websiteOffset = -(metaStroke + googleStroke + whatsappStroke);
 
+  // Dynamic Graph Data Generation
+  const graphDatasets = {
+    '7days': [
+      { label: 'May 12', value: 280 }, { label: 'May 13', value: 520 }, { label: 'May 14', value: 750 },
+      { label: 'May 15', value: 960 }, { label: 'May 16', value: 1247 }, { label: 'May 17', value: 960 },
+      { label: 'May 18', value: 1390 }
+    ],
+    '1month': [
+      { label: 'Week 1', value: 3400 }, { label: 'Week 2', value: 4100 }, { label: 'Week 3', value: 2900 },
+      { label: 'Week 4', value: 5200 }
+    ],
+    '1year': [
+      { label: 'Jan', value: 12000 }, { label: 'Feb', value: 15000 }, { label: 'Mar', value: 18500 },
+      { label: 'Apr', value: 14200 }, { label: 'May', value: 21000 }, { label: 'Jun', value: 25000 },
+      { label: 'Jul', value: 23000 }, { label: 'Aug', value: 28000 }, { label: 'Sep', value: 31000 },
+      { label: 'Oct', value: 29000 }, { label: 'Nov', value: 35000 }, { label: 'Dec', value: 42000 }
+    ]
+  };
+
+  const activeGraphData = graphDatasets[timeRange];
+  const maxGraphValue = Math.max(...activeGraphData.map(d => d.value)) || 100;
+  const yMultiplier = 180 / (maxGraphValue * 1.1); // 200 is bottom, 20 is top, 180 is height
+
+  const computedPoints = activeGraphData.map((d, i) => {
+    const cx = 60 + i * (390 / (activeGraphData.length - 1));
+    const cy = 200 - (d.value * yMultiplier);
+    const colW = 390 / (activeGraphData.length - 1);
+    const colX = cx - colW / 2;
+    return { ...d, cx, cy, colX, colW };
+  });
+
+  let linePath = `M ${computedPoints[0].cx},${computedPoints[0].cy}`;
+  for (let i = 1; i < computedPoints.length; i++) {
+    const prev = computedPoints[i - 1];
+    const curr = computedPoints[i];
+    const midX = (prev.cx + curr.cx) / 2;
+    linePath += ` C ${midX},${prev.cy} ${midX},${curr.cy} ${curr.cx},${curr.cy}`;
+  }
+  const shadedPath = linePath + ` L ${computedPoints[computedPoints.length - 1].cx},200 L ${computedPoints[0].cx},200 Z`;
+
+  // Compute Y-Axis labels dynamically
+  const maxRounded = Math.ceil(maxGraphValue * 1.1 / 100) * 100;
+  const yLabels = [0, maxRounded * 0.166, maxRounded * 0.333, maxRounded * 0.5, maxRounded * 0.666, maxRounded * 0.833, maxRounded].map(v => Math.round(v));
+
   return (
     <div className="fade-in" style={{ padding: '4px' }}>
       
@@ -82,21 +128,7 @@ export default function Dashboard() {
       <div className="db-header">
         <h2 className="db-title">Dashboard</h2>
         <div className="db-header-actions">
-          {/* Subtle Dynamic toggle control to prove developer capability */}
-          <button 
-            className="db-chart-dropdown" 
-            onClick={() => setDataSource(prev => prev === 'mockup' ? 'live' : 'mockup')}
-            style={{ 
-              borderColor: '#3b82f6', 
-              color: '#2563eb', 
-              background: 'rgba(37, 99, 235, 0.05)',
-              marginRight: '8px'
-            }}
-            title="Toggle between Static Mockup values and Live dynamic CRM data"
-          >
-            ⚡ Data Source: {dataSource === 'mockup' ? 'Mockup Mode' : 'Live CRM Context'}
-          </button>
-          
+
           <div className="db-date-picker">
             May 12 – May 18, 2024
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -107,18 +139,7 @@ export default function Dashboard() {
             </svg>
           </div>
           
-          <button className="db-bell-btn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-            </svg>
-            <div className="db-bell-badge" />
-          </button>
-          
-          <div className="db-avatar-circle" title={`Logged in as ${activeUser}`}>
-            <svg viewBox="0 0 24 24" fill="currentColor">
-              <path fillRule="evenodd" d="M18.685 19.097A9.723 9.723 0 0021.75 12c0-5.385-4.365-9.75-9.75-9.75S2.25 6.615 2.25 12c0 2.72.186 5.4.54 8.012A1 1 0 003.78 20.8h16.44a1 1 0 00.916-.623 9.695 9.695 0 00-.451-1.08zm-7.653-9.52c0-1.393 1.13-2.523 2.523-2.523s2.523 1.13 2.523 2.523-1.13 2.523-2.523 2.523-2.523-1.13-2.523-2.523zm-3.34 7.64c.244-1.722 1.718-3.05 3.511-3.05h1.996c1.793 0 3.267 1.328 3.51 3.05H7.691z" clipRule="evenodd" />
-            </svg>
-          </div>
+
         </div>
       </div>
 
@@ -211,9 +232,18 @@ export default function Dashboard() {
         <div className="db-chart-card">
           <div className="db-chart-header">
             <h3 className="db-chart-title">Leads Over Time</h3>
-            <div className="db-chart-dropdown">
-              Last 7 Days
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+              <select 
+                className="db-chart-dropdown" 
+                value={timeRange}
+                onChange={(e) => setTimeRange(e.target.value)}
+                style={{ appearance: 'none', paddingRight: '24px', background: 'transparent', border: 'none', outline: 'none', cursor: 'pointer' }}
+              >
+                <option value="7days">Last 7 Days</option>
+                <option value="1month">Last 1 Month</option>
+                <option value="1year">Last 1 Year</option>
+              </select>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: '14px', height: '14px', position: 'absolute', right: '8px', pointerEvents: 'none', color: 'var(--text-secondary)' }}>
                 <polyline points="6 9 12 15 18 9" />
               </svg>
             </div>
@@ -240,68 +270,58 @@ export default function Dashboard() {
               <line x1="45" y1="200" x2="480" y2="200" stroke="rgba(0,0,0,0.08)" />
 
               {/* Y Axis Labels */}
-              <text x="30" y="203" fill="#9ca3af" fontSize="10" textAnchor="end">0</text>
-              <text x="30" y="173" fill="#9ca3af" fontSize="10" textAnchor="end">250</text>
-              <text x="30" y="143" fill="#9ca3af" fontSize="10" textAnchor="end">500</text>
-              <text x="30" y="113" fill="#9ca3af" fontSize="10" textAnchor="end">750</text>
-              <text x="30" y="83" fill="#9ca3af" fontSize="10" textAnchor="end">1,000</text>
-              <text x="30" y="53" fill="#9ca3af" fontSize="10" textAnchor="end">1,250</text>
-              <text x="30" y="23" fill="#9ca3af" fontSize="10" textAnchor="end">1,500</text>
+              <text x="30" y="203" fill="#9ca3af" fontSize="10" textAnchor="end">{yLabels[0].toLocaleString()}</text>
+              <text x="30" y="173" fill="#9ca3af" fontSize="10" textAnchor="end">{yLabels[1].toLocaleString()}</text>
+              <text x="30" y="143" fill="#9ca3af" fontSize="10" textAnchor="end">{yLabels[2].toLocaleString()}</text>
+              <text x="30" y="113" fill="#9ca3af" fontSize="10" textAnchor="end">{yLabels[3].toLocaleString()}</text>
+              <text x="30" y="83" fill="#9ca3af" fontSize="10" textAnchor="end">{yLabels[4].toLocaleString()}</text>
+              <text x="30" y="53" fill="#9ca3af" fontSize="10" textAnchor="end">{yLabels[5].toLocaleString()}</text>
+              <text x="30" y="23" fill="#9ca3af" fontSize="10" textAnchor="end">{yLabels[6].toLocaleString()}</text>
 
-              {/* Smooth spline curve points coordinates
-                  Point 1: May 12 -> X: 60, Y: 166.4
-                  Point 2: May 13 -> X: 125, Y: 137.6
-                  Point 3: May 14 -> X: 190, Y: 110.0
-                  Point 4: May 15 -> X: 255, Y: 84.8
-                  Point 5: May 16 -> X: 320, Y: 50.4
-                  Point 6: May 17 -> X: 385, Y: 84.8
-                  Point 7: May 18 -> X: 450, Y: 33.2
-              */}
               {/* Shaded Area Under Spline Curve */}
               <path 
-                d="M 60,166.4 
-                   C 92.5,152 92.5,137.6 125,137.6 
-                   C 157.5,137.6 157.5,110.0 190,110.0 
-                   C 222.5,110.0 222.5,84.8 255,84.8 
-                   C 287.5,84.8 287.5,50.4 320,50.4 
-                   C 352.5,50.4 352.5,84.8 385,84.8 
-                   C 417.5,84.8 417.5,33.2 450,33.2 
-                   L 450,200 L 60,200 Z" 
+                d={shadedPath} 
                 fill="url(#chart-blue-grad)" 
               />
 
               {/* Glowing Line Spline */}
               <path 
-                d="M 60,166.4 
-                   C 92.5,152 92.5,137.6 125,137.6 
-                   C 157.5,137.6 157.5,110.0 190,110.0 
-                   C 222.5,110.0 222.5,84.8 255,84.8 
-                   C 287.5,84.8 287.5,50.4 320,50.4 
-                   C 352.5,50.4 352.5,84.8 385,84.8 
-                   C 417.5,84.8 417.5,33.2 450,33.2" 
+                d={linePath} 
                 fill="none" 
                 stroke="var(--primary, #2563eb)" 
                 strokeWidth="3.5" 
                 strokeLinecap="round" 
               />
 
-              {/* Circular Point Markers */}
-              <circle cx="60" cy="166.4" r="5" fill="#ffffff" stroke="var(--primary, #2563eb)" strokeWidth="3" />
-              <circle cx="125" cy="137.6" r="5" fill="#ffffff" stroke="var(--primary, #2563eb)" strokeWidth="3" />
-              <circle cx="190" cy="110.0" r="5" fill="#ffffff" stroke="var(--primary, #2563eb)" strokeWidth="3" />
-              <circle cx="255" cy="84.8" r="5" fill="#ffffff" stroke="var(--primary, #2563eb)" strokeWidth="3" />
-              <circle cx="320" cy="50.4" r="5" fill="#ffffff" stroke="var(--primary, #2563eb)" strokeWidth="3" />
-              <circle cx="385" cy="84.8" r="5" fill="#ffffff" stroke="var(--primary, #2563eb)" strokeWidth="3" />
-              <circle cx="450" cy="33.2" r="5" fill="#ffffff" stroke="var(--primary, #2563eb)" strokeWidth="3" />
+              {/* Vertical Hover Columns for tracking */}
+              {computedPoints.map((pt, i) => (
+                <g key={i} onMouseEnter={() => setHoveredPoint(pt)} onMouseLeave={() => setHoveredPoint(null)} style={{ cursor: 'crosshair' }}>
+                  {/* Invisible full height column for easier hovering */}
+                  <rect x={pt.colX} y="20" width={pt.colW} height="180" fill="transparent" />
+                  
+                  {/* Vertical line ONLY on hover (No dots anywhere!) */}
+                  {hoveredPoint?.label === pt.label && (
+                    <line x1={pt.cx} y1="20" x2={pt.cx} y2="200" stroke="#9ca3af" strokeWidth="1" strokeDasharray="4 4" style={{ pointerEvents: 'none' }} />
+                  )}
+                </g>
+              ))}
+
+              {/* Tooltip Overlay (Fixed at top of vertical line) */}
+              {hoveredPoint && (
+                <g transform={`translate(${hoveredPoint.cx}, 20)`} style={{ pointerEvents: 'none' }}>
+                  <rect x="-45" y="-10" width="90" height="42" rx="6" fill="#1e293b" />
+                  <polygon points="-6,32 6,32 0,38" fill="#1e293b" />
+                  <text x="0" y="6" fill="#f8fafc" fontSize="11" textAnchor="middle" fontWeight="bold">{hoveredPoint.label}</text>
+                  <text x="0" y="22" fill="#94a3b8" fontSize="10" textAnchor="middle">{hoveredPoint.value.toLocaleString()} Leads</text>
+                </g>
+              )}
 
               {/* X Axis Labels */}
-              <text x="60" y="215" fill="#9ca3af" fontSize="10" textAnchor="middle">May 12</text>
-              <text x="125" y="215" fill="#9ca3af" fontSize="10" textAnchor="middle">May 13</text>
-              <text x="190" y="215" fill="#9ca3af" fontSize="10" textAnchor="middle">May 14</text>
-              <text x="255" y="215" fill="#9ca3af" fontSize="10" textAnchor="middle">May 15</text>
-              <text x="320" y="215" fill="#9ca3af" fontSize="10" textAnchor="middle">May 16</text>
-              <text x="385" y="215" fill="#9ca3af" fontSize="10" textAnchor="middle">May 17</text>
-              <text x="450" y="215" fill="#9ca3af" fontSize="10" textAnchor="middle">May 18</text>
+              {computedPoints.map((pt, i) => (
+                <text key={i} x={pt.cx} y="215" fill="#9ca3af" fontSize="10" textAnchor="middle">
+                  {pt.label}
+                </text>
+              ))}
             </svg>
           </div>
         </div>

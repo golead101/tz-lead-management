@@ -12,9 +12,16 @@ export default function LoginScreen() {
   const handleSubmit = (e) => {
     e.preventDefault();
     setErrorMsg('');
-    const success = login(email, password);
-    if (!success) {
-      setErrorMsg('❌ Invalid credentials. Please use the demo credentials below.');
+    const res = login(email, password);
+    if (res === true || (res && res.success)) {
+      // Login success
+    } else {
+      const reason = res && res.reason;
+      if (reason === 'deactivated') {
+        setErrorMsg('❌ This account has been deactivated. Please contact an Admin.');
+      } else {
+        setErrorMsg('❌ Invalid credentials. Please use the demo credentials below.');
+      }
     }
   };
 
