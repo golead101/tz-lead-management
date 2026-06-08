@@ -2,10 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useCRM } from '../context/CRMContext';
 
 export default function Dashboard() {
-  const { leads, activeUser } = useCRM();
+  const { leads, activeUser, activeRole } = useCRM();
 
-  // Mode to toggle between exact mockup visual matches and live dynamic CRM computations!
-  const [dataSource, setDataSource] = useState('live'); // 'mockup' or 'live'
   const [hoveredPoint, setHoveredPoint] = useState(null);
   const [timeRange, setTimeRange] = useState('7days'); // '7days', '1month', '1year'
 
@@ -30,6 +28,14 @@ export default function Dashboard() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Filter leads based on counselor permissions (counselors only see their own leads)
+  const roleFilteredLeads = leads.filter(lead => {
+    if (activeRole === 'Counselor') {
+      return lead.counselor === activeUser;
+    }
+    return true;
+  });
+
   const formatDateRangeText = () => {
     if (dateRange.label !== 'Custom Range') {
       const end = new Date();
@@ -42,8 +48,8 @@ export default function Dashboard() {
         start.setDate(1);
       } else {
         // All Time
-        if (leads.length === 0) return 'All Time';
-        const dates = leads.map(l => new Date(l.createdDate)).filter(d => !isNaN(d));
+        if (roleFilteredLeads.length === 0) return 'All Time';
+        const dates = roleFilteredLeads.map(l => new Date(l.createdDate)).filter(d => !isNaN(d));
         if (dates.length === 0) return 'All Time';
         const minDate = new Date(Math.min(...dates));
         const maxDate = new Date(Math.max(...dates));
@@ -62,7 +68,7 @@ export default function Dashboard() {
 
   // Filter leads based on selected date range
   const filteredLeads = (() => {
-    if (dateRange.label === 'All Time') return leads;
+    if (dateRange.label === 'All Time') return roleFilteredLeads;
 
     const end = dateRange.endDate ? new Date(dateRange.endDate) : new Date();
     end.setHours(23, 59, 59, 999);
@@ -81,40 +87,17 @@ export default function Dashboard() {
       start = new Date(dateRange.startDate);
       start.setHours(0, 0, 0, 0);
     } else {
-      return leads;
+      return roleFilteredLeads;
     }
 
-    return leads.filter(l => {
+    return roleFilteredLeads.filter(l => {
       if (!l.createdDate) return false;
       const created = new Date(l.createdDate);
       return created >= start && created <= end;
     });
   })();
 
-  // 1. Exact Mockup Data representing the provided image
-  const mockupStats = {
-    // Source metrics
-    metaLeads: 1247,
-    googleLeads: 892,
-    whatsappLeads: 645,
-    websiteLeads: 523,
-    callLeads: 380,
-    walkinLeads: 165,
-    
-    // Bottom status cards
-    totalLeads: 3307,
-    contacted: 2185,
-    followUps: 1478,
-    converted: 568,
-
-    // Percentages for the donut chart
-    metaPct: 37.7,
-    googlePct: 27.0,
-    whatsappPct: 19.5,
-    websitePct: 15.8
-  };
-
-  // 2. Compute dynamic live stats from the CRM Context leads list for interactive toggling
+  // Compute dynamic live stats from the CRM Context leads list for interactive toggling
   const liveStats = (() => {
     const activeLeads = filteredLeads;
     const total = activeLeads.length || 1;
@@ -147,8 +130,7 @@ export default function Dashboard() {
     };
   })();
 
-  // Select active values based on toggle state
-  const activeStats = dataSource === 'mockup' ? mockupStats : liveStats;
+  const activeStats = liveStats;
 
   // Render SVG Donut segments based on HSL tailored colors
   // Circumference of circle with r=40 is 251.327
@@ -163,23 +145,59 @@ export default function Dashboard() {
   const whatsappOffset = -(metaStroke + googleStroke);
   const websiteOffset = -(metaStroke + googleStroke + whatsappStroke);
 
-  // Dynamic Graph Data Generation
+  // Dynamic Graph Data Generation from live filtered leads
   const graphDatasets = {
-    '7days': [
-      { label: 'May 12', value: 280 }, { label: 'May 13', value: 520 }, { label: 'May 14', value: 750 },
-      { label: 'May 15', value: 960 }, { label: 'May 16', value: 1247 }, { label: 'May 17', value: 960 },
-      { label: 'May 18', value: 1390 }
-    ],
-    '1month': [
-      { label: 'Week 1', value: 3400 }, { label: 'Week 2', value: 4100 }, { label: 'Week 3', value: 2900 },
-      { label: 'Week 4', value: 5200 }
-    ],
-    '1year': [
-      { label: 'Jan', value: 12000 }, { label: 'Feb', value: 15000 }, { label: 'Mar', value: 18500 },
-      { label: 'Apr', value: 14200 }, { label: 'May', value: 21000 }, { label: 'Jun', value: 25000 },
-      { label: 'Jul', value: 23000 }, { label: 'Aug', value: 28000 }, { label: 'Sep', value: 31000 },
-      { label: 'Oct', value: 29000 }, { label: 'Nov', value: 35000 }, { label: 'Dec', value: 42000 }
-    ]
+    '7days': (() => {
+      const data = [];
+      const end = dateRange.endDate ? new Date(dateRange.endDate) : new Date();
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(end);
+        d.setDate(end.getDate() - i);
+        const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const count = filteredLeads.filter(l => {
+          if (!l.createdDate) return false;
+          const created = new Date(l.createdDate);
+          return created.toDateString() === d.toDateString();
+        }).length;
+        data.push({ label, value: count });
+      }
+      return data;
+    })(),
+    '1month': (() => {
+      const data = [];
+      const end = dateRange.endDate ? new Date(dateRange.endDate) : new Date();
+      for (let i = 3; i >= 0; i--) {
+        const wEnd = new Date(end);
+        wEnd.setDate(end.getDate() - (i * 7));
+        const wStart = new Date(wEnd);
+        wStart.setDate(wEnd.getDate() - 6);
+        wStart.setHours(0,0,0,0);
+        wEnd.setHours(23,59,59,999);
+        const label = `Week ${4 - i}`;
+        const count = filteredLeads.filter(l => {
+          if (!l.createdDate) return false;
+          const created = new Date(l.createdDate);
+          return created >= wStart && created <= wEnd;
+        }).length;
+        data.push({ label, value: count });
+      }
+      return data;
+    })(),
+    '1year': (() => {
+      const data = [];
+      const end = dateRange.endDate ? new Date(dateRange.endDate) : new Date();
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date(end.getFullYear(), end.getMonth() - i, 1);
+        const label = d.toLocaleDateString('en-US', { month: 'short' });
+        const count = filteredLeads.filter(l => {
+          if (!l.createdDate) return false;
+          const created = new Date(l.createdDate);
+          return created.getFullYear() === d.getFullYear() && created.getMonth() === d.getMonth();
+        }).length;
+        data.push({ label, value: count });
+      }
+      return data;
+    })()
   };
 
   const activeGraphData = graphDatasets[timeRange];
@@ -203,8 +221,10 @@ export default function Dashboard() {
   }
   const shadedPath = linePath + ` L ${computedPoints[computedPoints.length - 1].cx},200 L ${computedPoints[0].cx},200 Z`;
 
-  // Compute Y-Axis labels dynamically
-  const maxRounded = Math.ceil(maxGraphValue * 1.1 / 100) * 100;
+  // Compute Y-Axis labels dynamically based on max value size
+  const maxVal = maxGraphValue * 1.1;
+  const factor = maxVal > 1000 ? 1000 : (maxVal > 100 ? 100 : (maxVal > 10 ? 10 : 1));
+  const maxRounded = Math.ceil(maxVal / factor) * factor || 10;
   const yLabels = [0, maxRounded * 0.166, maxRounded * 0.333, maxRounded * 0.5, maxRounded * 0.666, maxRounded * 0.833, maxRounded].map(v => Math.round(v));
 
   return (
