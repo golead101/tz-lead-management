@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useCRM } from '../context/CRMContext';
+import { db } from '../firebase';
+import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 
 export default function Integrations() {
   const { leads, integrations, updateIntegration, addLead, showToastMsg } = useCRM();
@@ -19,8 +21,14 @@ export default function Integrations() {
 
   // Form input states
   const [metaFields, setMetaFields] = useState({ appId: '', pageId: '', systemToken: '', webhookVerifyToken: '' });
-  const [googleFields, setGoogleFields] = useState({ developerToken: '', customerId: '', clientId: '', clientSecret: '', webhookPasskey: '' });
+  const [googleFields, setGoogleFields] = useState({ developerToken: '', customerId: '', clientId: '', clientSecret: '', refreshToken: '', webhookPasskey: '' });
   const [whatsappFields, setWhatsAppFields] = useState({ phoneNumberId: '', businessAccountId: '', systemToken: '' });
+
+  // Google Ads API connection and sync statuses
+  const [isValidating, setIsValidating] = useState(false);
+  const [validationResult, setValidationResult] = useState(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncLogs, setSyncLogs] = useState([]);
   const [webhookFields, setWebhookFields] = useState({ securitySecret: '', webhookUrlSlug: '' });
 
   // Sync state to inputs when selecting a platform
@@ -34,12 +42,14 @@ export default function Integrations() {
       });
     } else if (selectedPlatform === 'google') {
       setGoogleFields({
-        developerToken: integrations.google.developerToken || '',
+        developerToken: integrations.google.developerToken ? '••••••••••••••••' : '',
         customerId: integrations.google.customerId || '',
         clientId: integrations.google.clientId || '',
-        clientSecret: integrations.google.clientSecret || '',
+        clientSecret: integrations.google.clientSecret ? '••••••••••••••••' : '',
+        refreshToken: integrations.google.refreshToken ? '••••••••••••••••' : '',
         webhookPasskey: integrations.google.webhookPasskey || ''
       });
+      setValidationResult(null);
     } else if (selectedPlatform === 'whatsapp') {
       setWhatsAppFields({
         phoneNumberId: integrations.whatsapp.phoneNumberId || '',
@@ -53,6 +63,102 @@ export default function Integrations() {
       });
     }
   }, [selectedPlatform, integrations]);
+
+  // Subscribe to Google Ads logs from Firestore
+  useEffect(() => {
+    if (selectedPlatform === 'google') {
+      const q = query(collection(db, 'googleAdsLogs'), orderBy('timestamp', 'desc'), limit(5));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const logs = [];
+        snapshot.forEach((doc) => {
+          logs.push({ id: doc.id, ...doc.data() });
+        });
+        setSyncLogs(logs);
+      }, (err) => {
+        console.error("Error subscribing to Google Ads logs:", err);
+      });
+      return () => unsubscribe();
+    }
+  }, [selectedPlatform]);
+
+  // Connection testing helper
+  const testGoogleAdsConnection = async () => {
+    if (!googleFields.customerId) {
+      showToastMsg('Customer ID is required to test connection.', 'error');
+      return;
+    }
+    setIsValidating(true);
+    setValidationResult(null);
+
+    const fieldsToValidate = {
+      customerId: googleFields.customerId,
+      developerToken: googleFields.developerToken === '••••••••••••••••' ? integrations.google.developerToken : googleFields.developerToken,
+      clientId: googleFields.clientId,
+      clientSecret: googleFields.clientSecret === '••••••••••••••••' ? integrations.google.clientSecret : googleFields.clientSecret,
+      refreshToken: googleFields.refreshToken === '••••••••••••••••' ? integrations.google.refreshToken : googleFields.refreshToken
+    };
+
+    try {
+      const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const functionUrlBase = isDev 
+        ? 'http://127.0.0.1:5001/tz-lead-management/us-central1' 
+        : 'https://us-central1-tz-lead-management.cloudfunctions.net';
+      const functionUrl = `${functionUrlBase}/googleAdsValidate`;
+      const response = await fetch(functionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(fieldsToValidate)
+      });
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
+        setValidationResult({ success: true, message: 'Google Ads API authenticated successfully!' });
+        showToastMsg('Google Ads connection verified!', 'success');
+        updateIntegration('google', {
+          ...fieldsToValidate,
+          enabled: true,
+          status: 'Connected'
+        });
+      } else {
+        setValidationResult({ success: false, message: data.details || data.error || 'Connection verification failed.' });
+        showToastMsg(data.error || 'OAuth / API connection failed.', 'error');
+      }
+    } catch (err) {
+      console.error('Validation error:', err);
+      setValidationResult({ success: false, message: 'Could not communicate with Firebase validation function.' });
+      showToastMsg('Could not reach Cloud Function.', 'error');
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
+  // Reconciliation manual sync helper
+  const forceGoogleAdsSync = async () => {
+    setIsSyncing(true);
+    try {
+      const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const functionUrlBase = isDev 
+        ? 'http://127.0.0.1:5001/tz-lead-management/us-central1' 
+        : 'https://us-central1-tz-lead-management.cloudfunctions.net';
+      const functionUrl = `${functionUrlBase}/googleAdsSync`;
+      const response = await fetch(functionUrl, {
+        method: 'POST'
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        showToastMsg(`Sync successful! Imported ${data.leadsImported} leads.`, 'success');
+      } else {
+        showToastMsg(data.error || 'Sync execution failed.', 'error');
+      }
+    } catch (err) {
+      console.error('Manual sync error:', err);
+      showToastMsg('Sync function execution failed.', 'error');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const hasConfig = (platform) => {
     const data = integrations[platform];
@@ -93,7 +199,15 @@ export default function Integrations() {
       if (!metaFields.appId || !metaFields.systemToken) activeStatus = 'Setup Required';
     } else if (selectedPlatform === 'google') {
       fieldsToSave = { ...googleFields };
-      if (!googleFields.developerToken || !googleFields.customerId) activeStatus = 'Setup Required';
+      if (googleFields.developerToken === '••••••••••••••••') fieldsToSave.developerToken = integrations.google.developerToken;
+      if (googleFields.clientSecret === '••••••••••••••••') fieldsToSave.clientSecret = integrations.google.clientSecret;
+      if (googleFields.refreshToken === '••••••••••••••••') fieldsToSave.refreshToken = integrations.google.refreshToken;
+
+      if (!fieldsToSave.developerToken || !fieldsToSave.customerId || !fieldsToSave.clientId || !fieldsToSave.clientSecret || !fieldsToSave.refreshToken) {
+        activeStatus = 'Setup Required';
+      } else {
+        activeStatus = integrations.google.status === 'Connected' ? 'Connected' : 'Setup Required';
+      }
     } else if (selectedPlatform === 'whatsapp') {
       fieldsToSave = { ...whatsappFields };
       if (!whatsappFields.phoneNumberId || !whatsappFields.systemToken) activeStatus = 'Setup Required';
@@ -716,6 +830,7 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                         <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>Client ID</label>
                         <input 
                           type="text" 
+                          required
                           className="form-control" 
                           style={{ height: '36px', fontSize: '11px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)' }}
                           placeholder="google-client-id"
@@ -727,6 +842,7 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                         <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>Client Secret</label>
                         <input 
                           type="password" 
+                          required
                           className="form-control" 
                           style={{ height: '36px', fontSize: '11px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)' }}
                           placeholder="client-secret"
@@ -734,6 +850,18 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                           onChange={(e) => setGoogleFields({ ...googleFields, clientSecret: e.target.value })}
                         />
                       </div>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>OAuth 2.0 Refresh Token</label>
+                      <input 
+                        type="password" 
+                        required
+                        className="form-control" 
+                        style={{ height: '36px', fontSize: '11px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)' }}
+                        placeholder="OAuth 2.0 Refresh Token"
+                        value={googleFields.refreshToken}
+                        onChange={(e) => setGoogleFields({ ...googleFields, refreshToken: e.target.value })}
+                      />
                     </div>
                     <div className="form-group">
                       <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>Google Webhook Security Passkey (Key)</label>
@@ -746,6 +874,125 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                         value={googleFields.webhookPasskey}
                         onChange={(e) => setGoogleFields({ ...googleFields, webhookPasskey: e.target.value })}
                       />
+                    </div>
+
+                    {/* Google Ads Connection Test Actions */}
+                    <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
+                      <button
+                        type="button"
+                        onClick={testGoogleAdsConnection}
+                        disabled={isValidating}
+                        className="secondary-btn w-full"
+                        style={{
+                          height: '34px',
+                          fontSize: '11px',
+                          fontWeight: '700',
+                          background: 'rgba(47, 107, 255, 0.08)',
+                          color: 'var(--primary)',
+                          border: '1px solid rgba(47, 107, 255, 0.2)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          cursor: isValidating ? 'not-allowed' : 'pointer'
+                        }}
+                      >
+                        {isValidating ? (
+                          <>
+                            <div style={{ width: '12px', height: '12px', border: '2px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                            <span>Verifying...</span>
+                          </>
+                        ) : (
+                          <span>🔌 Test API Connection</span>
+                        )}
+                      </button>
+
+                      {integrations.google.status === 'Connected' && (
+                        <button
+                          type="button"
+                          onClick={forceGoogleAdsSync}
+                          disabled={isSyncing}
+                          className="secondary-btn w-full"
+                          style={{
+                            height: '34px',
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            background: 'rgba(16, 185, 129, 0.08)',
+                            color: '#059669',
+                            border: '1px solid rgba(16, 185, 129, 0.2)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            cursor: isSyncing ? 'not-allowed' : 'pointer'
+                          }}
+                        >
+                          {isSyncing ? (
+                            <>
+                              <div style={{ width: '12px', height: '12px', border: '2px solid rgba(0,0,0,0.1)', borderTopColor: '#059669', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                              <span>Syncing...</span>
+                            </>
+                          ) : (
+                            <span>🔄 Force API Sync</span>
+                          )}
+                        </button>
+                      )}
+                    </div>
+
+                    {validationResult && (
+                      <div style={{ 
+                        marginTop: '8px', 
+                        padding: '10px', 
+                        borderRadius: '6px', 
+                        fontSize: '11px',
+                        background: validationResult.success ? 'rgba(16,185,129,0.06)' : 'rgba(239,68,68,0.06)',
+                        color: validationResult.success ? '#059669' : '#dc2626',
+                        border: validationResult.success ? '1px solid rgba(16,185,129,0.15)' : '1px solid rgba(239,68,68,0.15)',
+                        lineHeight: '1.4'
+                      }}>
+                        <strong>{validationResult.success ? '✓ Connection Active' : '✗ Connection Failed'}</strong>
+                        <p style={{ margin: '4px 0 0 0', wordBreak: 'break-all', fontSize: '10px' }}>{validationResult.message}</p>
+                      </div>
+                    )}
+
+                    {/* Sync Logs Display */}
+                    <div style={{ marginTop: '16px', borderTop: '1px dashed var(--border-color)', paddingTop: '12px' }}>
+                      <h4 style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-primary)', marginBottom: '8px' }}>
+                        📋 Recent Sync & Webhook Logs
+                      </h4>
+                      {syncLogs.length === 0 ? (
+                        <p style={{ fontSize: '10.5px', color: 'var(--text-muted)', fontStyle: 'italic' }}>No sync activities logged yet.</p>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '150px', overflowY: 'auto' }}>
+                          {syncLogs.map((log) => (
+                            <div key={log.id} style={{ 
+                              padding: '8px', 
+                              borderRadius: '4px', 
+                              background: 'rgba(0,0,0,0.015)', 
+                              border: '1px solid var(--border-color)',
+                              fontSize: '10px',
+                              lineHeight: '1.3'
+                            }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                                <span style={{ 
+                                  fontWeight: '700', 
+                                  color: log.status === 'success' ? '#059669' : log.status === 'skipped' ? '#b45309' : '#dc2626',
+                                  textTransform: 'uppercase',
+                                  fontSize: '9px'
+                                }}>
+                                  {log.type} - {log.status}
+                                </span>
+                                <span style={{ color: 'var(--text-muted)', fontSize: '9px' }}>
+                                  {new Date(log.timestamp).toLocaleTimeString()}
+                                </span>
+                              </div>
+                              <span style={{ color: 'var(--text-secondary)' }}>
+                                {log.message || log.errorMessage || (log.leadId ? `Processed Lead: ${log.name || log.leadId}` : 'Google Ads action completed.')}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </>
                 )}

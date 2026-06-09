@@ -67,6 +67,7 @@ const DEFAULT_INTEGRATIONS = {
     customerId: '',
     clientId: '',
     clientSecret: '',
+    refreshToken: '',
     webhookPasskey: '',
     simulatedLeadsCount: 892
   },
