@@ -14,6 +14,7 @@ import Sandbox from './modules/Sandbox';
 import ConfigSettings from './modules/ConfigSettings';
 import Integrations from './modules/Integrations';
 import FollowUps from './modules/FollowUps';
+import LiveFormEmbed from './modules/LiveFormEmbed';
 
 // Beautiful visual page skeleton shimmer loader
 function ShimmerLoader() {
@@ -124,6 +125,16 @@ function MainAppContent() {
 }
 
 export default function App() {
+  const isLiveForm = window.location.pathname === '/live-form';
+
+  if (isLiveForm) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: 'transparent' }}>
+        <LiveFormEmbed />
+      </div>
+    );
+  }
+
   return (
     <CRMProvider>
       <MainAppContent />
