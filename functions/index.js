@@ -546,6 +546,47 @@ exports.encryptGoogleCredentials = functions.firestore
   });
 
 /**
+ * 5. encryptMetaCredentials
+ * Firestore trigger to automatically encrypt sensitive Meta credentials in-place.
+ */
+exports.encryptMetaCredentials = functions.firestore
+  .document('settings/integrations')
+  .onWrite(async (change, context) => {
+    if (!change.after.exists) return null;
+    const data = change.after.data();
+    const meta = data.meta;
+    if (!meta) return null;
+
+    let needsUpdate = false;
+    const updatedMeta = { ...meta };
+
+    const sensitiveFields = ['appSecret', 'verifyToken'];
+
+    const isEncrypted = (val) => {
+      if (!val) return true; // empty is fine
+      const parts = val.split(':');
+      if (parts.length !== 2) return false;
+      const [iv, cipher] = parts;
+      return iv.length === 32 && /^[0-9a-fA-F]+$/.test(iv) && /^[0-9a-fA-F]+$/.test(cipher);
+    };
+
+    sensitiveFields.forEach(field => {
+      const val = meta[field];
+      if (val && !isEncrypted(val)) {
+        updatedMeta[field] = cryptoHelper.encrypt(val);
+        needsUpdate = true;
+      }
+    });
+
+    if (needsUpdate) {
+      console.log('Encrypting Meta credentials in Firestore trigger.');
+      return change.after.ref.set({ meta: updatedMeta }, { merge: true });
+    }
+
+    return null;
+  });
+
+/**
  * Helper to fetch Meta integration credentials from Firestore.
  */
 async function getDecryptedMetaCredentials() {
@@ -560,9 +601,10 @@ async function getDecryptedMetaCredentials() {
   }
   return {
     appId: meta.appId || '',
-    pageId: meta.pageId || '',
-    systemToken: meta.systemToken || '',
+    appSecret: cryptoHelper.decrypt(meta.appSecret),
     webhookVerifyToken: meta.webhookVerifyToken || '',
+    verifyToken: cryptoHelper.decrypt(meta.verifyToken),
+    redirectUri: meta.redirectUri || '',
     enabled: meta.enabled || false,
     status: meta.status || 'Setup Required'
   };
@@ -578,24 +620,30 @@ exports.metaValidate = functions.https.onRequest((req, res) => {
       return res.status(405).json({ error: 'Method not allowed' });
     }
     try {
-      const { pageId, systemToken } = req.body;
-      if (!pageId || !systemToken) {
-        return res.status(400).json({ error: 'Page ID and System User Access Token are required.' });
+      let { verifyToken } = req.body;
+      
+      if (!verifyToken || verifyToken.includes('•••')) {
+        const stored = await getDecryptedMetaCredentials();
+        verifyToken = stored.verifyToken;
       }
 
-      // Query Meta Graph API for page details to check token validity
-      const graphUrl = `https://graph.facebook.com/v24.0/${pageId.trim()}?fields=name&access_token=${systemToken.trim()}`;
+      if (!verifyToken) {
+        return res.status(400).json({ error: 'Verify Token is required.' });
+      }
+
+      // Query Meta Graph API /me endpoint to check token validity
+      const graphUrl = `https://graph.facebook.com/v24.0/me?access_token=${verifyToken.trim()}`;
       const response = await axios.get(graphUrl);
       
-      if (response.data && response.data.name) {
+      if (response.data && response.data.id) {
         return res.status(200).json({ 
           success: true, 
-          message: `Successfully connected to Page: ${response.data.name}` 
+          message: `Successfully connected to Meta. Account ID: ${response.data.id}` 
         });
       } else {
         return res.status(400).json({ 
           success: false, 
-          error: 'Verification response did not return a valid page name.' 
+          error: 'Verification response did not return a valid account ID.' 
         });
       }
     } catch (err) {
@@ -664,14 +712,14 @@ exports.metaWebhook = functions.https.onRequest(async (req, res) => {
         return res.status(200).send('Integration disabled');
       }
 
-      const systemToken = creds.systemToken;
-      if (!systemToken) {
-        console.error('Meta system token is not configured in settings.');
+      const verifyToken = creds.verifyToken;
+      if (!verifyToken) {
+        console.error('Meta verify token is not configured in settings.');
         return res.status(500).send('Configuration Error');
       }
 
       // Query Meta Graph API for lead content fields
-      const graphUrl = `https://graph.facebook.com/v24.0/${leadId}?access_token=${systemToken}`;
+      const graphUrl = `https://graph.facebook.com/v24.0/${leadId}?access_token=${verifyToken}`;
       const response = await axios.get(graphUrl);
       const metaLead = response.data;
       console.log('Fetched Meta Lead details:', JSON.stringify(metaLead));

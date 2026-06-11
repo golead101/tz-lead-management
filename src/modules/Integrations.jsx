@@ -20,7 +20,7 @@ export default function Integrations() {
   const [selectedPlatform, setSelectedPlatform] = useState(null);
 
   // Form input states
-  const [metaFields, setMetaFields] = useState({ appId: '', pageId: '', systemToken: '', webhookVerifyToken: '' });
+  const [metaFields, setMetaFields] = useState({ appId: '', appSecret: '', webhookVerifyToken: '', verifyToken: '', redirectUri: '' });
   const [googleFields, setGoogleFields] = useState({ developerToken: '', customerId: '', managerCustomerId: '', clientId: '', clientSecret: '', refreshToken: '', webhookPasskey: '' });
   const [whatsappFields, setWhatsAppFields] = useState({ phoneNumberId: '', businessAccountId: '', systemToken: '' });
 
@@ -35,10 +35,11 @@ export default function Integrations() {
   useEffect(() => {
     if (selectedPlatform === 'meta') {
       setMetaFields({
-        appId: integrations.meta.appId || '',
-        pageId: integrations.meta.pageId || '',
-        systemToken: integrations.meta.systemToken || '',
-        webhookVerifyToken: integrations.meta.webhookVerifyToken || ''
+        appId: integrations.meta.appId || import.meta.env.META_APP_ID || '',
+        appSecret: integrations.meta.appSecret ? '••••••••••••••••' : (import.meta.env.META_APP_SECRET || ''),
+        webhookVerifyToken: integrations.meta.webhookVerifyToken || import.meta.env.META_WEBHOOK_VERIFY_TOKEN || '',
+        verifyToken: integrations.meta.verifyToken ? '••••••••••••••••' : (import.meta.env.VERIFY_TOKEN || ''),
+        redirectUri: integrations.meta.redirectUri || import.meta.env.META_REDIRECT_URI || ''
       });
     } else if (selectedPlatform === 'google') {
       setGoogleFields({
@@ -142,19 +143,20 @@ export default function Integrations() {
   };
 
   const testMetaConnection = async () => {
-    if (!metaFields.pageId || !metaFields.systemToken) {
-      showToastMsg('Page ID and System User Access Token are required to test connection.', 'error');
+    const fieldsToValidate = {
+      appId: metaFields.appId,
+      appSecret: metaFields.appSecret === '••••••••••••••••' ? integrations.meta.appSecret : metaFields.appSecret,
+      webhookVerifyToken: metaFields.webhookVerifyToken,
+      verifyToken: metaFields.verifyToken === '••••••••••••••••' ? integrations.meta.verifyToken : metaFields.verifyToken,
+      redirectUri: metaFields.redirectUri
+    };
+
+    if (!fieldsToValidate.verifyToken) {
+      showToastMsg('Verify Token is required to test connection.', 'error');
       return;
     }
     setIsValidating(true);
     setValidationResult(null);
-
-    const fieldsToValidate = {
-      appId: metaFields.appId,
-      pageId: metaFields.pageId,
-      systemToken: metaFields.systemToken,
-      webhookVerifyToken: metaFields.webhookVerifyToken
-    };
 
     try {
       const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'tz-lead-management';
@@ -165,8 +167,7 @@ export default function Integrations() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          pageId: metaFields.pageId,
-          systemToken: metaFields.systemToken
+          verifyToken: fieldsToValidate.verifyToken
         })
       });
       const data = await response.json();
@@ -227,7 +228,7 @@ export default function Integrations() {
   const hasConfig = (platform) => {
     const data = integrations[platform];
     if (platform === 'meta') {
-      return !!(data.appId && data.systemToken);
+      return !!(data.appId && data.verifyToken);
     } else if (platform === 'google') {
       return !!(data.developerToken && data.customerId);
     } else if (platform === 'whatsapp') {
@@ -270,14 +271,17 @@ export default function Integrations() {
 
     if (selectedPlatform === 'meta') {
       fieldsToSave = { ...metaFields };
+      if (metaFields.appSecret === '••••••••••••••••') fieldsToSave.appSecret = integrations.meta.appSecret;
+      if (metaFields.verifyToken === '••••••••••••••••') fieldsToSave.verifyToken = integrations.meta.verifyToken;
       
       const hasFieldsChanged = 
         fieldsToSave.appId !== integrations.meta.appId ||
-        fieldsToSave.pageId !== integrations.meta.pageId ||
-        fieldsToSave.systemToken !== integrations.meta.systemToken ||
-        fieldsToSave.webhookVerifyToken !== integrations.meta.webhookVerifyToken;
+        fieldsToSave.appSecret !== integrations.meta.appSecret ||
+        fieldsToSave.webhookVerifyToken !== integrations.meta.webhookVerifyToken ||
+        fieldsToSave.verifyToken !== integrations.meta.verifyToken ||
+        fieldsToSave.redirectUri !== integrations.meta.redirectUri;
 
-      if (!fieldsToSave.appId || !fieldsToSave.systemToken || !fieldsToSave.pageId) {
+      if (!fieldsToSave.appId || !fieldsToSave.verifyToken) {
         activeStatus = 'Setup Required';
       } else if (hasFieldsChanged) {
         activeStatus = 'Setup Required';
@@ -848,7 +852,7 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                 {selectedPlatform === 'meta' && (
                   <>
                     <div className="form-group">
-                      <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>Meta App ID</label>
+                      <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>Meta App ID (META_APP_ID)</label>
                       <input 
                         type="text" 
                         required
@@ -860,38 +864,51 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                       />
                     </div>
                     <div className="form-group">
-                      <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>Page ID</label>
+                      <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>Meta App Secret (META_APP_SECRET)</label>
+                      <input 
+                        type="password" 
+                        required
+                        className="form-control" 
+                        style={{ height: '36px', fontSize: '12px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)' }}
+                        placeholder="••••••••••••••••"
+                        value={metaFields.appSecret}
+                        onChange={(e) => setMetaFields({ ...metaFields, appSecret: e.target.value })}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>Meta Webhook Verify Token (META_WEBHOOK_VERIFY_TOKEN)</label>
                       <input 
                         type="text" 
                         required
                         className="form-control" 
                         style={{ height: '36px', fontSize: '12px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)' }}
-                        placeholder="e.g. 109283471029"
-                        value={metaFields.pageId}
-                        onChange={(e) => setMetaFields({ ...metaFields, pageId: e.target.value })}
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>System User Access Token</label>
-                      <textarea 
-                        required
-                        className="form-control" 
-                        style={{ height: '70px', fontSize: '11px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)', resize: 'none', padding: '8px' }}
-                        placeholder="EAAGy7A_meta_token..."
-                        value={metaFields.systemToken}
-                        onChange={(e) => setMetaFields({ ...metaFields, systemToken: e.target.value })}
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>Webhook Verification Token</label>
-                      <input 
-                        type="text" 
-                        required
-                        className="form-control" 
-                        style={{ height: '36px', fontSize: '12px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)' }}
-                        placeholder="e.g. techzone_secret_verify_2026"
+                        placeholder="e.g. meta_webhook_secret_2026"
                         value={metaFields.webhookVerifyToken}
                         onChange={(e) => setMetaFields({ ...metaFields, webhookVerifyToken: e.target.value })}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>Meta Access Token / Verify Token (VERIFY_TOKEN)</label>
+                      <input 
+                        type="password" 
+                        required
+                        className="form-control" 
+                        style={{ height: '36px', fontSize: '12px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)' }}
+                        placeholder="••••••••••••••••"
+                        value={metaFields.verifyToken}
+                        onChange={(e) => setMetaFields({ ...metaFields, verifyToken: e.target.value })}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>Meta Redirect URI (META_REDIRECT_URI)</label>
+                      <input 
+                        type="text" 
+                        required
+                        className="form-control" 
+                        style={{ height: '36px', fontSize: '12px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)' }}
+                        placeholder="e.g. https://your-domain.com/auth/callback"
+                        value={metaFields.redirectUri}
+                        onChange={(e) => setMetaFields({ ...metaFields, redirectUri: e.target.value })}
                       />
                     </div>
 

@@ -55,9 +55,10 @@ const DEFAULT_INTEGRATIONS = {
     enabled: false,
     status: 'Setup Required',
     appId: '',
-    systemToken: '',
-    pageId: '',
+    appSecret: '',
     webhookVerifyToken: '',
+    verifyToken: '',
+    redirectUri: '',
     simulatedLeadsCount: 1247
   },
   google: {
