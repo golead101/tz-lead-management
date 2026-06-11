@@ -101,12 +101,8 @@ export default function Integrations() {
     };
 
     try {
-      const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
       const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'tz-lead-management';
-      const functionUrlBase = isDev 
-        ? `http://127.0.0.1:5001/${projectId}/us-central1` 
-        : `https://us-central1-${projectId}.cloudfunctions.net`;
-      const functionUrl = `${functionUrlBase}/googleAdsValidate`;
+      const functionUrl = `https://us-central1-${projectId}.cloudfunctions.net/googleAdsValidate`;
       const response = await fetch(functionUrl, {
         method: 'POST',
         headers: {
@@ -145,16 +141,72 @@ export default function Integrations() {
     }
   };
 
+  const testMetaConnection = async () => {
+    if (!metaFields.pageId || !metaFields.systemToken) {
+      showToastMsg('Page ID and System User Access Token are required to test connection.', 'error');
+      return;
+    }
+    setIsValidating(true);
+    setValidationResult(null);
+
+    const fieldsToValidate = {
+      appId: metaFields.appId,
+      pageId: metaFields.pageId,
+      systemToken: metaFields.systemToken,
+      webhookVerifyToken: metaFields.webhookVerifyToken
+    };
+
+    try {
+      const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'tz-lead-management';
+      const functionUrl = `https://us-central1-${projectId}.cloudfunctions.net/metaValidate`;
+      const response = await fetch(functionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          pageId: metaFields.pageId,
+          systemToken: metaFields.systemToken
+        })
+      });
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
+        setValidationResult({ success: true, message: data.message || 'Meta API authenticated successfully!' });
+        showToastMsg('Meta connection verified!', 'success');
+        updateIntegration('meta', {
+          ...fieldsToValidate,
+          enabled: true,
+          status: 'Connected'
+        });
+      } else {
+        setValidationResult({ success: false, message: data.details || data.error || 'Connection verification failed.' });
+        showToastMsg(data.error || 'Meta API connection failed.', 'error');
+        updateIntegration('meta', {
+          enabled: false,
+          status: 'Setup Required'
+        });
+      }
+    } catch (err) {
+      console.error('Meta validation error:', err);
+      setValidationResult({ success: false, message: 'Could not communicate with Firebase Meta validation function.' });
+      showToastMsg('Could not reach Cloud Function.', 'error');
+      updateIntegration('meta', {
+        enabled: false,
+        status: 'Setup Required'
+      });
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
+
   // Reconciliation manual sync helper
   const forceGoogleAdsSync = async () => {
     setIsSyncing(true);
     try {
-      const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
       const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'tz-lead-management';
-      const functionUrlBase = isDev 
-        ? `http://127.0.0.1:5001/${projectId}/us-central1` 
-        : `https://us-central1-${projectId}.cloudfunctions.net`;
-      const functionUrl = `${functionUrlBase}/googleAdsSync`;
+      const functionUrl = `https://us-central1-${projectId}.cloudfunctions.net/googleAdsSync`;
       const response = await fetch(functionUrl, {
         method: 'POST'
       });
@@ -192,6 +244,11 @@ export default function Integrations() {
       return;
     }
 
+    if (platform === 'meta' && !integrations.meta.enabled && integrations.meta.status !== 'Connected') {
+      showToastMsg('Please run a successful "Test API Connection" before activating the Meta Ads integration.', 'error');
+      return;
+    }
+
     if (!integrations[platform].enabled && !hasConfig(platform)) {
       showToastMsg(`Please configure credentials for ${platform.toUpperCase()} before activating this integration.`, 'error');
       return;
@@ -213,7 +270,21 @@ export default function Integrations() {
 
     if (selectedPlatform === 'meta') {
       fieldsToSave = { ...metaFields };
-      if (!metaFields.appId || !metaFields.systemToken) activeStatus = 'Setup Required';
+      
+      const hasFieldsChanged = 
+        fieldsToSave.appId !== integrations.meta.appId ||
+        fieldsToSave.pageId !== integrations.meta.pageId ||
+        fieldsToSave.systemToken !== integrations.meta.systemToken ||
+        fieldsToSave.webhookVerifyToken !== integrations.meta.webhookVerifyToken;
+
+      if (!fieldsToSave.appId || !fieldsToSave.systemToken || !fieldsToSave.pageId) {
+        activeStatus = 'Setup Required';
+      } else if (hasFieldsChanged) {
+        activeStatus = 'Setup Required';
+        showToastMsg('Configuration credentials modified. Please test connection to re-activate.', 'warning');
+      } else {
+        activeStatus = integrations.meta.status === 'Connected' ? 'Connected' : 'Setup Required';
+      }
     } else if (selectedPlatform === 'google') {
       fieldsToSave = { ...googleFields };
       if (googleFields.developerToken === '••••••••••••••••') fieldsToSave.developerToken = integrations.google.developerToken;
@@ -823,6 +894,75 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                         onChange={(e) => setMetaFields({ ...metaFields, webhookVerifyToken: e.target.value })}
                       />
                     </div>
+
+                    {/* Meta Webhook Setup Info */}
+                    <div style={{ marginTop: '8px', padding: '10px', borderRadius: '6px', background: 'rgba(0,0,0,0.02)', border: '1px solid var(--border-color)', fontSize: '11px' }}>
+                      <label className="form-label" style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Webhook Callback URL</label>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <input 
+                          type="text" 
+                          readOnly 
+                          className="form-control" 
+                          style={{ height: '28px', fontSize: '10px', padding: '0 8px', background: 'rgba(0,0,0,0.04)', flex: '1', border: '1px solid var(--border-color)' }}
+                          value={`https://us-central1-${import.meta.env.VITE_FIREBASE_PROJECT_ID || 'tz-lead-management'}.cloudfunctions.net/metaWebhook`}
+                        />
+                        <button 
+                          type="button"
+                          onClick={() => copyToClipboard(`https://us-central1-${import.meta.env.VITE_FIREBASE_PROJECT_ID || 'tz-lead-management'}.cloudfunctions.net/metaWebhook`, 'Meta Webhook URL')}
+                          style={{ height: '28px', fontSize: '10px', padding: '0 8px', background: 'var(--primary)', color: '#ffffff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '700' }}
+                        >
+                          Copy
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Meta Connection Test Action */}
+                    <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
+                      <button
+                        type="button"
+                        onClick={testMetaConnection}
+                        disabled={isValidating}
+                        className="secondary-btn w-full"
+                        style={{
+                          height: '34px',
+                          fontSize: '11px',
+                          fontWeight: '700',
+                          background: 'rgba(47, 107, 255, 0.08)',
+                          color: 'var(--primary)',
+                          border: '1px solid rgba(47, 107, 255, 0.2)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          cursor: isValidating ? 'not-allowed' : 'pointer'
+                        }}
+                      >
+                        {isValidating ? (
+                          <>
+                            <div style={{ width: '12px', height: '12px', border: '2px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                            <span>Verifying...</span>
+                          </>
+                        ) : (
+                          <span>🔌 Test API Connection</span>
+                        )}
+                      </button>
+                    </div>
+
+                    {validationResult && (
+                      <div style={{ 
+                        marginTop: '8px', 
+                        padding: '10px', 
+                        borderRadius: '6px', 
+                        fontSize: '11px',
+                        background: validationResult.success ? 'rgba(16,185,129,0.06)' : 'rgba(239,68,68,0.06)',
+                        color: validationResult.success ? '#059669' : '#dc2626',
+                        border: validationResult.success ? '1px solid rgba(16,185,129,0.15)' : '1px solid rgba(239,68,68,0.15)',
+                        lineHeight: '1.4'
+                      }}>
+                        <strong>{validationResult.success ? '✓ Connection Active' : '✗ Connection Failed'}</strong>
+                        <p style={{ margin: '4px 0 0 0', wordBreak: 'break-all', fontSize: '10px' }}>{validationResult.message}</p>
+                      </div>
+                    )}
                   </>
                 )}
 

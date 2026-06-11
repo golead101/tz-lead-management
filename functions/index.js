@@ -544,3 +544,202 @@ exports.encryptGoogleCredentials = functions.firestore
 
     return null;
   });
+
+/**
+ * Helper to fetch Meta integration credentials from Firestore.
+ */
+async function getDecryptedMetaCredentials() {
+  const integrationDoc = await db.collection('settings').doc('integrations').get();
+  if (!integrationDoc.exists) {
+    throw new Error('Meta integration is not configured in Firestore settings.');
+  }
+  const data = integrationDoc.data();
+  const meta = data.meta;
+  if (!meta) {
+    throw new Error('Meta settings not found.');
+  }
+  return {
+    appId: meta.appId || '',
+    pageId: meta.pageId || '',
+    systemToken: meta.systemToken || '',
+    webhookVerifyToken: meta.webhookVerifyToken || '',
+    enabled: meta.enabled || false,
+    status: meta.status || 'Setup Required'
+  };
+}
+
+/**
+ * Meta Ads Webhook Connection Validator
+ * Verifies that the page ID and system token are valid.
+ */
+exports.metaValidate = functions.https.onRequest((req, res) => {
+  return cors(req, res, async () => {
+    if (req.method !== 'POST') {
+      return res.status(405).json({ error: 'Method not allowed' });
+    }
+    try {
+      const { pageId, systemToken } = req.body;
+      if (!pageId || !systemToken) {
+        return res.status(400).json({ error: 'Page ID and System User Access Token are required.' });
+      }
+
+      // Query Meta Graph API for page details to check token validity
+      const graphUrl = `https://graph.facebook.com/v24.0/${pageId.trim()}?fields=name&access_token=${systemToken.trim()}`;
+      const response = await axios.get(graphUrl);
+      
+      if (response.data && response.data.name) {
+        return res.status(200).json({ 
+          success: true, 
+          message: `Successfully connected to Page: ${response.data.name}` 
+        });
+      } else {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Verification response did not return a valid page name.' 
+        });
+      }
+    } catch (err) {
+      const errorMsg = err.response ? JSON.stringify(err.response.data) : err.message;
+      console.error('Meta Validation Error:', errorMsg);
+      return res.status(400).json({
+        success: false,
+        error: 'Meta connection validation failed.',
+        details: errorMsg
+      });
+    }
+  });
+});
+
+/**
+ * Meta Lead Ads Webhook Receiver
+ * Handles verification handshakes (GET) and real-time lead submissions (POST).
+ */
+exports.metaWebhook = functions.https.onRequest(async (req, res) => {
+  // GET: Handshake verification (Meta Webhook setup)
+  if (req.method === 'GET') {
+    try {
+      const mode = req.query['hub.mode'];
+      const token = req.query['hub.verify_token'];
+      const challenge = req.query['hub.challenge'];
+
+      const creds = await getDecryptedMetaCredentials();
+      const expectedToken = creds.webhookVerifyToken || 'techzone_secret_verify_2026';
+
+      if (mode === 'subscribe' && token === expectedToken) {
+        console.log('Meta Webhook verified successfully.');
+        return res.status(200).send(challenge);
+      } else {
+        console.warn('Meta Webhook verification failed due to verification token mismatch.');
+        return res.status(403).send('Forbidden');
+      }
+    } catch (e) {
+      console.error('Meta Webhook verification error:', e.message);
+      return res.status(500).send('Verification Error');
+    }
+  }
+
+  // POST: Lead Submission Callback
+  if (req.method === 'POST') {
+    try {
+      const payload = req.body;
+      console.log('Received Meta Webhook payload:', JSON.stringify(payload));
+
+      const entry = payload.entry?.[0];
+      const change = entry?.changes?.[0];
+      const value = change?.value;
+
+      if (!value || !value.leadgen_id) {
+        console.warn('Missing leadgen_id in Meta Webhook payload.');
+        return res.status(200).send('No leadgen_id');
+      }
+
+      const leadId = value.leadgen_id;
+      const campaignId = value.campaign_id || 'N/A';
+      const formId = value.form_id || 'N/A';
+
+      // Load decrypted Meta configurations
+      const creds = await getDecryptedMetaCredentials();
+      if (!creds.enabled) {
+        console.log('Meta Ads integration is disabled. Ignoring webhook.');
+        return res.status(200).send('Integration disabled');
+      }
+
+      const systemToken = creds.systemToken;
+      if (!systemToken) {
+        console.error('Meta system token is not configured in settings.');
+        return res.status(500).send('Configuration Error');
+      }
+
+      // Query Meta Graph API for lead content fields
+      const graphUrl = `https://graph.facebook.com/v24.0/${leadId}?access_token=${systemToken}`;
+      const response = await axios.get(graphUrl);
+      const metaLead = response.data;
+      console.log('Fetched Meta Lead details:', JSON.stringify(metaLead));
+
+      // Deduplicate check in Firestore
+      const duplicateCheck = await db.collection('leads')
+        .where('metaLeadId', '==', leadId)
+        .limit(1)
+        .get();
+
+      if (!duplicateCheck.empty) {
+        console.log(`Lead with metaLeadId ${leadId} already exists in Firestore. Skipping duplicate.`);
+        return res.status(200).send('Duplicate Skipped');
+      }
+
+      // Map fields from Graph API response
+      const fields = {};
+      (metaLead.field_data || []).forEach(f => {
+        fields[f.name] = f.values?.[0] || '';
+      });
+
+      const fullName = fields.full_name || fields.first_name || 'Meta Ads Inquiry';
+      const email = (fields.email || '').toLowerCase().trim();
+      const phone = fields.phone_number || '';
+      const location = fields.city || fields.location || 'Meta Ad';
+      const education = fields.education || 'Not Provided';
+
+      const leadRecord = {
+        id: `lead-meta-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        metaLeadId: leadId,
+        name: fullName,
+        email: email,
+        phone: phone,
+        location: location,
+        education: education,
+        course: 'Full-Stack Web Development', // Default course mapping
+        source: 'Meta Ads',
+        stage: 'New Lead',
+        counselor: 'Maha',
+        createdDate: new Date().toISOString(),
+        lastContacted: new Date().toISOString(),
+        customFields: {
+          campaignId: campaignId,
+          formId: formId,
+          adId: value.ad_id || 'N/A'
+        },
+        timeline: [{
+          id: `log-${Date.now()}`,
+          type: 'system',
+          title: 'Lead Captured via Meta Ads Webhook',
+          content: `Real-time sync. Form ID: ${formId}, Campaign ID: ${campaignId}.`,
+          timestamp: new Date().toISOString(),
+          user: 'Meta Server'
+        }],
+        whatsappMessages: []
+      };
+
+      // Store in Firestore
+      await db.collection('leads').doc(leadRecord.id).set(leadRecord);
+      console.log(`Successfully stored Meta webhook lead in Firestore: ${leadRecord.id}`);
+
+      return res.status(200).send('Success');
+    } catch (err) {
+      console.error('Meta webhook processing error:', err.response ? JSON.stringify(err.response.data) : err.message);
+      return res.status(500).send('Internal Webhook Error');
+    }
+  }
+
+  return res.status(405).send('Method Not Allowed');
+});
+
