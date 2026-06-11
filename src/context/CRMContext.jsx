@@ -65,6 +65,7 @@ const DEFAULT_INTEGRATIONS = {
     status: 'Setup Required',
     developerToken: '',
     customerId: '',
+    managerCustomerId: '',
     clientId: '',
     clientSecret: '',
     refreshToken: '',

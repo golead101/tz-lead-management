@@ -21,7 +21,7 @@ export default function Integrations() {
 
   // Form input states
   const [metaFields, setMetaFields] = useState({ appId: '', pageId: '', systemToken: '', webhookVerifyToken: '' });
-  const [googleFields, setGoogleFields] = useState({ developerToken: '', customerId: '', clientId: '', clientSecret: '', refreshToken: '', webhookPasskey: '' });
+  const [googleFields, setGoogleFields] = useState({ developerToken: '', customerId: '', managerCustomerId: '', clientId: '', clientSecret: '', refreshToken: '', webhookPasskey: '' });
   const [whatsappFields, setWhatsAppFields] = useState({ phoneNumberId: '', businessAccountId: '', systemToken: '' });
 
   // Google Ads API connection and sync statuses
@@ -42,11 +42,12 @@ export default function Integrations() {
       });
     } else if (selectedPlatform === 'google') {
       setGoogleFields({
-        developerToken: integrations.google.developerToken ? '••••••••••••••••' : '',
-        customerId: integrations.google.customerId || '',
-        clientId: integrations.google.clientId || '',
-        clientSecret: integrations.google.clientSecret ? '••••••••••••••••' : '',
-        refreshToken: integrations.google.refreshToken ? '••••••••••••••••' : '',
+        developerToken: integrations.google.developerToken ? '••••••••••••••••' : (import.meta.env.GOOGLE_ADS_DEVELOPER_TOKEN || ''),
+        customerId: integrations.google.customerId || import.meta.env.GOOGLE_ADS_CUSTOMER_ID || '',
+        managerCustomerId: integrations.google.managerCustomerId || import.meta.env.GOOGLE_ADS_MANAGER_CUSTOMER_ID || '',
+        clientId: integrations.google.clientId || import.meta.env.GOOGLE_ADS_CLIENT_ID || '',
+        clientSecret: integrations.google.clientSecret ? '••••••••••••••••' : (import.meta.env.GOOGLE_ADS_CLIENT_SECRET || ''),
+        refreshToken: integrations.google.refreshToken ? '••••••••••••••••' : (import.meta.env.GOOGLE_ADS_REFRESH_TOKEN || ''),
         webhookPasskey: integrations.google.webhookPasskey || ''
       });
       setValidationResult(null);
@@ -92,6 +93,7 @@ export default function Integrations() {
 
     const fieldsToValidate = {
       customerId: googleFields.customerId,
+      managerCustomerId: googleFields.managerCustomerId,
       developerToken: googleFields.developerToken === '••••••••••••••••' ? integrations.google.developerToken : googleFields.developerToken,
       clientId: googleFields.clientId,
       clientSecret: googleFields.clientSecret === '••••••••••••••••' ? integrations.google.clientSecret : googleFields.clientSecret,
@@ -100,9 +102,10 @@ export default function Integrations() {
 
     try {
       const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'tz-lead-management';
       const functionUrlBase = isDev 
-        ? 'http://127.0.0.1:5001/tz-lead-management/us-central1' 
-        : 'https://us-central1-tz-lead-management.cloudfunctions.net';
+        ? `http://127.0.0.1:5001/${projectId}/us-central1` 
+        : `https://us-central1-${projectId}.cloudfunctions.net`;
       const functionUrl = `${functionUrlBase}/googleAdsValidate`;
       const response = await fetch(functionUrl, {
         method: 'POST',
@@ -124,11 +127,19 @@ export default function Integrations() {
       } else {
         setValidationResult({ success: false, message: data.details || data.error || 'Connection verification failed.' });
         showToastMsg(data.error || 'OAuth / API connection failed.', 'error');
+        updateIntegration('google', {
+          enabled: false,
+          status: 'Setup Required'
+        });
       }
     } catch (err) {
       console.error('Validation error:', err);
       setValidationResult({ success: false, message: 'Could not communicate with Firebase validation function.' });
       showToastMsg('Could not reach Cloud Function.', 'error');
+      updateIntegration('google', {
+        enabled: false,
+        status: 'Setup Required'
+      });
     } finally {
       setIsValidating(false);
     }
@@ -139,9 +150,10 @@ export default function Integrations() {
     setIsSyncing(true);
     try {
       const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'tz-lead-management';
       const functionUrlBase = isDev 
-        ? 'http://127.0.0.1:5001/tz-lead-management/us-central1' 
-        : 'https://us-central1-tz-lead-management.cloudfunctions.net';
+        ? `http://127.0.0.1:5001/${projectId}/us-central1` 
+        : `https://us-central1-${projectId}.cloudfunctions.net`;
       const functionUrl = `${functionUrlBase}/googleAdsSync`;
       const response = await fetch(functionUrl, {
         method: 'POST'
@@ -175,6 +187,11 @@ export default function Integrations() {
   };
 
   const handleToggle = (platform) => {
+    if (platform === 'google' && !integrations.google.enabled && integrations.google.status !== 'Connected') {
+      showToastMsg('Please run a successful "Test API Connection" before activating the Google Ads integration.', 'error');
+      return;
+    }
+
     if (!integrations[platform].enabled && !hasConfig(platform)) {
       showToastMsg(`Please configure credentials for ${platform.toUpperCase()} before activating this integration.`, 'error');
       return;
@@ -203,8 +220,19 @@ export default function Integrations() {
       if (googleFields.clientSecret === '••••••••••••••••') fieldsToSave.clientSecret = integrations.google.clientSecret;
       if (googleFields.refreshToken === '••••••••••••••••') fieldsToSave.refreshToken = integrations.google.refreshToken;
 
+      const hasFieldsChanged = 
+        fieldsToSave.customerId !== integrations.google.customerId ||
+        fieldsToSave.managerCustomerId !== integrations.google.managerCustomerId ||
+        fieldsToSave.developerToken !== integrations.google.developerToken ||
+        fieldsToSave.clientId !== integrations.google.clientId ||
+        fieldsToSave.clientSecret !== integrations.google.clientSecret ||
+        fieldsToSave.refreshToken !== integrations.google.refreshToken;
+
       if (!fieldsToSave.developerToken || !fieldsToSave.customerId || !fieldsToSave.clientId || !fieldsToSave.clientSecret || !fieldsToSave.refreshToken) {
         activeStatus = 'Setup Required';
+      } else if (hasFieldsChanged) {
+        activeStatus = 'Setup Required';
+        showToastMsg('Configuration credentials modified. Please test connection to re-activate.', 'warning');
       } else {
         activeStatus = integrations.google.status === 'Connected' ? 'Connected' : 'Setup Required';
       }
@@ -814,6 +842,17 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                       />
                     </div>
                     <div className="form-group">
+                      <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>Manager Customer ID (Optional)</label>
+                      <input 
+                        type="text" 
+                        className="form-control" 
+                        style={{ height: '36px', fontSize: '12px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)' }}
+                        placeholder="e.g. 123-456-7890 (if using a manager/MCC account)"
+                        value={googleFields.managerCustomerId}
+                        onChange={(e) => setGoogleFields({ ...googleFields, managerCustomerId: e.target.value })}
+                      />
+                    </div>
+                    <div className="form-group">
                       <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>Developer Token</label>
                       <input 
                         type="password" 
@@ -1077,35 +1116,6 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                 </button>
               </form>
 
-              {/* Firebase Cloud Functions Node.js Script Viewers (Exclusive Production Setup Section) */}
-              {(selectedPlatform === 'google' || selectedPlatform === 'meta') && (
-                <div style={{ marginTop: '24px', borderTop: '1px dashed var(--border-color)', paddingTop: '20px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <h4 style={{ fontSize: '11.5px', fontWeight: '800', color: 'var(--text-primary)' }}>
-                      🔥 Firebase Cloud Function (Production Integration Script)
-                    </h4>
-                    <button 
-                      className="sidebar-logout-btn" 
-                      onClick={() => copyToClipboard(
-                        selectedPlatform === 'google' ? googleCloudCode : metaCloudCode, 
-                        selectedPlatform === 'google' ? 'Google Cloud' : 'Meta Webhook'
-                      )}
-                      style={{ padding: '2px 8px', fontSize: '9.5px', background: 'rgba(0,0,0,0.02)', color: 'var(--primary)', fontWeight: '700', display: 'flex', gap: '3px' }}
-                    >
-                      Copy Script
-                    </button>
-                  </div>
-                  <p style={{ fontSize: '10.5px', color: 'var(--text-muted)', lineHeight: '1.4', marginBottom: '10px' }}>
-                    Deploy this verified Node.js function inside your Firebase directory to automatically pipe webhook leads straight into Firestore:
-                  </p>
-
-                  <div className="code-viewer-block" style={{ margin: '0' }}>
-                    <pre className="code-pre" style={{ maxHeight: '180px', overflowY: 'auto', fontSize: '10px', padding: '10px', background: '#0a101f', color: '#f8fafc', borderRadius: '6px' }}>
-                      {selectedPlatform === 'google' ? googleCloudCode : metaCloudCode}
-                    </pre>
-                  </div>
-                </div>
-              )}
               {/* Integration Testing Sandbox Section */}
               <div style={{ marginTop: '24px', borderTop: '1px dashed var(--border-color)', paddingTop: '20px' }}>
                 <style>{`

@@ -29,6 +29,7 @@ async function getDecryptedCredentials() {
 
   return {
     customerId: google.customerId || '',
+    managerCustomerId: google.managerCustomerId || '',
     clientId: google.clientId || '',
     webhookPasskey: google.webhookPasskey || '',
     enabled: google.enabled || false,
@@ -71,7 +72,7 @@ exports.googleAdsValidate = functions.https.onRequest((req, res) => {
     let logRef = db.collection('googleAdsLogs').doc(logId);
 
     try {
-      let { customerId, developerToken, clientId, clientSecret, refreshToken } = req.body;
+      let { customerId, managerCustomerId, developerToken, clientId, clientSecret, refreshToken } = req.body;
 
       // If secrets are passed as masked placeholders, pull stored credentials from db
       if (!developerToken || developerToken.includes('•••') || !clientSecret || clientSecret.includes('•••') || !refreshToken || refreshToken.includes('•••')) {
@@ -80,6 +81,7 @@ exports.googleAdsValidate = functions.https.onRequest((req, res) => {
         if (!clientSecret || clientSecret.includes('•••')) clientSecret = stored.clientSecret;
         if (!refreshToken || refreshToken.includes('•••')) refreshToken = stored.refreshToken;
         if (!customerId) customerId = stored.customerId;
+        if (!managerCustomerId) managerCustomerId = stored.managerCustomerId;
         if (!clientId) clientId = stored.clientId;
       }
 
@@ -100,16 +102,23 @@ exports.googleAdsValidate = functions.https.onRequest((req, res) => {
       // 2. Query Google Ads API (fetch single campaign to test token and access status)
       const query = 'SELECT campaign.id, campaign.name FROM campaign LIMIT 1';
       
+      const headers = {
+        'Authorization': `Bearer ${accessToken}`,
+        'developer-token': developerToken,
+        'Content-Type': 'application/json'
+      };
+
+      if (managerCustomerId) {
+        const cleanManagerCustomerId = managerCustomerId.replace(/-/g, '').trim();
+        if (cleanManagerCustomerId) {
+          headers['login-customer-id'] = cleanManagerCustomerId;
+        }
+      }
+
       const response = await axios.post(
         `https://googleads.googleapis.com/v24/customers/${cleanCustomerId}/googleAds:search`,
         { query },
-        {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'developer-token': developerToken,
-            'Content-Type': 'application/json'
-          }
-        }
+        { headers }
       );
 
       // Successfully connected
@@ -358,16 +367,23 @@ exports.googleAdsSync = functions.https.onRequest((req, res) => {
         LIMIT 100
       `;
 
+      const headers = {
+        'Authorization': `Bearer ${accessToken}`,
+        'developer-token': creds.developerToken,
+        'Content-Type': 'application/json'
+      };
+
+      if (creds.managerCustomerId) {
+        const cleanManagerCustomerId = creds.managerCustomerId.replace(/-/g, '').trim();
+        if (cleanManagerCustomerId) {
+          headers['login-customer-id'] = cleanManagerCustomerId;
+        }
+      }
+
       const response = await axios.post(
         `https://googleads.googleapis.com/v24/customers/${cleanCustomerId}/googleAds:search`,
         { query },
-        {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'developer-token': creds.developerToken,
-            'Content-Type': 'application/json'
-          }
-        }
+        { headers }
       );
 
       const rows = response.data.results || [];
