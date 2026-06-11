@@ -90,6 +90,8 @@ const DEFAULT_INTEGRATIONS = {
 };
 
 const DEFAULT_COUNSELORS = [
+  { id: 'coun-stefan', name: 'Stefan Salvatore', email: 'stefan@academy.com', password: 'stefan123', role: 'Admin', status: 'Active' },
+  { id: 'coun-damon', name: 'Damon Salvatore', email: 'damon@academy.com', password: 'damon123', role: 'Manager', status: 'Active' },
   { id: 'coun-maha', name: 'Maha', email: 'maha@academy.com', password: 'maha123', role: 'Counselor', status: 'Active' },
   { id: 'coun-irfan', name: 'Irfan', email: 'irfan@academy.com', password: 'irfan123', role: 'Counselor', status: 'Active' }
 ];
@@ -430,23 +432,41 @@ export const CRMProvider = ({ children }) => {
   const login = (email, password) => {
     const formattedEmail = email.toLowerCase().trim();
     
-    // Check if the counselor is deactivated first
-    const counselorByEmail = counselors.find(c => c.email.toLowerCase() === formattedEmail);
-    if (counselorByEmail && counselorByEmail.status === 'Deactivated') {
-      showToastMsg('This account has been deactivated. Please contact an Admin.', 'error');
-      return { success: false, reason: 'deactivated' };
-    }
-    
-    // Check static fallback accounts for deactivation
-    if (formattedEmail === 'counselor' || formattedEmail === 'elena@academy.com' || formattedEmail === 'maha@academy.com') {
-      const nameToFind = (formattedEmail === 'maha@academy.com' || formattedEmail === 'counselor') ? 'Maha' : 'Elena Gilbert';
-      const found = counselors.find(c => c.name === nameToFind || c.email.toLowerCase() === formattedEmail);
-      if (found && found.status === 'Deactivated') {
+    // Resolve helper usernames to official emails
+    let lookupEmail = formattedEmail;
+    if (formattedEmail === 'admin') lookupEmail = 'stefan@academy.com';
+    else if (formattedEmail === 'manager') lookupEmail = 'damon@academy.com';
+    else if (formattedEmail === 'counselor') lookupEmail = 'maha@academy.com';
+
+    // 1. Check in the dynamic users/counselors state first
+    const user = counselors.find(c => 
+      c.email.toLowerCase() === lookupEmail || 
+      c.email.toLowerCase() === formattedEmail ||
+      (formattedEmail === 'admin' && c.role === 'Admin')
+    );
+
+    if (user) {
+      const isInactive = user.status === 'Inactive' || user.status === 'Deactivated' || user.status === 'inactive' || user.status === 'deactivated';
+      if (isInactive) {
         showToastMsg('This account has been deactivated. Please contact an Admin.', 'error');
         return { success: false, reason: 'deactivated' };
       }
+
+      const isPasswordMatch = password === user.password || 
+                              (user.role === 'Admin' && (password === 'admin' || password === 'stefan123')) ||
+                              (user.role === 'Manager' && (password === 'manager' || password === 'damon123')) ||
+                              (user.role === 'Counselor' && (password === 'counselor' || password === 'maha123' || password === 'irfan123'));
+      
+      if (isPasswordMatch) {
+        setActiveRole(user.role);
+        setActiveUser(user.name);
+        setIsLoggedIn(true);
+        showToastMsg(`Logged in as ${user.role}: ${user.name}`, 'success');
+        return { success: true };
+      }
     }
 
+    // 2. Static Fallbacks (just in case Firestore or localStorage is empty)
     if (formattedEmail === 'admin' || formattedEmail === 'stefan@academy.com') {
       if (password === 'admin' || password === 'stefan123') {
         setActiveRole('Admin');
@@ -455,37 +475,24 @@ export const CRMProvider = ({ children }) => {
         showToastMsg('Logged in as Admin: Stefan Salvatore', 'success');
         return { success: true };
       }
-    } else if (formattedEmail === 'manager' || formattedEmail === 'damon@academy.com' || formattedEmail === 'irfan@academy.com') {
-      if (password === 'manager' || password === 'damon123' || password === 'irfan123') {
+    } else if (formattedEmail === 'manager' || formattedEmail === 'damon@academy.com') {
+      if (password === 'manager' || password === 'damon123') {
         setActiveRole('Manager');
-        setActiveUser('Irfan');
+        setActiveUser('Damon Salvatore');
         setIsLoggedIn(true);
-        showToastMsg('Logged in as Manager: Irfan', 'success');
+        showToastMsg('Logged in as Manager: Damon Salvatore', 'success');
         return { success: true };
       }
-    } else {
-      // Dynamic counselor lookup
-      if (counselorByEmail) {
-        if (password === counselorByEmail.password || password.toLowerCase() === 'counselor' || password.toLowerCase() === `${counselorByEmail.name.split(' ')[0].toLowerCase()}123`) {
-          setActiveRole('Counselor');
-          setActiveUser(counselorByEmail.name);
-          setIsLoggedIn(true);
-          showToastMsg(`Logged in as Counselor: ${counselorByEmail.name}`, 'success');
-          return { success: true };
-        }
-      }
-      
-      // Fallback static accounts
-      if (formattedEmail === 'counselor' || formattedEmail === 'elena@academy.com' || formattedEmail === 'maha@academy.com') {
-        if (password === 'counselor' || password === 'elena123' || password === 'maha123') {
-          setActiveRole('Counselor');
-          setActiveUser('Maha');
-          setIsLoggedIn(true);
-          showToastMsg('Logged in as Counselor: Maha', 'success');
-          return { success: true };
-        }
+    } else if (formattedEmail === 'counselor' || formattedEmail === 'elena@academy.com' || formattedEmail === 'maha@academy.com') {
+      if (password === 'counselor' || password === 'elena123' || password === 'maha123') {
+        setActiveRole('Counselor');
+        setActiveUser('Maha');
+        setIsLoggedIn(true);
+        showToastMsg('Logged in as Counselor: Maha', 'success');
+        return { success: true };
       }
     }
+
     return { success: false, reason: 'invalid' };
   };
 
@@ -611,16 +618,16 @@ export const CRMProvider = ({ children }) => {
         console.error("Firestore customFields subscription error:", err);
       });
 
-      // 5. Counselors
-      counselorsUnsub = onSnapshot(collection(db, 'counselors'), (snapshot) => {
+      // 5. Users
+      counselorsUnsub = onSnapshot(collection(db, 'users'), (snapshot) => {
         if (!active) return;
         if (snapshot.empty) {
-          console.log("Firestore counselors collection is empty. Seeding with DEFAULT counselors...");
+          console.log("Firestore users collection is empty. Seeding with DEFAULT users...");
           const batch = writeBatch(db);
           DEFAULT_COUNSELORS.forEach((counselor) => {
-            batch.set(doc(db, 'counselors', counselor.id), counselor);
+            batch.set(doc(db, 'users', counselor.id), counselor);
           });
-          batch.commit().catch(err => console.error("Firestore seeding counselors failed:", err));
+          batch.commit().catch(err => console.error("Firestore seeding users failed:", err));
         } else {
           const counselorsData = snapshot.docs.map(doc => {
             const data = doc.data();
@@ -629,7 +636,7 @@ export const CRMProvider = ({ children }) => {
           setCounselors(counselorsData);
         }
       }, (err) => {
-        console.error("Firestore counselors subscription error:", err);
+        console.error("Firestore users subscription error:", err);
       });
 
       // 6. Branding
@@ -1469,22 +1476,24 @@ export const CRMProvider = ({ children }) => {
     showToastMsg(`Pipeline stage "${stageData.name}" created!`);
   };
 
-  // Counselor Adder
+  // Counselor/User Adder
   const addCounselor = (counselorData) => {
     const name = counselorData.name.trim();
     const email = counselorData.email ? counselorData.email.trim() : `${name.toLowerCase().replace(/ /g, '.')}@academy.com`;
     const password = counselorData.password ? counselorData.password.trim() : 'counselor';
+    const role = counselorData.role || 'Counselor';
+    const status = counselorData.status || 'Active';
     const newCounselor = {
       id: `coun-${Date.now()}`,
       name: name,
       email: email,
       password: password,
-      role: 'Counselor',
-      status: 'Active'
+      role: role,
+      status: status
     };
 
     if (isFirebaseEnabled) {
-      setDoc(doc(db, 'counselors', newCounselor.id), newCounselor)
+      setDoc(doc(db, 'users', newCounselor.id), newCounselor)
         .catch(err => {
           console.error("Firestore addCounselor failed:", err);
           setCounselors(prev => [...prev, newCounselor]);
@@ -1492,13 +1501,13 @@ export const CRMProvider = ({ children }) => {
     } else {
       setCounselors(prev => [...prev, newCounselor]);
     }
-    showToastMsg(`Counselor "${name}" added successfully.`);
+    showToastMsg(`User "${name}" added successfully.`);
   };
 
   // Counselor Remover
   const removeCounselor = (counselorId) => {
     if (isFirebaseEnabled) {
-      deleteDoc(doc(db, 'counselors', counselorId))
+      deleteDoc(doc(db, 'users', counselorId))
         .catch(err => {
           console.error("Firestore removeCounselor failed:", err);
           setCounselors(prev => prev.filter(c => c.id !== counselorId));
@@ -1506,7 +1515,7 @@ export const CRMProvider = ({ children }) => {
     } else {
       setCounselors(prev => prev.filter(c => c.id !== counselorId));
     }
-    showToastMsg('Counselor removed successfully.', 'error');
+    showToastMsg('User removed successfully.', 'error');
   };
 
   const updateCounselorStatus = (counselorId, status) => {
@@ -1518,7 +1527,7 @@ export const CRMProvider = ({ children }) => {
     });
 
     if (isFirebaseEnabled) {
-      setDoc(doc(db, 'counselors', counselorId), { status }, { merge: true })
+      setDoc(doc(db, 'users', counselorId), { status }, { merge: true })
         .catch(err => {
           console.error("Firestore updateCounselorStatus failed, falling back to local update:", err);
           setCounselors(nextCounselors);
@@ -1526,7 +1535,7 @@ export const CRMProvider = ({ children }) => {
     } else {
       setCounselors(nextCounselors);
     }
-    showToastMsg(`Counselor status updated to ${status}.`);
+    showToastMsg(`User status updated to ${status}.`);
   };
 
   // Clear Notifications

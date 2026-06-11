@@ -7,8 +7,6 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
-  const [showDemoCreds, setShowDemoCreds] = useState(false);
-
   const handleSubmit = (e) => {
     e.preventDefault();
     setErrorMsg('');
@@ -20,22 +18,10 @@ export default function LoginScreen() {
       if (reason === 'deactivated') {
         setErrorMsg('❌ This account has been deactivated. Please contact an Admin.');
       } else {
-        setErrorMsg('❌ Invalid credentials. Please use the demo credentials below.');
+        setErrorMsg('❌ Invalid credentials. Please try again.');
       }
     }
   };
-
-  const handleQuickFill = (demoEmail, demoPassword) => {
-    setEmail(demoEmail);
-    setPassword(demoPassword);
-    setErrorMsg('');
-  };
-
-  const demoAccounts = [
-    { label: '🔥 Admin (Stefan)', email: 'admin', pass: 'admin', desc: 'Stefan Salvatore • Full access' },
-    { label: '⚡ Manager (Irfan)', email: 'manager', pass: 'manager', desc: 'Irfan • Medium access' },
-    { label: '📞 Counselor (Maha)', email: 'counselor', pass: 'counselor', desc: 'Maha • Queue access' }
-  ];
 
   return (
     <div className="login-screen-wrapper">
@@ -70,7 +56,7 @@ export default function LoginScreen() {
           </div>
 
           <div className="login-brand-footer">
-            © 2026 {branding.instituteName}. Powered by Antigravity CRM.
+            © 2026 {branding.instituteName} | Powered by Yuva Intelli AI Solutions Pvt. Ltd.
           </div>
         </div>
 
@@ -130,55 +116,6 @@ export default function LoginScreen() {
               </button>
             </form>
 
-            {/* Demo Credentials Section */}
-            <div className="login-demo-panel">
-              <button 
-                type="button"
-                className="login-demo-toggle-btn"
-                style={{ borderRadius: 'var(--sidebar-radius, 8px)' }}
-                onClick={() => setShowDemoCreds(!showDemoCreds)}
-              >
-                <span>✨ Click to Quick-Fill Demo Credentials</span>
-                <svg 
-                  width="12" 
-                  height="12" 
-                  fill="none" 
-                  stroke="currentColor" 
-                  strokeWidth="2.5" 
-                  viewBox="0 0 24 24"
-                  style={{ 
-                    transform: showDemoCreds ? 'rotate(180deg)' : 'rotate(0deg)',
-                    transition: 'transform var(--transition-fast)'
-                  }}
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/>
-                </svg>
-              </button>
-
-              {showDemoCreds && (
-                <div className="login-demo-grid fade-in" style={{ marginTop: '8px' }}>
-                  {demoAccounts.map((account, idx) => (
-                    <button 
-                      key={idx}
-                      type="button" 
-                      className="login-demo-pill"
-                      style={{ 
-                        borderRadius: 'var(--sidebar-radius, 8px)',
-                        border: '1px solid var(--border-color)',
-                        padding: '12px'
-                      }}
-                      onClick={() => handleQuickFill(account.email, account.pass)}
-                    >
-                      <div style={{ fontWeight: '750', color: 'var(--sidebar-active-bg, #2F6BFF)', fontSize: '11.5px' }}>{account.label}</div>
-                      <div style={{ fontSize: '9.5px', color: 'var(--text-muted)', marginTop: '3px' }}>{account.desc}</div>
-                      <div style={{ fontSize: '9.5px', color: 'var(--text-secondary)', fontFamily: 'monospace', marginTop: '5px', background: 'rgba(0,0,0,0.03)', padding: '3px 6px', borderRadius: '4px' }}>
-                        {account.email} / {account.pass}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
           </div>
         </div>
       </div>

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CRMProvider, useCRM } from './context/CRMContext';
 import Sidebar from './components/Sidebar';
-import Topbar from './components/Topbar';
 import LoginScreen from './components/LoginScreen';
 
 // Page Modules
@@ -111,8 +110,6 @@ function MainAppContent() {
 
       {/* Core main dashboard panel */}
       <div className="main-wrapper">
-        <Topbar />
-
         {/* Responsive Scrolling Canvas */}
         <main className="content-area">
           <div className="fade-in">

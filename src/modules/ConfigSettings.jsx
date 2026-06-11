@@ -89,6 +89,8 @@ export default function ConfigSettings() {
   const [cName, setCName] = useState('');
   const [cEmail, setCEmail] = useState('');
   const [cPassword, setCPassword] = useState('');
+  const [cRole, setCRole] = useState('Counselor');
+  const [cStatus, setCStatus] = useState('Active');
 
   if (activeRole !== 'Admin') {
     return (
@@ -201,11 +203,15 @@ export default function ConfigSettings() {
     addCounselor({
       name: cName,
       email: cEmail,
-      password: cPassword
+      password: cPassword,
+      role: cRole,
+      status: cStatus
     });
     setCName('');
     setCEmail('');
     setCPassword('');
+    setCRole('Counselor');
+    setCStatus('Active');
   };
 
   return (
@@ -245,7 +251,7 @@ export default function ConfigSettings() {
           className={`settings-tab-btn ${activeTab === 'counselors' ? 'active' : ''}`}
           onClick={() => setActiveTab('counselors')}
         >
-          Team Counselors
+          User Management
         </button>
       </div>
 
@@ -808,7 +814,7 @@ export default function ConfigSettings() {
           <div className="settings-pane active sandbox-split">
             {/* List of active counselors */}
             <div className="dashboard-panel">
-              <h3 className="panel-title mb-4">Team Counselors Directory</h3>
+              <h3 className="panel-title mb-4">User Directory</h3>
               <div style={{ maxHeight: '350px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {counselors.map(c => {
                   const status = c.status || 'Active';
@@ -820,7 +826,7 @@ export default function ConfigSettings() {
                         "Are you sure you want to deactivate this account? The user will no longer be able to log in until an Admin reactivates the account."
                       );
                       if (confirmDeactivate) {
-                        updateCounselorStatus(c.id, 'Deactivated');
+                        updateCounselorStatus(c.id, 'Inactive');
                       }
                     } else {
                       updateCounselorStatus(c.id, 'Active');
@@ -831,18 +837,30 @@ export default function ConfigSettings() {
                     <div key={c.id} className="config-list-item" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <div className="card-counselor-avatar" style={{ width: '36px', height: '36px', fontSize: '13px', fontWeight: '700', borderRadius: '50%', background: isActive ? 'var(--primary)' : '#94a3b8', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          {c.name.split(' ').map(n=>n[0]).join('').toUpperCase()}
+                          {(c.name || '').split(' ').map(n=>n[0]).join('').toUpperCase()}
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '4px' }}>
                             <span style={{ fontWeight: '700', color: 'var(--text-primary)', fontSize: '13.5px' }}>{c.name}</span>
+                            <span style={{ 
+                              background: c.role === 'Admin' ? '#faf5ff' : c.role === 'Manager' ? '#fff7ed' : '#f0fdf4',
+                              color: c.role === 'Admin' ? '#6b21a8' : c.role === 'Manager' ? '#c2410c' : '#15803d',
+                              fontSize: '10px',
+                              fontWeight: '750',
+                              padding: '2px 8px',
+                              borderRadius: '12px',
+                              border: c.role === 'Admin' ? '1px solid #e9d5ff' : c.role === 'Manager' ? '1px solid #ffedd5' : '1px solid #bbf7d0',
+                              marginLeft: '6px'
+                            }}>
+                              {c.role || 'Counselor'}
+                            </span>
                             {isActive ? (
-                              <span style={{ background: '#ecfdf5', color: '#059669', fontSize: '10px', fontWeight: '700', padding: '2px 8px', borderRadius: '12px', border: '1px solid #a7f3d0' }}>
+                              <span style={{ background: '#ecfdf5', color: '#059669', fontSize: '10px', fontWeight: '700', padding: '2px 8px', borderRadius: '12px', border: '1px solid #a7f3d0', marginLeft: '6px' }}>
                                 Active
                               </span>
                             ) : (
-                              <span style={{ background: '#fef2f2', color: '#dc2626', fontSize: '10px', fontWeight: '700', padding: '2px 8px', borderRadius: '12px', border: '1px solid #fecaca' }}>
-                                Deactivated
+                              <span style={{ background: '#fef2f2', color: '#dc2626', fontSize: '10px', fontWeight: '700', padding: '2px 8px', borderRadius: '12px', border: '1px solid #fecaca', marginLeft: '6px' }}>
+                                Inactive
                               </span>
                             )}
                           </div>
@@ -850,7 +868,7 @@ export default function ConfigSettings() {
                         </div>
                       </div>
                       
-                      {activeRole === 'Admin' && (
+                      {activeRole === 'Admin' && c.role !== 'Admin' && (
                         <label className="status-toggle-switch" style={{ position: 'relative', display: 'inline-block', width: '36px', height: '20px', margin: 0 }}>
                           <input 
                             type="checkbox" 
@@ -890,7 +908,7 @@ export default function ConfigSettings() {
 
             {/* Creator form */}
             <div className="dashboard-panel">
-              <h3 className="panel-title mb-4">Add Team Counselor</h3>
+              <h3 className="panel-title mb-4">Create New User</h3>
               <form onSubmit={handleAddCounselor}>
                 <div className="form-group">
                   <label className="form-label">Full Name</label>
@@ -928,12 +946,37 @@ export default function ConfigSettings() {
                   />
                 </div>
 
+                <div className="form-group two-col">
+                  <div>
+                    <label className="form-label">User Role</label>
+                    <select 
+                      className="form-control"
+                      value={cRole}
+                      onChange={(e) => setCRole(e.target.value)}
+                    >
+                      <option value="Counselor">Counselor</option>
+                      <option value="Manager">Manager</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="form-label">Initial Status</label>
+                    <select 
+                      className="form-control"
+                      value={cStatus}
+                      onChange={(e) => setCStatus(e.target.value)}
+                    >
+                      <option value="Active">Active (Enabled)</option>
+                      <option value="Inactive">Inactive (Disabled)</option>
+                    </select>
+                  </div>
+                </div>
+
                 <div style={{ background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.15)', padding: '10px 14px', borderRadius: 'var(--radius-sm)', fontSize: '11px', color: '#3b82f6', marginTop: '16px' }}>
-                  <strong>🔔 Agent Assignment:</strong> Creating a new counselor automatically registers them inside the CRM. They will immediately become assignable to student inquiries.
+                  <strong>🔔 User Assignment:</strong> Creating a new user registers them inside the CRM. Managers get cross-team monitoring access, and Counselors receive isolated queues.
                 </div>
 
                 <button type="submit" className="primary-btn mt-4">
-                  Add Counselor Agent
+                  Create User Account
                 </button>
               </form>
             </div>
