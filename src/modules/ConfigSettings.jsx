@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useCRM } from '../context/CRMContext';
-
+import { functions } from '../firebase';
+import { httpsCallable } from 'firebase/functions';
 function ColorField({ label, desc, value, onChange, icon }) {
   const pickerRef = useRef(null);
   return (
@@ -91,6 +92,7 @@ export default function ConfigSettings() {
   const [cPassword, setCPassword] = useState('');
   const [cRole, setCRole] = useState('Counselor');
   const [cStatus, setCStatus] = useState('Active');
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
 
   if (activeRole !== 'Admin') {
     return (
@@ -197,21 +199,34 @@ export default function ConfigSettings() {
     setFieldRequired(false);
   };
 
-  const handleAddCounselor = (e) => {
+  const handleAddCounselor = async (e) => {
     e.preventDefault();
-    if (!cName.trim() || !cEmail.trim()) return;
-    addCounselor({
-      name: cName,
-      email: cEmail,
-      password: cPassword,
-      role: cRole,
-      status: cStatus
-    });
-    setCName('');
-    setCEmail('');
-    setCPassword('');
-    setCRole('Counselor');
-    setCStatus('Active');
+    if (!cName.trim() || !cEmail.trim() || !cPassword.trim()) return;
+    
+    setIsCreatingUser(true);
+    try {
+      const createUserAccount = httpsCallable(functions, 'createUserAccount');
+      const result = await createUserAccount({
+        name: cName,
+        email: cEmail,
+        password: cPassword,
+        role: cRole
+      });
+      
+      if (result.data.success) {
+        alert(result.data.message);
+        setCName('');
+        setCEmail('');
+        setCPassword('');
+        setCRole('Counselor');
+        setCStatus('Active');
+      }
+    } catch (error) {
+      console.error('Error creating user account:', error);
+      alert('Failed to create user account: ' + error.message);
+    } finally {
+      setIsCreatingUser(false);
+    }
   };
 
   return (
@@ -975,8 +990,8 @@ export default function ConfigSettings() {
                   <strong>🔔 User Assignment:</strong> Creating a new user registers them inside the CRM. Managers get cross-team monitoring access, and Counselors receive isolated queues.
                 </div>
 
-                <button type="submit" className="primary-btn mt-4">
-                  Create User Account
+                <button type="submit" className="primary-btn mt-4" disabled={isCreatingUser}>
+                  {isCreatingUser ? 'Creating...' : 'Create User Account'}
                 </button>
               </form>
             </div>
