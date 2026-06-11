@@ -19,7 +19,9 @@ export default function GridView() {
     setActiveView,
     showToastMsg,
     showDetailModal,
-    setShowDetailModal
+    setShowDetailModal,
+    updateLeadStage,
+    logNote
   } = useCRM();
 
   // Filter States
@@ -64,14 +66,26 @@ export default function GridView() {
     if (selectedCounselor !== 'All' && lead.counselor !== selectedCounselor) return false;
     if (selectedSource !== 'All') {
       const srcLower = (lead.source || '').toLowerCase();
-      if (selectedSource === 'Meta') {
+      if (selectedSource === 'meta') {
         if (!srcLower.includes('meta')) return false;
-      } else if (selectedSource === 'Google Ads') {
+      } else if (selectedSource === 'google') {
         if (!srcLower.includes('google')) return false;
-      } else if (selectedSource === 'Website') {
+      } else if (selectedSource === 'whatsapp') {
+        if (!srcLower.includes('whatsapp')) return false;
+      } else if (selectedSource === 'website') {
         if (!srcLower.includes('website')) return false;
-      } else {
-        if (lead.source !== selectedSource) return false;
+      } else if (selectedSource === 'call') {
+        if (!srcLower.includes('call') && !srcLower.includes('phone') && !srcLower.includes('referral')) return false;
+      } else if (selectedSource === 'walkin') {
+        if (!srcLower.includes('walk-in') && !srcLower.includes('walkin')) return false;
+      } else if (selectedSource === 'other') {
+        const isMeta = srcLower.includes('meta');
+        const isGoogle = srcLower.includes('google');
+        const isWhatsapp = srcLower.includes('whatsapp');
+        const isWebsite = srcLower.includes('website');
+        const isCall = srcLower.includes('call') || srcLower.includes('phone') || srcLower.includes('referral');
+        const isWalkin = srcLower.includes('walk-in') || srcLower.includes('walkin');
+        if (isMeta || isGoogle || isWhatsapp || isWebsite || isCall || isWalkin) return false;
       }
     }
 
@@ -200,6 +214,14 @@ export default function GridView() {
   const handleRowClick = (leadId) => {
     setSelectedLeadId(leadId);
     setShowDetailModal(true);
+  };
+
+  const [timelineNoteText, setTimelineNoteText] = useState('');
+
+  const handleAddNoteSubmit = () => {
+    if (!timelineNoteText.trim() || !selectedLeadId) return;
+    logNote(selectedLeadId, timelineNoteText.trim());
+    setTimelineNoteText('');
   };
 
   const getInitials = (name) => {
@@ -339,7 +361,7 @@ export default function GridView() {
               onChange={(e) => { setSelectedCounselor(e.target.value); setCurrentPage(1); }}
               className="gv-filter-select"
             >
-              <option value="All">All Counselors</option>
+              <option key="all" value="All">All Counselors</option>
               {counselors.map(c => (
                 <option key={c.id} value={c.name}>
                   {c.name} {c.status === 'Deactivated' ? '(Deactivated)' : ''}
@@ -360,9 +382,12 @@ export default function GridView() {
             className="gv-filter-select"
           >
             <option value="All">All Sources</option>
-            <option value="Meta">Meta</option>
-            <option value="Google Ads">Google Ads</option>
-            <option value="Website">Website</option>
+            <option value="meta">meta</option>
+            <option value="google">google</option>
+            <option value="whatsapp">whatsapp</option>
+            <option value="website">website</option>
+            <option value="call">call</option>
+            <option value="walkin">walkin</option>
           </select>
         </div>
       </div>
@@ -521,7 +546,9 @@ export default function GridView() {
 
                       {/* Source */}
                       <td>
-                        <span className="gv-source-text">{lead.source}</span>
+                        <span className="gv-source-text">
+                          {lead.source === 'Website Form' || lead.source === 'Website Form Widget' || lead.source === 'Website' ? 'Website Leads' : lead.source}
+                        </span>
                       </td>
 
                       {/* Owner */}
@@ -667,28 +694,274 @@ export default function GridView() {
       )}
 
       {/* ──────────── LEAD DETAIL MODAL ──────────── */}
-      {showDetailModal && (
-        <div className="lead-detail-modal-overlay" onClick={() => { setSelectedLeadId(null); setShowDetailModal(false); }}>
-          <div className="lead-detail-modal-content" style={{ maxWidth: '600px' }} onClick={(e) => e.stopPropagation()}>
-            <button 
-              type="button" 
-              className="lead-detail-modal-close" 
-              onClick={() => { setSelectedLeadId(null); setShowDetailModal(false); }}
-              title="Close Details"
-            >
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <line x1="18" y1="6" x2="6" y2="18"/>
-                <line x1="6" y1="6" x2="18" y2="18"/>
-              </svg>
-            </button>
-            <DetailTimeline 
-              onClose={() => { setSelectedLeadId(null); setShowDetailModal(false); }} 
-              backText="Back to Leads"
-              hideTimeline={true} 
-            />
+      {showDetailModal && (() => {
+        if (!selectedLeadId) {
+          return (
+            <div className="lead-detail-modal-overlay" onClick={() => { setSelectedLeadId(null); setShowDetailModal(false); }}>
+              <div className="lead-detail-modal-content" style={{ maxWidth: '600px' }} onClick={(e) => e.stopPropagation()}>
+                <button 
+                  type="button" 
+                  className="lead-detail-modal-close" 
+                  onClick={() => { setSelectedLeadId(null); setShowDetailModal(false); }}
+                  title="Close Details"
+                >
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </button>
+                <DetailTimeline 
+                  onClose={() => { setSelectedLeadId(null); setShowDetailModal(false); }} 
+                  backText="Back to Leads"
+                  hideTimeline={true} 
+                />
+              </div>
+            </div>
+          );
+        }
+
+        const lead = leads.find(l => l.id === selectedLeadId);
+        if (!lead) return null;
+        
+        // Formatted creation date
+        const formattedCreatedDate = lead.createdDate 
+          ? new Date(lead.createdDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ', ' + 
+            new Date(lead.createdDate).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+          : 'Unknown Date';
+          
+        return (
+          <div className="lead-detail-modal-overlay" onClick={() => { setSelectedLeadId(null); setShowDetailModal(false); setTimelineNoteText(''); }}>
+            <div className="lead-detail-modal-content" style={{ maxWidth: '960px', width: '92%', height: '88vh', maxHeight: '720px', padding: '0px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={(e) => e.stopPropagation()}>
+              
+              {/* Modal Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '24px 28px 16px 28px', borderBottom: '1px solid #f1f5f9' }}>
+                <div>
+                  <h3 style={{ margin: '0 0 6px 0', fontSize: '24px', fontWeight: '800', color: '#0f172a' }}>{lead.name}</h3>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '13px', color: '#64748b', fontWeight: '500' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                      {lead.phone}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                      {formattedCreatedDate}
+                    </div>
+                  </div>
+                </div>
+                
+                <button 
+                  type="button" 
+                  onClick={() => { setSelectedLeadId(null); setShowDetailModal(false); setTimelineNoteText(''); }}
+                  style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </button>
+              </div>
+
+              {/* Modal Body Columns */}
+              <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+                {/* Left Column: Status, Agent, Complete Information */}
+                <div style={{ width: '45%', padding: '24px 28px', borderRight: '1px solid #f1f5f9', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  
+                  {/* Lead Status Section */}
+                  <div>
+                    <h4 style={{ margin: '0 0 12px 0', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#475569', letterSpacing: '0.05em' }}>Lead Status</h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {[
+                        { label: 'New', dbStage: 'New Lead' },
+                        { label: 'Contacted', dbStage: 'Contacted' },
+                        { label: 'Qualified', dbStage: 'Interested' },
+                        { label: 'Closed Won', dbStage: 'Converted' },
+                        { label: 'Closed Lost', dbStage: 'Not Interested' }
+                      ].map(item => {
+                        const isCurrent = lead.stage === item.dbStage || (item.dbStage === 'Interested' && ['Interested', 'Demo Scheduled', 'Demo Attended', 'Follow-up Pending'].includes(lead.stage));
+                        return (
+                          <button
+                            key={item.label}
+                            onClick={() => updateLeadStage(lead.id, item.dbStage)}
+                            style={{
+                              width: '100%',
+                              padding: '10px 16px',
+                              borderRadius: '8px',
+                              border: 'none',
+                              textAlign: 'left',
+                              fontSize: '13px',
+                              fontWeight: '600',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              background: isCurrent ? '#f1f5f9' : 'transparent',
+                              color: isCurrent ? '#1e293b' : '#64748b',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            {item.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Assigned Agent Section */}
+                  <div>
+                    <h4 style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#475569', letterSpacing: '0.05em' }}>Assigned Agent</h4>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px', borderRadius: '8px', border: '1px solid #f1f5f9', background: '#f8fafc' }}>
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#64748b" strokeWidth="2.5"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                      <span style={{ fontSize: '13px', fontWeight: '600', color: '#334155' }}>
+                        {lead.counselor || 'Unassigned'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Complete Information Section */}
+                  <div>
+                    <h4 style={{ margin: '0 0 12px 0', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#475569', letterSpacing: '0.05em' }}>Complete Information</h4>
+                    <div style={{ padding: '16px 20px', borderRadius: '12px', border: '1px solid #f1f5f9', background: '#f8fafc', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {lead.source === 'WhatsApp' || lead.source === 'WhatsApp Inbound' ? (
+                        <>
+                          <div>
+                            <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase', marginBottom: '2px', letterSpacing: '0.03em' }}>Form Name</div>
+                            <div style={{ fontSize: '13px', color: '#1e293b', fontWeight: '600' }}>WhatsApp</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase', marginBottom: '2px', letterSpacing: '0.03em' }}>Page Name</div>
+                            <div style={{ fontSize: '13px', color: '#1e293b', fontWeight: '600' }}>WhatsApp Lead</div>
+                          </div>
+                        </>
+                      ) : lead.source === 'Meta' || lead.source === 'Meta Ads' ? (
+                        <>
+                          <div>
+                            <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase', marginBottom: '2px', letterSpacing: '0.03em' }}>Form Name</div>
+                            <div style={{ fontSize: '13px', color: '#1e293b', fontWeight: '600' }}>Meta Ads Form</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase', marginBottom: '2px', letterSpacing: '0.03em' }}>Page Name</div>
+                            <div style={{ fontSize: '13px', color: '#1e293b', fontWeight: '600' }}>Meta Lead</div>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div>
+                            <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase', marginBottom: '2px', letterSpacing: '0.03em' }}>Source</div>
+                            <div style={{ fontSize: '13px', color: '#1e293b', fontWeight: '600' }}>
+                              {lead.source === 'Walk-in' && lead.subSource ? `Walk-in (${lead.subSource})` : lead.source}
+                            </div>
+                          </div>
+                        </>
+                      )}
+                      <div>
+                        <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase', marginBottom: '2px', letterSpacing: '0.03em' }}>Email</div>
+                        <div style={{ fontSize: '13px', color: '#1e293b', fontWeight: '600' }}>{lead.email || 'Not Provided'}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase', marginBottom: '2px', letterSpacing: '0.03em' }}>Location</div>
+                        <div style={{ fontSize: '13px', color: '#1e293b', fontWeight: '600' }}>{lead.location || 'Not Provided'}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase', marginBottom: '2px', letterSpacing: '0.03em' }}>Education</div>
+                        <div style={{ fontSize: '13px', color: '#1e293b', fontWeight: '600' }}>{lead.education || 'Not Provided'}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase', marginBottom: '2px', letterSpacing: '0.03em' }}>Course</div>
+                        <div style={{ fontSize: '13px', color: '#1e293b', fontWeight: '600' }}>{lead.course || 'Not Provided'}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Column: Activity Timeline */}
+                <div style={{ width: '55%', padding: '24px 28px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                  <h4 style={{ margin: '0 0 16px 0', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#475569', letterSpacing: '0.05em' }}>Activity Timeline</h4>
+                  
+                  {/* Timeline stream */}
+                  <div style={{ flex: 1, overflowY: 'auto', paddingRight: '4px', display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '16px' }}>
+                    {(() => {
+                      const timelineNodes = [...(lead.timeline || [])].reverse();
+                      if (timelineNodes.length === 0) {
+                        return (
+                          <div style={{ textAlign: 'center', padding: '40px 0', color: '#94a3b8', fontSize: '13px' }}>
+                            No activity logged yet.
+                          </div>
+                        );
+                      }
+                      return timelineNodes.map((node, index) => {
+                        const formattedNodeTime = node.timestamp
+                          ? new Date(node.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ', ' +
+                            new Date(node.timestamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+                          : 'Unknown time';
+                        return (
+                          <div key={node.id} style={{ display: 'flex', gap: '14px', position: 'relative' }}>
+                            {/* Connecting Line */}
+                            {index < timelineNodes.length - 1 && (
+                              <div style={{ position: 'absolute', left: '5px', top: '12px', bottom: '-24px', width: '1px', borderLeft: '1px solid #e2e8f0' }} />
+                            )}
+                            {/* Circle dot */}
+                            <div style={{ width: '11px', height: '11px', borderRadius: '50%', background: '#64748b', marginTop: '6px', flexShrink: 0, zIndex: 1 }} />
+                            
+                            {/* Log card */}
+                            <div style={{ flex: 1, padding: '12px 16px', borderRadius: '8px', border: '1px solid #f1f5f9', background: '#f8fafc' }}>
+                              <div style={{ fontSize: '13.5px', color: '#1e293b', fontWeight: '600', lineHeight: '1.4', wordBreak: 'break-word' }}>
+                                {node.content || node.title}
+                              </div>
+                              <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '6px', fontWeight: '500' }}>
+                                {node.user} • {formattedNodeTime}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+
+                  {/* Add note input form */}
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="Add a note or log activity..."
+                      style={{ flex: 1, borderRadius: '8px', padding: '10px 14px', fontSize: '13px' }}
+                      value={timelineNoteText}
+                      onChange={(e) => setTimelineNoteText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleAddNoteSubmit();
+                        }
+                      }}
+                    />
+                    <button
+                      onClick={handleAddNoteSubmit}
+                      style={{
+                        width: '36px',
+                        height: '36px',
+                        borderRadius: '50%',
+                        background: '#2563eb',
+                        border: 'none',
+                        color: '#ffffff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        flexShrink: 0,
+                        transition: 'transform 0.1s ease'
+                      }}
+                    >
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ transform: 'rotate(45deg) translate(-1px, 1px)' }}>
+                        <line x1="22" y1="2" x2="11" y2="13"/>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

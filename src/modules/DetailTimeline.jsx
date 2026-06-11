@@ -30,7 +30,7 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
   const [collapsedNodeIds, setCollapsedNodeIds] = useState([]);
 
   const toggleNodeCollapse = (id) => {
-    setCollapsedNodeIds(prev => 
+    setCollapsedNodeIds(prev =>
       prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
     );
   };
@@ -55,9 +55,23 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
   const [formEducation, setFormEducation] = useState(lead ? lead.education : '');
   const [formCourse, setFormCourse] = useState(lead ? lead.course : courses[0]?.name || '');
   const [formSource, setFormSource] = useState(lead ? lead.source : 'Walk-in');
+
+  // Dynamic list of unique sub-sources for walk-in leads
+  const walkinSubSources = (() => {
+    const uniqueSubs = leads
+      .filter(l => {
+        const srcLower = (l.source || '').toLowerCase();
+        return srcLower.includes('walk-in') || srcLower.includes('walkin');
+      })
+      .map(l => l.subSource || 'Walk-in');
+    return ['Walk-in', ...new Set(uniqueSubs.filter(s => s !== 'Walk-in' && s.toLowerCase().trim() !== 'walk-in'))];
+  })();
+
+  const [formSubSource, setFormSubSource] = useState(lead ? (lead.subSource || 'Walk-in') : 'Walk-in');
+  const [customSubSource, setCustomSubSource] = useState('');
   const [formCounselor, setFormCounselor] = useState(lead ? lead.counselor : activeUser);
   const [formStage, setFormStage] = useState(lead ? lead.stage : 'New Lead');
-  
+
   // Custom Fields form data
   const [formCustomFields, setFormCustomFields] = useState(() => {
     if (lead && lead.customFields) {
@@ -98,7 +112,7 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
 
   // Multi-select questions checkbox helper
   const handleQuestionToggle = (qName) => {
-    setCallQuestions(prev => 
+    setCallQuestions(prev =>
       prev.includes(qName) ? prev.filter(q => q !== qName) : [...prev, qName]
     );
   };
@@ -113,6 +127,8 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
       setFormEducation(lead.education);
       setFormCourse(lead.course);
       setFormSource(lead.source);
+      setFormSubSource(lead.subSource || 'Walk-in');
+      setCustomSubSource('');
       setFormCounselor(lead.counselor);
       setFormStage(lead.stage);
       setFormCustomFields(lead.customFields || {});
@@ -125,6 +141,8 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
       setFormEducation('');
       setFormCourse(courses[0]?.name || '');
       setFormSource('Walk-in');
+      setFormSubSource('Walk-in');
+      setCustomSubSource('');
       setFormCounselor(activeUser);
       setFormStage('New Lead');
       setFormCustomFields({});
@@ -135,6 +153,9 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
   // Form Submission
   const handleFormSubmit = (e) => {
     e.preventDefault();
+    const isWalkin = lead ? (lead.source === 'Walk-in') : true;
+    const finalSubSource = formSubSource === 'other' ? (customSubSource.trim() || 'Walk-in') : formSubSource;
+
     const data = {
       name: formName,
       email: formEmail,
@@ -142,7 +163,8 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
       location: formLocation,
       education: formEducation,
       course: formCourse,
-      source: formSource,
+      source: lead ? lead.source : 'Walk-in',
+      subSource: isWalkin ? (finalSubSource || 'Walk-in') : (lead?.subSource || ''),
       counselor: formCounselor,
       stage: formStage,
       customFields: formCustomFields
@@ -220,8 +242,8 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
     <div className="fade-in">
       {!onClose && (
         <div style={{ marginBottom: '14px', display: 'flex', alignItems: 'center' }}>
-          <button 
-            className="secondary-btn" 
+          <button
+            className="secondary-btn"
             style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '12px', fontWeight: '600' }}
             onClick={() => {
               if (onClose) {
@@ -232,7 +254,7 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
             }}
           >
             <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
             {backText}
           </button>
@@ -267,43 +289,43 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
                   borderBottom: '1px solid var(--border-color)',
                   margin: '10px 0 5px 0'
                 }}>
-                  <button 
+                  <button
                     type="button"
-                    className="primary-btn justify-center" 
-                    style={{ fontSize: '12px', padding: '10px', fontWeight: '600' }} 
+                    className="primary-btn justify-center"
+                    style={{ fontSize: '12px', padding: '10px', fontWeight: '600' }}
                     onClick={() => setCallModalOpen(true)}
                   >
-                    <svg viewBox="0 0 24 24" width="14" height="14" style={{ marginRight: '6px' }} fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.94.725l.548 2.2a1 1 0 01-.321.988l-1.305.98a10.582 10.582 0 004.872 4.872l.98-1.305a1 1 0 01.988-.321l2.2.548a1 1 0 01.725.94V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                    <svg viewBox="0 0 24 24" width="14" height="14" style={{ marginRight: '6px' }} fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.94.725l.548 2.2a1 1 0 01-.321.988l-1.305.98a10.582 10.582 0 004.872 4.872l.98-1.305a1 1 0 01.988-.321l2.2.548a1 1 0 01.725.94V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
                     Log Call
                   </button>
-                  <button 
+                  <button
                     type="button"
-                    className="secondary-btn justify-center" 
-                    style={{ fontSize: '12px', padding: '10px', fontWeight: '600' }} 
+                    className="secondary-btn justify-center"
+                    style={{ fontSize: '12px', padding: '10px', fontWeight: '600' }}
                     onClick={() => setFollowupModalOpen(true)}
                   >
-                    <svg viewBox="0 0 24 24" width="14" height="14" style={{ marginRight: '6px' }} fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                    <svg viewBox="0 0 24 24" width="14" height="14" style={{ marginRight: '6px' }} fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
                     Schedule Callback
                   </button>
-                  <button 
+                  <button
                     type="button"
-                    className="secondary-btn justify-center" 
-                    style={{ fontSize: '12px', padding: '10px', fontWeight: '600' }} 
+                    className="secondary-btn justify-center"
+                    style={{ fontSize: '12px', padding: '10px', fontWeight: '600' }}
                     onClick={() => setDemoModalOpen(true)}
                   >
-                    <svg viewBox="0 0 24 24" width="14" height="14" style={{ marginRight: '6px' }} fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 10l5 5-5 5m-6-5h11M4 4v7a4 4 0 004 4h1"/></svg>
+                    <svg viewBox="0 0 24 24" width="14" height="14" style={{ marginRight: '6px' }} fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 10l5 5-5 5m-6-5h11M4 4v7a4 4 0 004 4h1" /></svg>
                     Schedule Demo
                   </button>
-                  <button 
+                  <button
                     type="button"
-                    className="secondary-btn justify-center" 
-                    style={{ fontSize: '12px', padding: '10px', fontWeight: '600' }} 
+                    className="secondary-btn justify-center"
+                    style={{ fontSize: '12px', padding: '10px', fontWeight: '600' }}
                     onClick={() => {
                       if (onClose) onClose();
                       setActiveView('whatsapp');
                     }}
                   >
-                    <svg viewBox="0 0 24 24" width="14" height="14" style={{ marginRight: '6px' }} fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
+                    <svg viewBox="0 0 24 24" width="14" height="14" style={{ marginRight: '6px' }} fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" /></svg>
                     Chat Inbound
                   </button>
                 </div>
@@ -314,7 +336,7 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
                 <div className="profile-section-title">Contact Information</div>
                 <div className="profile-detail-item">
                   <span className="detail-label">
-                    <svg viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.94.725l.548 2.2a1 1 0 01-.321.988l-1.305.98a10.582 10.582 0 004.872 4.872l.98-1.305a1 1 0 01.988-.321l2.2.548a1 1 0 01.725.94V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                    <svg viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.94.725l.548 2.2a1 1 0 01-.321.988l-1.305.98a10.582 10.582 0 004.872 4.872l.98-1.305a1 1 0 01.988-.321l2.2.548a1 1 0 01.725.94V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
                     Phone
                   </span>
                   <span className="detail-value">{lead.phone}</span>
@@ -322,7 +344,7 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
 
                 <div className="profile-detail-item">
                   <span className="detail-label">
-                    <svg viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                    <svg viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
                     Email
                   </span>
                   <span className="detail-value">{lead.email}</span>
@@ -330,7 +352,7 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
 
                 <div className="profile-detail-item">
                   <span className="detail-label">
-                    <svg viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><circle cx="12" cy="11" r="3"/></svg>
+                    <svg viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><circle cx="12" cy="11" r="3" /></svg>
                     Location
                   </span>
                   <span className="detail-value">{lead.location}</span>
@@ -340,7 +362,7 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
                 <div className="profile-section-title">Academic & Intake</div>
                 <div className="profile-detail-item">
                   <span className="detail-label">
-                    <svg viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M12 14l9-5-9-5-9 5 9 5z"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"/></svg>
+                    <svg viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M12 14l9-5-9-5-9 5 9 5z" /><path strokeLinecap="round" strokeLinejoin="round" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" /></svg>
                     Education Background
                   </span>
                   <span className="detail-value">{lead.education}</span>
@@ -348,7 +370,7 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
 
                 <div className="profile-detail-item">
                   <span className="detail-label">
-                    <svg viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                    <svg viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
                     Program of Interest
                   </span>
                   <span className="detail-value">{lead.course}</span>
@@ -356,46 +378,58 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
 
                 <div className="profile-detail-item">
                   <span className="detail-label">
-                    <svg viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+                    <svg viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
                     Inquiry Source
                   </span>
-                  <span className="detail-value">{lead.source}</span>
+                  <span className="detail-value">
+                    {(() => {
+                      if (lead.source === 'Website Form' || lead.source === 'Website Form Widget' || lead.source === 'Website') {
+                        return 'Website Leads';
+                      }
+                      if (lead.source === 'Walk-in' || lead.source === 'Walk-In') {
+                        return lead.subSource && lead.subSource !== 'Walk-in' ? `Walk-in (${lead.subSource})` : 'Walk-in';
+                      }
+                      return lead.source;
+                    })()}
+                  </span>
                 </div>
 
                 {/* Assignment Section */}
                 <div className="profile-section-title">Assignment & Custom Data</div>
                 <div className="profile-detail-item">
                   <span className="detail-label">
-                    <svg viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                    <svg viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                     Assigned Counselor
                   </span>
                   <span className="detail-value">{lead.counselor}</span>
                 </div>
 
                 {/* Renders Custom Fields dynamically */}
-                {customFields.map(field => {
-                  const val = lead.customFields?.[field.id] || 'Not Set';
-                  return (
-                    <div key={field.id} className="profile-detail-item">
-                      <span className="detail-label">
-                        <svg viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-                        {field.name}
-                      </span>
-                      <span className="detail-value">{val}</span>
-                    </div>
-                  );
-                })}
+                {customFields
+                  .filter(field => field.name.toLowerCase().trim() !== 'inquiry source')
+                  .map(field => {
+                    const val = lead.customFields?.[field.id] || 'Not Set';
+                    return (
+                      <div key={field.id} className="profile-detail-item">
+                        <span className="detail-label">
+                          <svg viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                          {field.name}
+                        </span>
+                        <span className="detail-value">{val}</span>
+                      </div>
+                    );
+                  })}
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
                 <button className="primary-btn w-full justify-between" onClick={() => setIsEditMode(true)}>
                   Edit Profile
-                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                 </button>
                 {activeRole === 'Admin' && (
                   <button className="secondary-btn w-full justify-between" style={{ color: '#f43f5e' }} onClick={() => deleteLead(lead.id)}>
                     Remove Inquiry
-                    <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                   </button>
                 )}
               </div>
@@ -409,9 +443,9 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
 
               <div className="form-group">
                 <label className="form-label">Full Name</label>
-                <input 
-                  type="text" 
-                  className="form-control" 
+                <input
+                  type="text"
+                  className="form-control"
                   required
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
@@ -422,9 +456,9 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
 
               <div className="form-group">
                 <label className="form-label">Phone Number</label>
-                <input 
-                  type="text" 
-                  className="form-control" 
+                <input
+                  type="text"
+                  className="form-control"
                   required
                   value={formPhone}
                   onChange={(e) => setFormPhone(e.target.value)}
@@ -435,9 +469,9 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
 
               <div className="form-group">
                 <label className="form-label">Education/Experience</label>
-                <input 
-                  type="text" 
-                  className="form-control" 
+                <input
+                  type="text"
+                  className="form-control"
                   placeholder="e.g. final year B.Tech, Graduate"
                   value={formEducation}
                   onChange={(e) => setFormEducation(e.target.value)}
@@ -446,7 +480,7 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
 
               <div className="form-group">
                 <label className="form-label">Applied Course</label>
-                <select 
+                <select
                   className="form-control"
                   value={formCourse}
                   onChange={(e) => setFormCourse(e.target.value)}
@@ -455,26 +489,38 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
                 </select>
               </div>
 
-              <div className="form-group">
-                <label className="form-label">Inquiry Source</label>
-                <select 
-                  className="form-control"
-                  value={formSource}
-                  onChange={(e) => setFormSource(e.target.value)}
-                >
-                  <option value="Walk-in">Walk-in Inbound</option>
-                  <option value="Meta Ads">Meta (Facebook/Instagram)</option>
-                  <option value="Google Search">Google Platforms</option>
-                  <option value="Website Form">Website Form</option>
-                  <option value="WhatsApp Inbound">WhatsApp</option>
-                  <option value="Student Referral">Student Referral</option>
-                </select>
-              </div>
+              {(!lead || lead.source === 'Walk-in') && (
+                <div className="form-group">
+                  <label className="form-label">Inquiry Source</label>
+                  <select
+                    className="form-control"
+                    value={formSubSource}
+                    onChange={(e) => setFormSubSource(e.target.value)}
+                  >
+                    {walkinSubSources.map(sub => (
+                      <option key={sub} value={sub}>{sub}</option>
+                    ))}
+                    <option value="other">other</option>
+                  </select>
+
+                  {formSubSource === 'other' && (
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="Enter custom source (e.g. poster, justdail)"
+                      style={{ marginTop: '8px' }}
+                      value={customSubSource}
+                      onChange={(e) => setCustomSubSource(e.target.value)}
+                      required
+                    />
+                  )}
+                </div>
+              )}
 
               {activeRole !== 'Counselor' && (
                 <div className="form-group">
                   <label className="form-label">Assigned Counselor</label>
-                  <select 
+                  <select
                     className="form-control"
                     value={formCounselor}
                     onChange={(e) => setFormCounselor(e.target.value)}
@@ -492,7 +538,7 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
 
               <div className="form-group">
                 <label className="form-label">Stage</label>
-                <select 
+                <select
                   className="form-control"
                   value={formStage}
                   onChange={(e) => setFormStage(e.target.value)}
@@ -502,27 +548,29 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
               </div>
 
               {/* Custom field entries inside forms */}
-              {customFields.map(field => (
-                <div key={field.id} className="form-group">
-                  <label className="form-label">{field.name}</label>
-                  {field.type === 'select' ? (
-                    <select
-                      className="form-control"
-                      value={formCustomFields[field.id] || ''}
-                      onChange={(e) => setFormCustomFields(prev => ({ ...prev, [field.id]: e.target.value }))}
-                    >
-                      {field.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                    </select>
-                  ) : (
-                    <input
-                      type="text"
-                      className="form-control"
-                      value={formCustomFields[field.id] || ''}
-                      onChange={(e) => setFormCustomFields(prev => ({ ...prev, [field.id]: e.target.value }))}
-                    />
-                  )}
-                </div>
-              ))}
+              {customFields
+                .filter(field => field.name.toLowerCase().trim() !== 'inquiry source')
+                .map(field => (
+                  <div key={field.id} className="form-group">
+                    <label className="form-label">{field.name}</label>
+                    {field.type === 'select' ? (
+                      <select
+                        className="form-control"
+                        value={formCustomFields[field.id] || ''}
+                        onChange={(e) => setFormCustomFields(prev => ({ ...prev, [field.id]: e.target.value }))}
+                      >
+                        {field.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={formCustomFields[field.id] || ''}
+                        onChange={(e) => setFormCustomFields(prev => ({ ...prev, [field.id]: e.target.value }))}
+                      />
+                    )}
+                  </div>
+                ))}
 
               <div className="flex gap-2 mt-4">
                 {lead && (
@@ -548,17 +596,17 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
                 {/* Timeline Utility Action bar */}
                 <div className="timeline-action-bar">
                   <button className="primary-btn" onClick={() => setCallModalOpen(true)}>
-                    <svg viewBox="0 0 24 24"><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.94.725l.548 2.2a1 1 0 01-.321.988l-1.305.98a10.582 10.582 0 004.872 4.872l.98-1.305a1 1 0 01.988-.321l2.2.548a1 1 0 01.725.94V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" stroke="currentColor" strokeWidth="2" fill="none"/></svg>
+                    <svg viewBox="0 0 24 24"><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.94.725l.548 2.2a1 1 0 01-.321.988l-1.305.98a10.582 10.582 0 004.872 4.872l.98-1.305a1 1 0 01.988-.321l2.2.548a1 1 0 01.725.94V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" stroke="currentColor" strokeWidth="2" fill="none" /></svg>
                     Log Call
                   </button>
 
                   <button className="secondary-btn" onClick={() => setFollowupModalOpen(true)}>
-                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2" stroke="currentColor" strokeWidth="2" fill="none"/></svg>
+                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" stroke="currentColor" strokeWidth="2" fill="none" /></svg>
                     Schedule Callback
                   </button>
 
                   <button className="secondary-btn" onClick={() => setDemoModalOpen(true)}>
-                    <svg viewBox="0 0 24 24"><path d="M15 10l5 5-5 5m-6-5h11M4 4v7a4 4 0 004 4h1" stroke="currentColor" strokeWidth="2" fill="none"/></svg>
+                    <svg viewBox="0 0 24 24"><path d="M15 10l5 5-5 5m-6-5h11M4 4v7a4 4 0 004 4h1" stroke="currentColor" strokeWidth="2" fill="none" /></svg>
                     Schedule Demo
                   </button>
 
@@ -572,12 +620,12 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
 
                 {/* Timeline logs timeline */}
                 <h3 className="panel-title mb-2">Timeline Interaction Audit Feed</h3>
-                
+
                 {/* Filter Pills Bar */}
                 <div className="timeline-filter-bar">
                   {['All', 'Calls', 'Chats', 'System', 'Demos'].map(cat => (
-                    <button 
-                      key={cat} 
+                    <button
+                      key={cat}
                       className={`timeline-filter-pill ${timelineFilter === cat ? 'active' : ''}`}
                       onClick={() => setTimelineFilter(cat)}
                     >
@@ -590,17 +638,17 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
                   {filteredTimeline.slice().reverse().map(node => {
                     const isCollapsed = collapsedNodeIds.includes(node.id);
                     return (
-                      <div 
-                        key={node.id} 
+                      <div
+                        key={node.id}
                         className={`timeline-node node-${node.type} timeline-node-collapsible`}
                         onClick={() => toggleNodeCollapse(node.id)}
                       >
                         <div className="timeline-icon-container">
-                          {node.type === 'call' && <svg viewBox="0 0 24 24"><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.94.725l.548 2.2a1 1 0 01-.321.988l-1.305.98a10.582 10.582 0 004.872 4.872l.98-1.305a1 1 0 01.988-.321l2.2.548a1 1 0 01.725.94V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" stroke="currentColor" strokeWidth="3"/></svg>}
-                          {node.type === 'whatsapp' && <svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" stroke="currentColor" strokeWidth="3"/></svg>}
-                          {node.type === 'system' && <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01" stroke="currentColor" strokeWidth="3"/></svg>}
-                          {node.type === 'followup' && <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2" stroke="currentColor" strokeWidth="3"/></svg>}
-                          {node.type === 'demo' && <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2m12-10a4 4 0 11-8 0 4 4 0 018 0z" stroke="currentColor" strokeWidth="3"/></svg>}
+                          {node.type === 'call' && <svg viewBox="0 0 24 24"><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.94.725l.548 2.2a1 1 0 01-.321.988l-1.305.98a10.582 10.582 0 004.872 4.872l.98-1.305a1 1 0 01.988-.321l2.2.548a1 1 0 01.725.94V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" stroke="currentColor" strokeWidth="3" /></svg>}
+                          {node.type === 'whatsapp' && <svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" stroke="currentColor" strokeWidth="3" /></svg>}
+                          {node.type === 'system' && <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4m0-4h.01" stroke="currentColor" strokeWidth="3" /></svg>}
+                          {node.type === 'followup' && <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" stroke="currentColor" strokeWidth="3" /></svg>}
+                          {node.type === 'demo' && <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2m12-10a4 4 0 11-8 0 4 4 0 018 0z" stroke="currentColor" strokeWidth="3" /></svg>}
                         </div>
 
                         <div className="node-header">
@@ -627,7 +675,7 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
               </>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, color: 'var(--text-muted)' }}>
-                <svg viewBox="0 0 24 24" width="60" height="60" stroke="currentColor" strokeWidth="1" fill="none"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2m12-10a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                <svg viewBox="0 0 24 24" width="60" height="60" stroke="currentColor" strokeWidth="1" fill="none"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2m12-10a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
                 <p style={{ marginTop: '12px' }}>Fill in details on the left to capture a new student inquiry into the platform.</p>
               </div>
             )}
@@ -644,7 +692,7 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
             <div className="modal-header">
               <h4 className="modal-title">Log Phone/WhatsApp Call Outcome</h4>
               <button className="modal-close-btn" onClick={() => setCallModalOpen(false)}>
-                <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" strokeWidth="2.5"/></svg>
+                <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" strokeWidth="2.5" /></svg>
               </button>
             </div>
 
@@ -677,8 +725,8 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px' }}>
                   {['Fees Structure', 'Course Duration', 'Job Placements', 'Internships', 'Demo Class Required', 'Timing Batches'].map(q => (
                     <label key={q} className="flex align-center gap-2" style={{ cursor: 'pointer' }}>
-                      <input 
-                        type="checkbox" 
+                      <input
+                        type="checkbox"
                         checked={callQuestions.includes(q)}
                         onChange={() => handleQuestionToggle(q)}
                       />
@@ -690,8 +738,8 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
 
               <div className="form-group">
                 <label className="form-label">Detailed Interaction Notes</label>
-                <textarea 
-                  className="form-control" 
+                <textarea
+                  className="form-control"
                   placeholder="Detail what was discussed..."
                   value={callNotes}
                   onChange={(e) => setCallNotes(e.target.value)}
@@ -700,7 +748,7 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
 
               <div className="form-group">
                 <label className="form-label">Pipeline Stage Shift (Optional)</label>
-                <select 
+                <select
                   className="form-control"
                   value={callUpdateStage}
                   onChange={(e) => setCallUpdateStage(e.target.value)}
@@ -713,8 +761,8 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
               {/* Schedule Follow-up inside Call Form */}
               <div className="form-group" style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--glass-border)', padding: '10px 14px', borderRadius: 'var(--radius-md)' }}>
                 <label className="flex align-center gap-2 mb-4" style={{ cursor: 'pointer', fontWeight: '600' }}>
-                  <input 
-                    type="checkbox" 
+                  <input
+                    type="checkbox"
                     checked={callSchedFollowup}
                     onChange={(e) => setCallSchedFollowup(e.target.checked)}
                   />
@@ -725,8 +773,8 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
                   <div className="fade-in">
                     <div className="form-group">
                       <label className="form-label">Callback Date & Time</label>
-                      <input 
-                        type="datetime-local" 
+                      <input
+                        type="datetime-local"
                         className="form-control"
                         required={callSchedFollowup}
                         value={callFollowupDate}
@@ -735,9 +783,9 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
                     </div>
                     <div className="form-group" style={{ marginBottom: '0' }}>
                       <label className="form-label">Follow-up Goal / Objective</label>
-                      <input 
-                        type="text" 
-                        className="form-control" 
+                      <input
+                        type="text"
+                        className="form-control"
                         placeholder="e.g. brochures feedback check, Zoom call"
                         value={callFollowupReason}
                         onChange={(e) => setCallFollowupReason(e.target.value)}
@@ -765,15 +813,15 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
             <div className="modal-header">
               <h4 className="modal-title">Schedule Callback Follow-up</h4>
               <button className="modal-close-btn" onClick={() => setFollowupModalOpen(false)}>
-                <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" strokeWidth="2.5"/></svg>
+                <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" strokeWidth="2.5" /></svg>
               </button>
             </div>
 
             <div className="modal-body">
               <div className="form-group">
                 <label className="form-label">Callback Date & Time</label>
-                <input 
-                  type="datetime-local" 
+                <input
+                  type="datetime-local"
                   className="form-control"
                   required
                   value={followupDate}
@@ -782,9 +830,9 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
               </div>
               <div className="form-group">
                 <label className="form-label">Purpose / Callback Goal</label>
-                <input 
-                  type="text" 
-                  className="form-control" 
+                <input
+                  type="text"
+                  className="form-control"
                   placeholder="e.g. check brochure read, timing confirmation"
                   value={followupReason}
                   onChange={(e) => setFollowupReason(e.target.value)}
@@ -809,7 +857,7 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
             <div className="modal-header">
               <h4 className="modal-title">Schedule Demo / Live Class Invitation</h4>
               <button className="modal-close-btn" onClick={() => setDemoModalOpen(false)}>
-                <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" strokeWidth="2.5"/></svg>
+                <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" strokeWidth="2.5" /></svg>
               </button>
             </div>
 
@@ -817,9 +865,9 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
               <div className="form-group two-col">
                 <div>
                   <label className="form-label">Class Date</label>
-                  <input 
-                    type="date" 
-                    className="form-control" 
+                  <input
+                    type="date"
+                    className="form-control"
                     required
                     value={demoDate}
                     onChange={(e) => setDemoDate(e.target.value)}
@@ -827,9 +875,9 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
                 </div>
                 <div>
                   <label className="form-label">Class Time</label>
-                  <input 
-                    type="time" 
-                    className="form-control" 
+                  <input
+                    type="time"
+                    className="form-control"
                     required
                     value={demoTime}
                     onChange={(e) => setDemoTime(e.target.value)}
@@ -840,7 +888,7 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
               <div className="form-group two-col">
                 <div>
                   <label className="form-label">Conducting Trainer</label>
-                  <select 
+                  <select
                     className="form-control"
                     value={demoTrainer}
                     onChange={(e) => setDemoTrainer(e.target.value)}
@@ -856,7 +904,7 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
                 </div>
                 <div>
                   <label className="form-label">Class Mode</label>
-                  <select 
+                  <select
                     className="form-control"
                     value={demoMode}
                     onChange={(e) => setDemoMode(e.target.value)}
@@ -870,8 +918,8 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
 
               <div className="form-group">
                 <label className="form-label">Location Room / Video Link URL</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   className="form-control"
                   placeholder="meet.google.com/abc-def-ghi"
                   value={demoLocation}

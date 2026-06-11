@@ -157,7 +157,9 @@ export default function KanbanView() {
           >
             <option value="All">All Sources</option>
             {uniqueSources.filter(s => s !== 'All').map(source => (
-              <option key={source} value={source}>{source}</option>
+              <option key={source} value={source}>
+                {source === 'Website Form' || source === 'Website Form Widget' || source === 'Website' ? 'Website Leads' : source}
+              </option>
             ))}
           </select>
         </div>
@@ -196,7 +198,9 @@ export default function KanbanView() {
                     <div className="card-counselor-avatar" title={lead.counselor}>
                       {getInitials(lead.counselor)}
                     </div>
-                    <span style={{ fontSize: '10px' }}>{lead.source}</span>
+                    <span style={{ fontSize: '10px' }}>
+                      {lead.source === 'Website Form' || lead.source === 'Website Form Widget' || lead.source === 'Website' ? 'Website Leads' : lead.source}
+                    </span>
                   </div>
 
                   {isFollowupOverdue && (

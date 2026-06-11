@@ -1039,6 +1039,40 @@ export const CRMProvider = ({ children }) => {
     showToastMsg('Call history logged successfully.');
   };
 
+  // Logging custom interaction notes
+  const logNote = (leadId, noteText) => {
+    let updatedLead = null;
+    const nextLeads = leads.map(lead => {
+      if (lead.id === leadId) {
+        const noteLog = {
+          id: `log-note-${Date.now()}`,
+          type: 'call',
+          title: 'Interaction Note',
+          content: noteText,
+          timestamp: new Date().toISOString(),
+          user: activeUser
+        };
+        updatedLead = {
+          ...lead,
+          lastContacted: new Date().toISOString(),
+          timeline: [...(lead.timeline || []), noteLog]
+        };
+        return updatedLead;
+      }
+      return lead;
+    });
+
+    if (isFirebaseEnabled && updatedLead) {
+      setDoc(doc(db, 'leads', leadId), updatedLead)
+        .catch(err => {
+          console.error("Firestore logNote failed, falling back to local update:", err);
+          setLeads(nextLeads);
+        });
+    } else {
+      setLeads(nextLeads);
+    }
+  };
+
   // Directly schedule/postpone a follow-up date
   const scheduleFollowup = (leadId, dateStr, reason) => {
     const schedDate = new Date(dateStr).toISOString();
@@ -1624,6 +1658,7 @@ export const CRMProvider = ({ children }) => {
       deleteLead,
       updateLeadStage,
       logCall,
+      logNote,
       scheduleFollowup,
       completeFollowup,
       scheduleDemo,

@@ -6,6 +6,7 @@ export default function Dashboard() {
 
   const [hoveredPoint, setHoveredPoint] = useState(null);
   const [timeRange, setTimeRange] = useState('7days'); // '7days', '1month', '1year'
+  const [walkinExpanded, setWalkinExpanded] = useState(true);
 
   // Date Picker States
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
@@ -106,7 +107,21 @@ export default function Dashboard() {
     const whatsappCount = activeLeads.filter(l => l.source === 'WhatsApp Inbound' || l.source === 'WhatsApp').length;
     const websiteCount = activeLeads.filter(l => l.source === 'Website Form' || l.source === 'Website').length;
     const callCount = activeLeads.filter(l => l.source === 'Call' || l.source === 'Inbound Call' || l.source === 'Outbound Call' || l.source === 'Phone' || l.source === 'Student Referral').length;
-    const walkinCount = activeLeads.filter(l => l.source === 'Walk-in').length;
+    const walkinCount = activeLeads.filter(l => {
+      const srcLower = (l.source || '').toLowerCase();
+      return srcLower.includes('walk-in') || srcLower.includes('walkin');
+    }).length;
+    
+    const othersCount = activeLeads.filter(l => {
+      const srcLower = (l.source || '').toLowerCase();
+      const isMeta = srcLower.includes('meta');
+      const isGoogle = srcLower.includes('google');
+      const isWhatsapp = srcLower.includes('whatsapp');
+      const isWebsite = srcLower.includes('website');
+      const isCall = srcLower.includes('call') || srcLower.includes('phone') || srcLower.includes('referral');
+      const isWalkin = srcLower.includes('walk-in') || srcLower.includes('walkin');
+      return !(isMeta || isGoogle || isWhatsapp || isWebsite || isCall || isWalkin);
+    }).length;
     
     const contactedCount = activeLeads.filter(l => ['Contacted', 'Interested', 'Demo Scheduled', 'Demo Attended'].includes(l.stage)).length;
     const followUpsCount = activeLeads.filter(l => l.followupDate || l.stage === 'Follow-up Pending').length;
@@ -119,6 +134,7 @@ export default function Dashboard() {
       websiteLeads: websiteCount,
       callLeads: callCount,
       walkinLeads: walkinCount,
+      othersLeads: othersCount,
       totalLeads: activeLeads.length,
       contacted: contactedCount,
       followUps: followUpsCount,
@@ -126,24 +142,69 @@ export default function Dashboard() {
       metaPct: parseFloat(((metaCount / total) * 100).toFixed(1)),
       googlePct: parseFloat(((googleCount / total) * 100).toFixed(1)),
       whatsappPct: parseFloat(((whatsappCount / total) * 100).toFixed(1)),
-      websitePct: parseFloat(((websiteCount / total) * 100).toFixed(1))
+      websitePct: parseFloat(((websiteCount / total) * 100).toFixed(1)),
+      callPct: parseFloat(((callCount / total) * 100).toFixed(1)),
+      walkinPct: parseFloat(((walkinCount / total) * 100).toFixed(1)),
+      othersPct: parseFloat(((othersCount / total) * 100).toFixed(1))
     };
   })();
 
   const activeStats = liveStats;
 
-  // Render SVG Donut segments based on HSL tailored colors
-  // Circumference of circle with r=40 is 251.327
-  const circ = 251.327;
-  const metaStroke = (activeStats.metaPct / 100) * circ;
-  const googleStroke = (activeStats.googlePct / 100) * circ;
-  const whatsappStroke = (activeStats.whatsappPct / 100) * circ;
-  const websiteStroke = (activeStats.websitePct / 100) * circ;
+  // Group walk-in leads by sub-source
+  const walkinLeadsList = filteredLeads.filter(l => {
+    const srcLower = (l.source || '').toLowerCase();
+    return srcLower.includes('walk-in') || srcLower.includes('walkin');
+  });
 
-  const metaOffset = 0;
-  const googleOffset = -metaStroke;
-  const whatsappOffset = -(metaStroke + googleStroke);
-  const websiteOffset = -(metaStroke + googleStroke + whatsappStroke);
+  const walkinGroups = {};
+  walkinLeadsList.forEach(l => {
+    const sub = l.subSource || 'Walk-in';
+    const key = sub.toLowerCase().trim();
+    if (!walkinGroups[key]) {
+      walkinGroups[key] = {
+        label: sub,
+        count: 0
+      };
+    }
+    walkinGroups[key].count += 1;
+  });
+
+  const walkinPalette = [
+    '#db2777', // Walk-in pink (base)
+    '#ec4899', // Pink 500
+    '#f43f5e', // Rose 500
+    '#fb7185', // Rose 400
+    '#be185d', // Pink 700
+    '#fda4af', // Rose 300
+    '#9d174d', // Pink 800
+  ];
+
+  const walkinSegments = Object.keys(walkinGroups).map((key, index) => {
+    const group = walkinGroups[key];
+    return {
+      key: `walkin_${key}`,
+      label: group.label,
+      count: group.count,
+      color: walkinPalette[index % walkinPalette.length]
+    };
+  });
+
+  // Build all segments for the donut chart
+  const totalLeadsCount = filteredLeads.length || 1;
+  const donutSegments = [
+    { label: 'meta', count: activeStats.metaLeads, color: '#2563eb' },
+    { label: 'google', count: activeStats.googleLeads, color: '#f97316' },
+    { label: 'whatsapp', count: activeStats.whatsappLeads, color: '#10b981' },
+    { label: 'website', count: activeStats.websiteLeads, color: '#8b5cf6' },
+    { label: 'call', count: activeStats.callLeads, color: '#06b6d4' },
+    ...walkinSegments
+  ].map(seg => ({
+    ...seg,
+    pct: parseFloat(((seg.count / totalLeadsCount) * 100).toFixed(1))
+  }));
+
+  const circ = 251.327;
 
   // Dynamic Graph Data Generation from live filtered leads
   const graphDatasets = {
@@ -380,7 +441,7 @@ export default function Dashboard() {
               </svg>
             </div>
             <div className="db-source-details">
-              <span className="db-source-label">Meta Leads</span>
+              <span className="db-source-label">meta</span>
               <span className="db-source-value">{activeStats.metaLeads.toLocaleString()}</span>
             </div>
           </div>
@@ -398,7 +459,7 @@ export default function Dashboard() {
               </svg>
             </div>
             <div className="db-source-details">
-              <span className="db-source-label">Google Ads Leads</span>
+              <span className="db-source-label">google</span>
               <span className="db-source-value">{activeStats.googleLeads.toLocaleString()}</span>
             </div>
           </div>
@@ -413,7 +474,7 @@ export default function Dashboard() {
               </svg>
             </div>
             <div className="db-source-details">
-              <span className="db-source-label">WhatsApp Leads</span>
+              <span className="db-source-label">whatsapp</span>
               <span className="db-source-value">{activeStats.whatsappLeads.toLocaleString()}</span>
             </div>
           </div>
@@ -430,7 +491,7 @@ export default function Dashboard() {
               </svg>
             </div>
             <div className="db-source-details">
-              <span className="db-source-label">Website Form Leads</span>
+              <span className="db-source-label">website</span>
               <span className="db-source-value">{activeStats.websiteLeads.toLocaleString()}</span>
             </div>
           </div>
@@ -445,7 +506,7 @@ export default function Dashboard() {
               </svg>
             </div>
             <div className="db-source-details">
-              <span className="db-source-label">Call Leads</span>
+              <span className="db-source-label">call</span>
               <span className="db-source-value">{activeStats.callLeads.toLocaleString()}</span>
             </div>
           </div>
@@ -463,7 +524,7 @@ export default function Dashboard() {
               </svg>
             </div>
             <div className="db-source-details">
-              <span className="db-source-label">Walk-in Leads</span>
+              <span className="db-source-label">walkin</span>
               <span className="db-source-value">{activeStats.walkinLeads.toLocaleString()}</span>
             </div>
           </div>
@@ -583,21 +644,28 @@ export default function Dashboard() {
                 {/* Background loop */}
                 <circle cx="50" cy="50" r="40" fill="transparent" stroke="rgba(0,0,0,0.02)" strokeWidth="10" />
 
-                {/* Website Form segment (purple) */}
-                <circle cx="50" cy="50" r="40" fill="transparent" stroke="#8b5cf6" strokeWidth="10"
-                        strokeDasharray={`${websiteStroke} ${circ}`} strokeDashoffset={websiteOffset} />
-
-                {/* WhatsApp segment (green) */}
-                <circle cx="50" cy="50" r="40" fill="transparent" stroke="#10b981" strokeWidth="10"
-                        strokeDasharray={`${whatsappStroke} ${circ}`} strokeDashoffset={whatsappOffset} />
-
-                {/* Google Ads segment (orange) */}
-                <circle cx="50" cy="50" r="40" fill="transparent" stroke="#f97316" strokeWidth="10"
-                        strokeDasharray={`${googleStroke} ${circ}`} strokeDashoffset={googleOffset} />
-
-                {/* Meta segment (blue) */}
-                <circle cx="50" cy="50" r="40" fill="transparent" stroke="#2563eb" strokeWidth="10"
-                        strokeDasharray={`${metaStroke} ${circ}`} strokeDashoffset={metaOffset} />
+                {(() => {
+                  let accumulatedStroke = 0;
+                  return donutSegments.map((seg, idx) => {
+                    const stroke = (seg.pct / 100) * circ;
+                    const offset = -accumulatedStroke;
+                    accumulatedStroke += stroke;
+                    if (seg.count === 0) return null;
+                    return (
+                      <circle
+                        key={idx}
+                        cx="50"
+                        cy="50"
+                        r="40"
+                        fill="transparent"
+                        stroke={seg.color}
+                        strokeWidth="10"
+                        strokeDasharray={`${stroke} ${circ}`}
+                        strokeDashoffset={offset}
+                      />
+                    );
+                  });
+                })()}
               </svg>
 
               {/* Exact Mockup Center Text */}
@@ -627,7 +695,7 @@ export default function Dashboard() {
               <div className="db-donut-legend-item">
                 <div className="db-donut-legend-left">
                   <div className="db-donut-legend-square" style={{ background: '#2563eb' }} />
-                  <span className="db-donut-legend-label">Meta</span>
+                  <span className="db-donut-legend-label">meta</span>
                 </div>
                 <span className="db-donut-legend-pct">{activeStats.metaPct}%</span>
               </div>
@@ -635,7 +703,7 @@ export default function Dashboard() {
               <div className="db-donut-legend-item">
                 <div className="db-donut-legend-left">
                   <div className="db-donut-legend-square" style={{ background: '#f97316' }} />
-                  <span className="db-donut-legend-label">Google Ads</span>
+                  <span className="db-donut-legend-label">google</span>
                 </div>
                 <span className="db-donut-legend-pct">{activeStats.googlePct}%</span>
               </div>
@@ -643,7 +711,7 @@ export default function Dashboard() {
               <div className="db-donut-legend-item">
                 <div className="db-donut-legend-left">
                   <div className="db-donut-legend-square" style={{ background: '#10b981' }} />
-                  <span className="db-donut-legend-label">WhatsApp</span>
+                  <span className="db-donut-legend-label">whatsapp</span>
                 </div>
                 <span className="db-donut-legend-pct">{activeStats.whatsappPct}%</span>
               </div>
@@ -651,9 +719,62 @@ export default function Dashboard() {
               <div className="db-donut-legend-item">
                 <div className="db-donut-legend-left">
                   <div className="db-donut-legend-square" style={{ background: '#8b5cf6' }} />
-                  <span className="db-donut-legend-label">Website Form</span>
+                  <span className="db-donut-legend-label">website</span>
                 </div>
                 <span className="db-donut-legend-pct">{activeStats.websitePct}%</span>
+              </div>
+
+              <div className="db-donut-legend-item">
+                <div className="db-donut-legend-left">
+                  <div className="db-donut-legend-square" style={{ background: '#06b6d4' }} />
+                  <span className="db-donut-legend-label">call</span>
+                </div>
+                <span className="db-donut-legend-pct">{activeStats.callPct}%</span>
+              </div>
+
+              {/* Walk-in Group nested hierarchy */}
+              <div className="db-donut-legend-item" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '4px' }}>
+                <div 
+                  onClick={() => setWalkinExpanded(!walkinExpanded)}
+                  style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', cursor: 'pointer', userSelect: 'none' }}
+                >
+                  <div className="db-donut-legend-left">
+                    <div className="db-donut-legend-square" style={{ background: '#db2777' }} />
+                    <span className="db-donut-legend-label" style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      walkin
+                      <span style={{ fontSize: '8px', opacity: 0.7, display: 'inline-block', transition: 'transform 0.2s', transform: walkinExpanded ? 'rotate(0deg)' : 'rotate(-90deg)' }}>▼</span>
+                    </span>
+                  </div>
+                  <span className="db-donut-legend-pct" style={{ fontWeight: '600' }}>{activeStats.walkinPct}%</span>
+                </div>
+                
+                {/* Sub-sources nested tree hierarchy list */}
+                {walkinExpanded && (
+                  <div style={{ paddingLeft: '14px', borderLeft: '1px dashed #e5e7eb', marginLeft: '4px', display: 'flex', flexDirection: 'column', gap: '6px', width: '100%', marginTop: '4px' }}>
+                    {walkinSegments.length === 0 ? (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: '11px', color: '#6b7280' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <div style={{ width: '6px', height: '6px', borderRadius: '1px', background: '#db2777' }} />
+                          <span>Walk-in</span>
+                        </div>
+                        <span>0%</span>
+                      </div>
+                    ) : (
+                      walkinSegments.map(seg => {
+                        const segPct = parseFloat(((seg.count / totalLeadsCount) * 100).toFixed(1));
+                        return (
+                          <div key={seg.key} style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: '11px', color: '#4b5563' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <div style={{ width: '6px', height: '6px', borderRadius: '1px', background: seg.color }} />
+                              <span>{seg.label}</span>
+                            </div>
+                            <span>{segPct}%</span>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
