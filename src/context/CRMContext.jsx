@@ -79,6 +79,9 @@ const DEFAULT_INTEGRATIONS = {
     phoneNumberId: '',
     businessAccountId: '',
     systemToken: '',
+    accessToken: '',
+    apiVersion: 'v20.0',
+    webhookVerifyToken: '',
     simulatedLeadsCount: 645
   },
   webhooks: {
@@ -388,9 +391,25 @@ export const CRMProvider = ({ children }) => {
   });
 
   const [integrations, setIntegrations] = useState(() => {
-    const hasReset = localStorage.getItem('crm_integrations_seed_reset_v2');
+    const hasReset = localStorage.getItem('crm_integrations_seed_reset_v3');
     if (!hasReset) {
-      localStorage.setItem('crm_integrations_seed_reset_v2', 'true');
+      localStorage.setItem('crm_integrations_seed_reset_v3', 'true');
+      const local = localStorage.getItem('crm_integrations');
+      if (local) {
+        try {
+          const parsed = JSON.parse(local);
+          const merged = {
+            meta: { ...DEFAULT_INTEGRATIONS.meta, ...parsed.meta },
+            google: { ...DEFAULT_INTEGRATIONS.google, ...parsed.google },
+            whatsapp: { ...DEFAULT_INTEGRATIONS.whatsapp, ...parsed.whatsapp },
+            webhooks: { ...DEFAULT_INTEGRATIONS.webhooks, ...parsed.webhooks }
+          };
+          localStorage.setItem('crm_integrations', JSON.stringify(merged));
+          return merged;
+        } catch (e) {
+          console.error("Error merging integrations state:", e);
+        }
+      }
       localStorage.setItem('crm_integrations', JSON.stringify(DEFAULT_INTEGRATIONS));
       return DEFAULT_INTEGRATIONS;
     }
@@ -907,6 +926,36 @@ export const CRMProvider = ({ children }) => {
             timestamp: new Date().toISOString(),
             user: 'Automation Server'
           });
+
+          // Dispatch to real WhatsApp API if integration is active
+          if (integrations.whatsapp.enabled && lead.phone) {
+            const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'leads-management-tz';
+            const url = `https://us-central1-${projectId}.cloudfunctions.net/sendWhatsAppMessage`;
+            
+            fetch(url, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                leadId: leadId,
+                recipientPhone: lead.phone,
+                messageText: autoMsg,
+                counselorName: 'Automation Server'
+              })
+            })
+            .then(async (res) => {
+              const data = await res.json();
+              if (res.ok && data.success) {
+                console.log('Automated WhatsApp message delivered in real-time!');
+              } else {
+                console.error('Automated WhatsApp API failed:', data.error || data.details);
+              }
+            })
+            .catch((err) => {
+              console.error('Error dispatching automated WhatsApp to Cloud Function:', err);
+            });
+          }
         }
 
         updatedLead = {
@@ -1207,6 +1256,42 @@ export const CRMProvider = ({ children }) => {
   // Sending custom WhatsApp logs & triggering bot automated simulated reply
   const sendWhatsAppMsg = (leadId, messageText) => {
     if (!messageText.trim()) return;
+
+    // If real WhatsApp integration is active and enabled, make the HTTP call to Firebase Cloud Function
+    if (integrations.whatsapp.enabled) {
+      const activeLead = leads.find(l => l.id === leadId);
+      if (activeLead && activeLead.phone) {
+        const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'leads-management-tz';
+        const url = `https://us-central1-${projectId}.cloudfunctions.net/sendWhatsAppMessage`;
+        
+        fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            leadId: leadId,
+            recipientPhone: activeLead.phone,
+            messageText: messageText,
+            counselorName: activeUser
+          })
+        })
+        .then(async (res) => {
+          const data = await res.json();
+          if (res.ok && data.success) {
+            showToastMsg('WhatsApp message delivered in real-time!', 'success');
+          } else {
+            console.error('WhatsApp API failed:', data.error || data.details);
+            showToastMsg(data.error || 'Failed to deliver WhatsApp message via API.', 'error');
+          }
+        })
+        .catch((err) => {
+          console.error('Error dispatching WhatsApp to Cloud Function:', err);
+          showToastMsg('Could not reach WhatsApp gateway function.', 'error');
+        });
+      }
+      return;
+    }
 
     const outgoingMsg = {
       id: `msg-sent-${Date.now()}`,

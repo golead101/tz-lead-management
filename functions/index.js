@@ -670,11 +670,22 @@ exports.metaWebhook = functions.https.onRequest(async (req, res) => {
       const token = req.query['hub.verify_token'];
       const challenge = req.query['hub.challenge'];
 
-      const creds = await getDecryptedMetaCredentials();
-      const expectedToken = creds.webhookVerifyToken || 'techzone_secret_verify_2026';
+      // Quick validation using env variables to prevent function execution timeouts
+      const expectedToken = process.env.META_WEBHOOK_VERIFY_TOKEN || 
+                            process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || 
+                            'techzone_secret_verify_2026';
 
       if (mode === 'subscribe' && token === expectedToken) {
-        console.log('Meta Webhook verified successfully.');
+        console.log('Meta Webhook verified successfully via env token.');
+        return res.status(200).send(challenge);
+      }
+
+      // Fallback to Firestore check if env doesn't match
+      const creds = await getDecryptedMetaCredentials();
+      const dbExpectedToken = creds.webhookVerifyToken || expectedToken;
+
+      if (mode === 'subscribe' && token === dbExpectedToken) {
+        console.log('Meta Webhook verified successfully via database token.');
         return res.status(200).send(challenge);
       } else {
         console.warn('Meta Webhook verification failed due to verification token mismatch.');
@@ -718,22 +729,16 @@ exports.metaWebhook = functions.https.onRequest(async (req, res) => {
         return res.status(500).send('Configuration Error');
       }
 
-      // Query Meta Graph API for lead content fields
-      const graphUrl = `https://graph.facebook.com/v24.0/${leadId}?access_token=${verifyToken}`;
-      const response = await axios.get(graphUrl);
+      // Query Meta Graph API for lead content fields (explicitly requesting field_data)
+      const graphUrl = `https://graph.facebook.com/v20.0/${leadId}`;
+      const response = await axios.get(graphUrl, {
+        params: {
+          access_token: verifyToken,
+          fields: 'id,created_time,field_data'
+        }
+      });
       const metaLead = response.data;
       console.log('Fetched Meta Lead details:', JSON.stringify(metaLead));
-
-      // Deduplicate check in Firestore
-      const duplicateCheck = await db.collection('leads')
-        .where('metaLeadId', '==', leadId)
-        .limit(1)
-        .get();
-
-      if (!duplicateCheck.empty) {
-        console.log(`Lead with metaLeadId ${leadId} already exists in Firestore. Skipping duplicate.`);
-        return res.status(200).send('Duplicate Skipped');
-      }
 
       // Map fields from Graph API response
       const fields = {};
@@ -748,7 +753,7 @@ exports.metaWebhook = functions.https.onRequest(async (req, res) => {
       const education = fields.education || 'Not Provided';
 
       const leadRecord = {
-        id: `lead-meta-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        id: leadId, // Use leadgen_id directly to avoid duplicates
         metaLeadId: leadId,
         name: fullName,
         email: email,
@@ -759,7 +764,7 @@ exports.metaWebhook = functions.https.onRequest(async (req, res) => {
         source: 'Meta Ads',
         stage: 'New Lead',
         counselor: 'Maha',
-        createdDate: new Date().toISOString(),
+        createdDate: metaLead.created_time || new Date().toISOString(),
         lastContacted: new Date().toISOString(),
         customFields: {
           campaignId: campaignId,
@@ -777,9 +782,9 @@ exports.metaWebhook = functions.https.onRequest(async (req, res) => {
         whatsappMessages: []
       };
 
-      // Store in Firestore
-      await db.collection('leads').doc(leadRecord.id).set(leadRecord);
-      console.log(`Successfully stored Meta webhook lead in Firestore: ${leadRecord.id}`);
+      // Store in Firestore using Meta Lead ID as doc name (deduplicates naturally)
+      await db.collection('leads').doc(leadId).set(leadRecord, { merge: true });
+      console.log(`Successfully stored Meta webhook lead in Firestore: ${leadId}`);
 
       return res.status(200).send('Success');
     } catch (err) {
@@ -858,3 +863,309 @@ exports.createUserAccount = functions.https.onCall(async (data, context) => {
     );
   }
 });
+
+/**
+ * Helper to fetch decrypted WhatsApp integration credentials.
+ */
+async function getDecryptedWhatsAppCredentials() {
+  const integrationDoc = await db.collection('settings').doc('integrations').get();
+  if (!integrationDoc.exists) {
+    throw new Error('WhatsApp integration is not configured in settings.');
+  }
+  const data = integrationDoc.data();
+  const whatsapp = data.whatsapp;
+  if (!whatsapp) {
+    throw new Error('WhatsApp settings not found.');
+  }
+  
+  // Support both encrypted and plaintext access tokens
+  let accessToken = whatsapp.accessToken || whatsapp.systemToken || '';
+  if (accessToken && cryptoHelper && typeof cryptoHelper.decrypt === 'function') {
+    try {
+      const parts = accessToken.split(':');
+      if (parts.length === 2 && parts[0].length === 32) {
+        accessToken = cryptoHelper.decrypt(accessToken);
+      }
+    } catch (e) {
+      // ignore, use plaintext
+    }
+  }
+
+  return {
+    phoneNumberId: whatsapp.phoneNumberId || '',
+    businessAccountId: whatsapp.businessAccountId || '',
+    accessToken: accessToken,
+    apiVersion: whatsapp.apiVersion || 'v20.0',
+    webhookVerifyToken: whatsapp.webhookVerifyToken || '',
+    enabled: whatsapp.enabled || false,
+    status: whatsapp.status || 'Setup Required'
+  };
+}
+
+/**
+ * sendWhatsAppMessage
+ * Dispatches an outbound WhatsApp text message via Meta's Graph API.
+ */
+exports.sendWhatsAppMessage = functions.https.onRequest((req, res) => {
+  return cors(req, res, async () => {
+    if (req.method !== 'POST') {
+      return res.status(405).json({ error: 'Method not allowed' });
+    }
+
+    try {
+      const { leadId, recipientPhone, messageText } = req.body;
+      if (!recipientPhone || !messageText) {
+        return res.status(400).json({ error: 'recipientPhone and messageText are required.' });
+      }
+
+      // 1. Load configuration
+      const creds = await getDecryptedWhatsAppCredentials();
+      if (!creds.enabled && !req.body.bypassEnabledCheck) {
+        return res.status(400).json({ error: 'WhatsApp integration is not enabled in settings.' });
+      }
+
+      if (!creds.phoneNumberId || !creds.accessToken) {
+        return res.status(400).json({ error: 'WhatsApp integration credentials are not fully configured.' });
+      }
+
+      const cleanPhone = recipientPhone.replace(/[^0-9]/g, '');
+
+      // 2. Dispatch Meta Graph API request
+      const url = `https://graph.facebook.com/${creds.apiVersion}/${creds.phoneNumberId}/messages`;
+      const payload = {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: cleanPhone,
+        type: 'text',
+        text: { body: messageText }
+      };
+
+      console.log(`[WhatsApp CF] Sending message to ${cleanPhone}. URL: ${url}`);
+      const response = await axios.post(url, payload, {
+        headers: {
+          'Authorization': `Bearer ${creds.accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log('[WhatsApp CF] Meta response:', response.status, JSON.stringify(response.data));
+      const messageId = response.data.messages?.[0]?.id;
+
+      // 3. Update lead data in Firestore
+      if (leadId) {
+        const leadRef = db.collection('leads').doc(leadId);
+        const leadSnap = await leadRef.get();
+        if (leadSnap.exists) {
+          const leadData = leadSnap.data();
+          
+          const outboundMsg = {
+            id: `msg-sent-${Date.now()}`,
+            sender: 'counselor',
+            text: messageText,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            waMessageId: messageId || null,
+            status: 'sent',
+            timestamp: new Date().toISOString()
+          };
+
+          const updatedChat = [...(leadData.whatsappMessages || []), outboundMsg];
+          const nextTimeline = [...(leadData.timeline || []), {
+            id: `log-wa-${Date.now()}`,
+            type: 'whatsapp',
+            title: 'WhatsApp Dispatched',
+            content: messageText,
+            timestamp: new Date().toISOString(),
+            user: req.body.counselorName || 'Counselor'
+          }];
+
+          await leadRef.update({
+            whatsappMessages: updatedChat,
+            timeline: nextTimeline,
+            lastContacted: new Date().toISOString()
+          });
+        }
+      }
+
+      return res.status(200).json({ success: true, messageId });
+
+    } catch (err) {
+      const errorMsg = err.response ? JSON.stringify(err.response.data) : err.message;
+      console.error('[WhatsApp CF] Error sending WhatsApp message:', errorMsg);
+      return res.status(400).json({
+        success: false,
+        error: 'Failed to send WhatsApp message.',
+        details: errorMsg
+      });
+    }
+  });
+});
+
+/**
+ * whatsappWebhook
+ * Public webhook endpoint for receiving incoming WhatsApp text replies and handshakes.
+ */
+exports.whatsappWebhook = functions.https.onRequest((req, res) => {
+  if (req.method === 'GET') {
+    try {
+      const mode = req.query['hub.mode'];
+      const token = req.query['hub.verify_token'];
+      const challenge = req.query['hub.challenge'];
+
+      return db.collection('settings').doc('integrations').get()
+        .then((docRef) => {
+          let expectedToken = 'techzone_secret_verify_2026';
+          if (docRef.exists) {
+            const data = docRef.data();
+            if (data.whatsapp && data.whatsapp.webhookVerifyToken) {
+              expectedToken = data.whatsapp.webhookVerifyToken;
+            }
+          }
+
+          if (mode === 'subscribe' && token === expectedToken) {
+            console.log('WhatsApp Webhook verified successfully.');
+            return res.status(200).send(challenge);
+          } else {
+            console.warn('WhatsApp Webhook verification failed.');
+            return res.status(403).send('Forbidden');
+          }
+        })
+        .catch((err) => {
+          console.error('WhatsApp Webhook verification lookup error:', err.message);
+          return res.status(500).send('Verification Error');
+        });
+    } catch (e) {
+      console.error('WhatsApp Webhook verification error:', e.message);
+      return res.status(500).send('Verification Error');
+    }
+  }
+
+  if (req.method === 'POST') {
+    try {
+      const payload = req.body;
+      console.log('Received WhatsApp webhook payload:', JSON.stringify(payload));
+
+      const entry = payload.entry?.[0];
+      const change = entry?.changes?.[0];
+      const value = change?.value;
+
+      if (!value || !value.messages) {
+        return res.status(200).send('EVENT_RECEIVED');
+      }
+
+      const contact = value.contacts?.[0];
+      const message = value.messages?.[0];
+
+      if (!message || !message.from) {
+        return res.status(200).send('No message details');
+      }
+
+      const senderPhoneRaw = message.from;
+      const senderName = contact?.profile?.name || 'WhatsApp Student';
+      const messageText = message.text?.body || '';
+
+      const cleanedSenderPhone = senderPhoneRaw.replace(/[^0-9]/g, '');
+
+      // Query leads collection to find a phone number match
+      return db.collection('leads').get()
+        .then(async (leadsSnap) => {
+          let matchedLeadRef = null;
+          let matchedLeadData = null;
+
+          leadsSnap.forEach((doc) => {
+            const lead = doc.data();
+            if (lead.phone) {
+              const cleanedLeadPhone = lead.phone.replace(/[^0-9]/g, '');
+              if (cleanedLeadPhone === cleanedSenderPhone || 
+                  (cleanedLeadPhone.length >= 10 && cleanedSenderPhone.length >= 10 && 
+                   cleanedLeadPhone.slice(-10) === cleanedSenderPhone.slice(-10))) {
+                matchedLeadRef = doc.ref;
+                matchedLeadData = lead;
+              }
+            }
+          });
+
+          const inboundMsg = {
+            id: `msg-recv-${Date.now()}`,
+            sender: 'lead',
+            text: messageText || `[${message.type || 'attachment'} shared]`,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            waMessageId: message.id || null,
+            timestamp: new Date().toISOString()
+          };
+
+          if (matchedLeadRef && matchedLeadData) {
+            console.log(`[WhatsApp Webhook] Appending to lead: ${matchedLeadData.name}`);
+            
+            const updatedChat = [...(matchedLeadData.whatsappMessages || []), inboundMsg];
+            const nextTimeline = [...(matchedLeadData.timeline || []), {
+              id: `log-wa-in-${Date.now()}`,
+              type: 'whatsapp',
+              title: 'WhatsApp Received',
+              content: messageText || `[${message.type || 'attachment'} shared]`,
+              timestamp: new Date().toISOString(),
+              user: 'System'
+            }];
+
+            await matchedLeadRef.update({
+              whatsappMessages: updatedChat,
+              timeline: nextTimeline,
+              lastContacted: new Date().toISOString()
+            });
+
+          } else {
+            console.log(`[WhatsApp Webhook] Creating new lead for phone ${senderPhoneRaw}`);
+            
+            let formattedPhone = senderPhoneRaw;
+            if (senderPhoneRaw.startsWith('91') && senderPhoneRaw.length === 12) {
+              formattedPhone = `+91 ${senderPhoneRaw.slice(2, 7)} ${senderPhoneRaw.slice(7)}`;
+            } else if (!senderPhoneRaw.startsWith('+')) {
+              formattedPhone = `+${senderPhoneRaw}`;
+            }
+
+            const newLeadId = `lead-wa-inbound-${Date.now()}`;
+            const newLead = {
+              id: newLeadId,
+              name: senderName,
+              email: `${senderName.toLowerCase().replace(/[^a-z0-9]/g, '.')}@wa-inbound.com`,
+              phone: formattedPhone,
+              location: 'WhatsApp Inquiry',
+              education: 'Not Provided',
+              course: 'Full-Stack Web Development',
+              source: 'WhatsApp Inbound',
+              stage: 'New Lead',
+              counselor: 'Maha',
+              createdDate: new Date().toISOString(),
+              lastContacted: new Date().toISOString(),
+              customFields: {
+                waMessageId: message.id || null
+              },
+              timeline: [{
+                id: `log-${Date.now()}`,
+                type: 'system',
+                title: 'Lead Captured via WhatsApp Webhook',
+                content: `Real-time WhatsApp inquiry received. Text: "${messageText}"`,
+                timestamp: new Date().toISOString(),
+                user: 'WhatsApp Server'
+              }],
+              whatsappMessages: [inboundMsg]
+            };
+
+            await db.collection('leads').doc(newLeadId).set(newLead);
+          }
+
+          return res.status(200).send('EVENT_RECEIVED');
+        })
+        .catch((err) => {
+          console.error('[WhatsApp Webhook] Query error:', err);
+          return res.status(500).send('Internal Server Error');
+        });
+
+    } catch (err) {
+      console.error('[WhatsApp Webhook] Processing error:', err);
+      return res.status(500).send('Internal Server Error');
+    }
+  }
+
+  return res.status(405).send('Method Not Allowed');
+});
+

@@ -22,7 +22,7 @@ export default function Integrations() {
   // Form input states
   const [metaFields, setMetaFields] = useState({ appId: '', appSecret: '', webhookVerifyToken: '', verifyToken: '', redirectUri: '' });
   const [googleFields, setGoogleFields] = useState({ developerToken: '', customerId: '', managerCustomerId: '', clientId: '', clientSecret: '', refreshToken: '', webhookPasskey: '' });
-  const [whatsappFields, setWhatsAppFields] = useState({ phoneNumberId: '', businessAccountId: '', systemToken: '' });
+  const [whatsappFields, setWhatsAppFields] = useState({ phoneNumberId: '', businessAccountId: '', systemToken: '', accessToken: '', apiVersion: 'v20.0', webhookVerifyToken: '' });
 
   // Google Ads API connection and sync statuses
   const [isValidating, setIsValidating] = useState(false);
@@ -54,9 +54,12 @@ export default function Integrations() {
       setValidationResult(null);
     } else if (selectedPlatform === 'whatsapp') {
       setWhatsAppFields({
-        phoneNumberId: integrations.whatsapp.phoneNumberId || '',
-        businessAccountId: integrations.whatsapp.businessAccountId || '',
-        systemToken: integrations.whatsapp.systemToken || ''
+        phoneNumberId: integrations.whatsapp.phoneNumberId || import.meta.env.WHATSAPP_PHONE_NUMBER_ID || '',
+        businessAccountId: integrations.whatsapp.businessAccountId || import.meta.env.WHATSAPP_BUSINESS_ACCOUNT_ID || '',
+        systemToken: integrations.whatsapp.systemToken || integrations.whatsapp.accessToken || import.meta.env.WHATSAPP_ACCESS_TOKEN || '',
+        accessToken: integrations.whatsapp.accessToken || integrations.whatsapp.systemToken || import.meta.env.WHATSAPP_ACCESS_TOKEN || '',
+        apiVersion: integrations.whatsapp.apiVersion || import.meta.env.WHATSAPP_API_VERSION || 'v20.0',
+        webhookVerifyToken: integrations.whatsapp.webhookVerifyToken || import.meta.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || ''
       });
     } else if (selectedPlatform === 'webhooks') {
       setWebhookFields({
@@ -232,7 +235,7 @@ export default function Integrations() {
     } else if (platform === 'google') {
       return !!(data.developerToken && data.customerId);
     } else if (platform === 'whatsapp') {
-      return !!(data.phoneNumberId && data.systemToken);
+      return !!(data.phoneNumberId && (data.systemToken || data.accessToken));
     } else if (platform === 'webhooks') {
       return !!(data.securitySecret);
     }
@@ -313,7 +316,15 @@ export default function Integrations() {
       }
     } else if (selectedPlatform === 'whatsapp') {
       fieldsToSave = { ...whatsappFields };
-      if (!whatsappFields.phoneNumberId || !whatsappFields.systemToken) activeStatus = 'Setup Required';
+      // Ensure systemToken is always set (synchronised with accessToken) for backward compatibility
+      if (fieldsToSave.accessToken && !fieldsToSave.systemToken) {
+        fieldsToSave.systemToken = fieldsToSave.accessToken;
+      } else if (fieldsToSave.systemToken && !fieldsToSave.accessToken) {
+        fieldsToSave.accessToken = fieldsToSave.systemToken;
+      }
+      if (!whatsappFields.phoneNumberId || !(whatsappFields.systemToken || whatsappFields.accessToken)) {
+        activeStatus = 'Setup Required';
+      }
     } else if (selectedPlatform === 'webhooks') {
       fieldsToSave = { ...webhookFields };
       if (!webhookFields.securitySecret) activeStatus = 'Setup Required';
@@ -899,18 +910,6 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                         onChange={(e) => setMetaFields({ ...metaFields, verifyToken: e.target.value })}
                       />
                     </div>
-                    <div className="form-group">
-                      <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>Meta Redirect URI (META_REDIRECT_URI)</label>
-                      <input 
-                        type="text" 
-                        required
-                        className="form-control" 
-                        style={{ height: '36px', fontSize: '12px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)' }}
-                        placeholder="e.g. https://your-domain.com/auth/callback"
-                        value={metaFields.redirectUri}
-                        onChange={(e) => setMetaFields({ ...metaFields, redirectUri: e.target.value })}
-                      />
-                    </div>
 
                     {/* Meta Webhook Setup Info */}
                     <div style={{ marginTop: '8px', padding: '10px', borderRadius: '6px', background: 'rgba(0,0,0,0.02)', border: '1px solid var(--border-color)', fontSize: '11px' }}>
@@ -1197,7 +1196,7 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                 {selectedPlatform === 'whatsapp' && (
                   <>
                     <div className="form-group">
-                      <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>WhatsApp Phone Number ID</label>
+                      <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>WhatsApp Phone Number ID (WHATSAPP_PHONE_NUMBER_ID)</label>
                       <input 
                         type="text" 
                         required
@@ -1209,7 +1208,7 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                       />
                     </div>
                     <div className="form-group">
-                      <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>WhatsApp Business Account ID</label>
+                      <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>WhatsApp Business Account ID (WHATSAPP_BUSINESS_ACCOUNT_ID)</label>
                       <input 
                         type="text" 
                         required
@@ -1221,14 +1220,42 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                       />
                     </div>
                     <div className="form-group">
-                      <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>Permanent Access Token</label>
+                      <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>WhatsApp API Version (WHATSAPP_API_VERSION)</label>
+                      <input 
+                        type="text" 
+                        required
+                        className="form-control" 
+                        style={{ height: '36px', fontSize: '12px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)' }}
+                        placeholder="e.g. v20.0"
+                        value={whatsappFields.apiVersion}
+                        onChange={(e) => setWhatsAppFields({ ...whatsappFields, apiVersion: e.target.value })}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>WhatsApp Webhook Verify Token (WHATSAPP_WEBHOOK_VERIFY_TOKEN)</label>
+                      <input 
+                        type="text" 
+                        required
+                        className="form-control" 
+                        style={{ height: '36px', fontSize: '12px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)' }}
+                        placeholder="e.g. whatsapp_webhook_token_secure"
+                        value={whatsappFields.webhookVerifyToken}
+                        onChange={(e) => setWhatsAppFields({ ...whatsappFields, webhookVerifyToken: e.target.value })}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>Permanent Access Token (WHATSAPP_ACCESS_TOKEN)</label>
                       <textarea 
                         required
                         className="form-control" 
                         style={{ height: '70px', fontSize: '11px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)', resize: 'none', padding: '8px' }}
                         placeholder="EAAGy7B_whatsapp_token..."
-                        value={whatsappFields.systemToken}
-                        onChange={(e) => setWhatsAppFields({ ...whatsappFields, systemToken: e.target.value })}
+                        value={whatsappFields.accessToken || whatsappFields.systemToken}
+                        onChange={(e) => setWhatsAppFields({ 
+                          ...whatsappFields, 
+                          accessToken: e.target.value,
+                          systemToken: e.target.value
+                        })}
                       />
                     </div>
                   </>
