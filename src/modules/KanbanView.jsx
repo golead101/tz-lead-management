@@ -199,7 +199,9 @@ export default function KanbanView() {
                       {getInitials(lead.counselor)}
                     </div>
                     <span style={{ fontSize: '10px' }}>
-                      {lead.source === 'Website Form' || lead.source === 'Website Form Widget' || lead.source === 'Website' ? 'Website Leads' : lead.source}
+                      {lead.source === 'Website Form' || lead.source === 'Website Form Widget' || lead.source === 'Website' 
+                        ? 'Website Leads' 
+                        : (lead.source === 'Walk-in' && lead.subSource ? `Walk-in (${lead.subSource})` : lead.source)}
                     </span>
                   </div>
 

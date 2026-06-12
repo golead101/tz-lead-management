@@ -4,7 +4,7 @@ import { db } from '../firebase';
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 
 export default function Integrations() {
-  const { leads, integrations, updateIntegration, addLead, showToastMsg } = useCRM();
+  const { leads, integrations, updateIntegration, addLead, showToastMsg, setActiveView } = useCRM();
 
   const getCapturedCount = (platform) => {
     let sourceNames = [];
@@ -793,6 +793,76 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
               }}
             >
               Configure WhatsApp
+            </button>
+          </div>
+        </div>
+
+        {/* Iframe Web Connector Card */}
+        <div className="db-source-card integrations-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', height: '100%', minHeight: '230px', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <div className="db-source-icon-wrap web" style={{ width: '42px', height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="20" height="20">
+                  <rect x="2" y="3" width="20" height="18" rx="2" ry="2" />
+                  <line x1="2" y1="8" x2="22" y2="8" />
+                  <line x1="6" y1="21" x2="6" y2="8" />
+                </svg>
+              </div>
+              
+              <div 
+                className="db-chart-dropdown active-toggle"
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: '12px',
+                  fontSize: '11px',
+                  background: 'var(--primary-glow, rgba(47,107,255,0.08))',
+                  color: 'var(--primary)',
+                  borderColor: 'var(--primary)',
+                  fontWeight: '700'
+                }}
+              >
+                Active ●
+              </div>
+            </div>
+
+            <h3 style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '6px' }}>Iframe Web Connector</h3>
+            <p style={{ fontSize: '11.5px', color: 'var(--text-muted)', lineHeight: '1.4', marginBottom: '12px' }}>
+              Generate, customize, and embed secure inquiry forms directly into your external website pages.
+            </p>
+          </div>
+
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
+              <span className="db-source-badge" style={{ 
+                background: 'rgba(16,185,129,0.08)',
+                color: '#10b981',
+                fontSize: '10px',
+                padding: '2px 8px',
+                borderRadius: '6px',
+                fontWeight: '700'
+              }}>
+                Connected
+              </span>
+              
+              <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>
+                {getCapturedCount('webhooks').toLocaleString()} leads captured
+              </span>
+            </div>
+
+            <button 
+              className="primary-btn w-full mt-3"
+              onClick={() => setActiveView('sandbox')}
+              style={{
+                height: '32px',
+                fontSize: '11px',
+                fontWeight: '700',
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid var(--border-color)',
+                color: 'var(--text-primary)',
+                cursor: 'pointer'
+              }}
+            >
+              Configure Iframe
             </button>
           </div>
         </div>

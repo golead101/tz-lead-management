@@ -57,15 +57,18 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
   const [formSource, setFormSource] = useState(lead ? lead.source : 'Walk-in');
 
   // Dynamic list of unique sub-sources for walk-in leads
-  const walkinSubSources = (() => {
+  const [localSubSources, setLocalSubSources] = useState([]);
+
+  React.useEffect(() => {
     const uniqueSubs = leads
       .filter(l => {
         const srcLower = (l.source || '').toLowerCase();
         return srcLower.includes('walk-in') || srcLower.includes('walkin');
       })
       .map(l => l.subSource || 'Walk-in');
-    return ['Walk-in', ...new Set(uniqueSubs.filter(s => s !== 'Walk-in' && s.toLowerCase().trim() !== 'walk-in'))];
-  })();
+    const computed = ['Walk-in', ...new Set(uniqueSubs.filter(s => s !== 'Walk-in' && s.toLowerCase().trim() !== 'walk-in'))];
+    setLocalSubSources(prev => Array.from(new Set([...computed, ...prev])));
+  }, [leads]);
 
   const [formSubSource, setFormSubSource] = useState(lead ? (lead.subSource || 'Walk-in') : 'Walk-in');
   const [customSubSource, setCustomSubSource] = useState('');
@@ -88,6 +91,21 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
   const [callModalOpen, setCallModalOpen] = useState(false);
   const [followupModalOpen, setFollowupModalOpen] = useState(false);
   const [demoModalOpen, setDemoModalOpen] = useState(false);
+
+  // Custom select dropdown states for Inquiry Source
+  const [isSourceDropdownOpen, setIsSourceDropdownOpen] = useState(false);
+  const [hoveredSource, setHoveredSource] = useState(null);
+  const sourceDropdownRef = React.useRef(null);
+
+  React.useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (sourceDropdownRef.current && !sourceDropdownRef.current.contains(event.target)) {
+        setIsSourceDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Call outcome logging form state
   const [callStatus, setCallStatus] = useState('');
@@ -492,29 +510,178 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
               </div>
 
               {(!lead || lead.source === 'Walk-in') && (
-                <div className="form-group">
+                <div className="form-group" style={{ position: 'relative' }} ref={sourceDropdownRef}>
                   <label className="form-label">Inquiry Source</label>
-                  <select
-                    className="form-control"
-                    value={formSubSource}
-                    onChange={(e) => setFormSubSource(e.target.value)}
+                  
+                  {/* Custom select trigger button */}
+                  <div 
+                    className="form-control" 
+                    onClick={() => setIsSourceDropdownOpen(prev => !prev)}
+                    style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'center', 
+                      cursor: 'pointer',
+                      background: 'rgba(0,0,0,0.02)',
+                      borderColor: 'var(--border-color)',
+                      height: '38px',
+                      padding: '0 12px',
+                      borderRadius: '6px',
+                      userSelect: 'none'
+                    }}
                   >
-                    {walkinSubSources.map(sub => (
-                      <option key={sub} value={sub}>{sub}</option>
-                    ))}
-                    <option value="other">other</option>
-                  </select>
+                    <span style={{ fontSize: '13px', color: 'var(--text-primary)' }}>
+                      {formSubSource}
+                    </span>
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ color: 'var(--text-secondary)' }}>
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </div>
+
+                  {/* Custom dropdown menu */}
+                  {isSourceDropdownOpen && (
+                    <div 
+                      style={{ 
+                        position: 'absolute', 
+                        top: '100%', 
+                        left: 0, 
+                        right: 0, 
+                        marginTop: '4px', 
+                        background: '#ffffff', 
+                        border: '1px solid var(--border-color)', 
+                        borderRadius: '6px', 
+                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)', 
+                        zIndex: 10,
+                        maxHeight: '200px',
+                        overflowY: 'auto'
+                      }}
+                    >
+                      {/* Walk-in Option */}
+                      <div 
+                        onClick={() => {
+                          setFormSubSource('Walk-in');
+                          setIsSourceDropdownOpen(false);
+                        }}
+                        onMouseEnter={() => setHoveredSource('Walk-in')}
+                        onMouseLeave={() => setHoveredSource(null)}
+                        style={{ 
+                          padding: '8px 12px', 
+                          fontSize: '13px', 
+                          cursor: 'pointer', 
+                          color: formSubSource === 'Walk-in' ? 'var(--primary)' : 'var(--text-primary)',
+                          background: formSubSource === 'Walk-in' ? 'var(--primary-glow)' : (hoveredSource === 'Walk-in' ? 'rgba(0,0,0,0.02)' : 'transparent'),
+                          fontWeight: formSubSource === 'Walk-in' ? '700' : '500',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between'
+                        }}
+                      >
+                        Walk-in
+                      </div>
+
+                      {/* Custom Options list with Remove buttons on the right side */}
+                      {localSubSources.filter(s => s !== 'Walk-in').map(sub => (
+                        <div 
+                          key={sub}
+                          onClick={() => {
+                            setFormSubSource(sub);
+                            setIsSourceDropdownOpen(false);
+                          }}
+                          onMouseEnter={() => setHoveredSource(sub)}
+                          onMouseLeave={() => setHoveredSource(null)}
+                          style={{ 
+                            padding: '8px 12px', 
+                            fontSize: '13px', 
+                            cursor: 'pointer', 
+                            color: formSubSource === sub ? 'var(--primary)' : 'var(--text-primary)',
+                            background: formSubSource === sub ? 'var(--primary-glow)' : (hoveredSource === sub ? 'rgba(0,0,0,0.02)' : 'transparent'),
+                            fontWeight: formSubSource === sub ? '700' : '500',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between'
+                          }}
+                        >
+                          <span>{sub}</span>
+                          <span 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setLocalSubSources(prev => prev.filter(s => s !== sub));
+                              if (formSubSource === sub) {
+                                setFormSubSource('Walk-in');
+                              }
+                            }}
+                            style={{ 
+                              color: '#ef4444', 
+                              fontWeight: 'bold', 
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              background: 'rgba(239, 68, 68, 0.08)',
+                              fontSize: '11px',
+                              cursor: 'pointer'
+                            }}
+                            title={`Remove option "${sub}"`}
+                          >
+                            ✕ Remove
+                          </span>
+                        </div>
+                      ))}
+
+                      {/* Other Option */}
+                      <div 
+                        onClick={() => {
+                          setFormSubSource('other');
+                          setIsSourceDropdownOpen(false);
+                        }}
+                        onMouseEnter={() => setHoveredSource('other')}
+                        onMouseLeave={() => setHoveredSource(null)}
+                        style={{ 
+                          padding: '8px 12px', 
+                          fontSize: '13px', 
+                          cursor: 'pointer', 
+                          color: formSubSource === 'other' ? 'var(--primary)' : 'var(--text-primary)',
+                          background: formSubSource === 'other' ? 'var(--primary-glow)' : (hoveredSource === 'other' ? 'rgba(0,0,0,0.02)' : 'transparent'),
+                          fontWeight: formSubSource === 'other' ? '700' : '500',
+                          borderTop: '1px solid var(--border-color)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between'
+                        }}
+                      >
+                        other
+                      </div>
+                    </div>
+                  )}
 
                   {formSubSource === 'other' && (
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder="Enter custom source (e.g. poster, justdail)"
-                      style={{ marginTop: '8px' }}
-                      value={customSubSource}
-                      onChange={(e) => setCustomSubSource(e.target.value)}
-                      required
-                    />
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder="Enter custom source (e.g. poster, justdail)"
+                        style={{ flex: 1 }}
+                        value={customSubSource}
+                        onChange={(e) => setCustomSubSource(e.target.value)}
+                        required
+                      />
+                      <button
+                        type="button"
+                        className="primary-btn"
+                        style={{ height: '38px', padding: '0 12px', fontSize: '13px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        onClick={() => {
+                          const trimmed = customSubSource.trim();
+                          if (trimmed) {
+                            setLocalSubSources(prev => {
+                              if (prev.includes(trimmed)) return prev;
+                              return [...prev, trimmed];
+                            });
+                            setFormSubSource(trimmed);
+                            setCustomSubSource('');
+                          }
+                        }}
+                      >
+                        + Add
+                      </button>
+                    </div>
                   )}
                 </div>
               )}

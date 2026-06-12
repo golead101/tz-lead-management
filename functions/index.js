@@ -632,18 +632,32 @@ exports.metaValidate = functions.https.onRequest((req, res) => {
       }
 
       // Query Meta Graph API /me endpoint to check token validity
-      const graphUrl = `https://graph.facebook.com/v24.0/me?access_token=${verifyToken.trim()}`;
-      const response = await axios.get(graphUrl);
+      let response;
+      try {
+        const graphUrl = `https://graph.facebook.com/v24.0/me?access_token=${verifyToken.trim()}`;
+        response = await axios.get(graphUrl);
+      } catch (meErr) {
+        // Fallback for System User Access Tokens (which can throw code 1 /me error because they aren't real users)
+        console.log("System User token detected or /me failed, trying /app endpoint as fallback");
+        try {
+          const graphUrlApp = `https://graph.facebook.com/v24.0/app?access_token=${verifyToken.trim()}`;
+          response = await axios.get(graphUrlApp);
+        } catch (appErr) {
+          // If both fail, throw the original error or the app error
+          throw meErr;
+        }
+      }
       
       if (response.data && response.data.id) {
+        const displayName = response.data.name ? `${response.data.name} (App)` : `Account ID: ${response.data.id}`;
         return res.status(200).json({ 
           success: true, 
-          message: `Successfully connected to Meta. Account ID: ${response.data.id}` 
+          message: `Successfully connected to Meta. Connected to ${displayName}` 
         });
       } else {
         return res.status(400).json({ 
           success: false, 
-          error: 'Verification response did not return a valid account ID.' 
+          error: 'Verification response did not return a valid ID.' 
         });
       }
     } catch (err) {

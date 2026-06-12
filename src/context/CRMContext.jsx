@@ -521,6 +521,15 @@ export const CRMProvider = ({ children }) => {
 
   // Firestore Sync Effect
   useEffect(() => {
+    if (!isLoggedIn) {
+      // Clean up local states when logged out
+      setLeads([]);
+      setCourses([]);
+      setPipelineStages([]);
+      setCounselors([]);
+      return;
+    }
+
     let active = true;
     let leadsUnsub = null;
     let coursesUnsub = null;
@@ -664,7 +673,7 @@ export const CRMProvider = ({ children }) => {
       if (brandingUnsub) brandingUnsub();
       if (integrationsUnsub) integrationsUnsub();
     };
-  }, []);
+  }, [isLoggedIn]);
 
   // Persistence hooks
   useEffect(() => {
@@ -777,6 +786,7 @@ export const CRMProvider = ({ children }) => {
       education: leadData.education || 'Not Provided',
       course: leadData.course || (courses[0] ? courses[0].name : ''),
       source: leadData.source || 'Website Form',
+      subSource: leadData.subSource || '',
       counselor: leadData.counselor || activeUser,
       stage: leadData.stage || 'New Lead',
       createdDate: new Date().toISOString(),
@@ -787,7 +797,7 @@ export const CRMProvider = ({ children }) => {
           id: `log-${Date.now()}`,
           type: 'system',
           title: 'Lead Captured',
-          content: `Inquiry successfully entered system via ${leadData.source || 'Website Form'}.`,
+          content: `Inquiry successfully entered system via ${leadData.source === 'Walk-in' && leadData.subSource ? `Walk-in (${leadData.subSource})` : (leadData.source || 'Website Form')}.`,
           timestamp: new Date().toISOString(),
           user: 'System'
         }

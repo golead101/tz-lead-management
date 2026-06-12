@@ -54,17 +54,7 @@ export default function Sidebar() {
         </svg>
       )
     },
-    {
-      id: 'courses',
-      target: 'sandbox',
-      label: 'iframe',
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-        </svg>
-      )
-    },
+
     {
       id: 'integrations',
       target: 'integrations',
@@ -115,7 +105,6 @@ export default function Sidebar() {
     if (item.id === 'dashboard') return activeView === 'dashboard';
     if (item.id === 'leads') return activeView === 'grid' || activeView === 'detail';
     if (item.id === 'followups') return activeView === 'followups';
-    if (item.id === 'courses') return activeView === 'sandbox';
     if (item.id === 'integrations') return activeView === 'integrations';
     if (item.id === 'reports') return activeView === 'analytics';
     if (item.id === 'automation') return activeView === 'whatsapp';
@@ -192,10 +181,10 @@ export default function Sidebar() {
       <nav className="navigation-menu">
         {menuItems.map(item => {
           // Role-based tab exclusions
-          if (activeRole === 'Counselor' && (item.id === 'settings' || item.id === 'reports' || item.id === 'courses')) {
+          if (activeRole === 'Counselor' && (item.id === 'settings' || item.id === 'reports')) {
             return null;
           }
-          if (activeRole === 'Manager' && (item.id === 'settings' || item.id === 'courses')) {
+          if (activeRole === 'Manager' && (item.id === 'settings')) {
             return null;
           }
           // Admin has all tabs access, no exclusions
