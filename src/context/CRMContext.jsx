@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { db } from '../firebase';
-import { collection, doc, setDoc, deleteDoc, onSnapshot, writeBatch } from 'firebase/firestore';
-
+import { db, auth } from '../firebase';
+import { collection, doc, setDoc, deleteDoc, onSnapshot, writeBatch, getDoc } from 'firebase/firestore';
+import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
 const CRMContext = createContext();
 
 // Default configurations
@@ -89,13 +89,6 @@ const DEFAULT_INTEGRATIONS = {
     simulatedLeadsCount: 612
   }
 };
-
-const DEFAULT_COUNSELORS = [
-  { id: 'coun-stefan', name: 'Stefan Salvatore', email: 'stefan@academy.com', password: 'stefan123', role: 'Admin', status: 'Active' },
-  { id: 'coun-damon', name: 'Damon Salvatore', email: 'damon@academy.com', password: 'damon123', role: 'Manager', status: 'Active' },
-  { id: 'coun-maha', name: 'Maha', email: 'maha@academy.com', password: 'maha123', role: 'Counselor', status: 'Active' },
-  { id: 'coun-irfan', name: 'Irfan', email: 'irfan@academy.com', password: 'irfan123', role: 'Counselor', status: 'Active' }
-];
 
 // Rich Seed Data of 12 Leads
 const SEED_LEADS = [
@@ -405,10 +398,7 @@ export const CRMProvider = ({ children }) => {
     return local ? JSON.parse(local) : DEFAULT_INTEGRATIONS;
   });
 
-  const [counselors, setCounselors] = useState(() => {
-    const local = localStorage.getItem('crm_counselors');
-    return local ? JSON.parse(local) : DEFAULT_COUNSELORS;
-  });
+  const [counselors, setCounselors] = useState([]);
 
   // Global Session Roles
   const [activeRole, setActiveRole] = useState(() => {
@@ -432,81 +422,60 @@ export const CRMProvider = ({ children }) => {
 
   const [isFirebaseEnabled, setIsFirebaseEnabled] = useState(false);
 
-  const login = (email, password) => {
-    const formattedEmail = email.toLowerCase().trim();
-    
-    // Resolve helper usernames to official emails
-    let lookupEmail = formattedEmail;
-    if (formattedEmail === 'admin') lookupEmail = 'stefan@academy.com';
-    else if (formattedEmail === 'manager') lookupEmail = 'damon@academy.com';
-    else if (formattedEmail === 'counselor') lookupEmail = 'maha@academy.com';
-
-    // 1. Check in the dynamic users/counselors state first
-    const user = counselors.find(c => 
-      c.email.toLowerCase() === lookupEmail || 
-      c.email.toLowerCase() === formattedEmail ||
-      (formattedEmail === 'admin' && c.role === 'Admin')
-    );
-
-    if (user) {
-      const isInactive = user.status === 'Inactive' || user.status === 'Deactivated' || user.status === 'inactive' || user.status === 'deactivated';
-      if (isInactive) {
-        showToastMsg('This account has been deactivated. Please contact an Admin.', 'error');
-        return { success: false, reason: 'deactivated' };
-      }
-
-      const isPasswordMatch = password === user.password || 
-                              (user.role === 'Admin' && (password === 'admin' || password === 'stefan123')) ||
-                              (user.role === 'Manager' && (password === 'manager' || password === 'damon123')) ||
-                              (user.role === 'Counselor' && (password === 'counselor' || password === 'maha123' || password === 'irfan123'));
-      
-      if (isPasswordMatch) {
-        setActiveRole(user.role);
-        setActiveUser(user.name);
-        setIsLoggedIn(true);
-        showToastMsg(`Logged in as ${user.role}: ${user.name}`, 'success');
-        return { success: true };
-      }
+  const login = async (email, password) => {
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      // Let onAuthStateChanged handle the role/name state setting
+      return { success: true };
+    } catch (err) {
+      console.error("Firebase Login Error:", err);
+      return { success: false, reason: 'invalid', message: err.message };
     }
-
-    // 2. Static Fallbacks (just in case Firestore or localStorage is empty)
-    if (formattedEmail === 'admin' || formattedEmail === 'stefan@academy.com') {
-      if (password === 'admin' || password === 'stefan123') {
-        setActiveRole('Admin');
-        setActiveUser('Stefan Salvatore');
-        setIsLoggedIn(true);
-        showToastMsg('Logged in as Admin: Stefan Salvatore', 'success');
-        return { success: true };
-      }
-    } else if (formattedEmail === 'manager' || formattedEmail === 'damon@academy.com') {
-      if (password === 'manager' || password === 'damon123') {
-        setActiveRole('Manager');
-        setActiveUser('Damon Salvatore');
-        setIsLoggedIn(true);
-        showToastMsg('Logged in as Manager: Damon Salvatore', 'success');
-        return { success: true };
-      }
-    } else if (formattedEmail === 'counselor' || formattedEmail === 'elena@academy.com' || formattedEmail === 'maha@academy.com') {
-      if (password === 'counselor' || password === 'elena123' || password === 'maha123') {
-        setActiveRole('Counselor');
-        setActiveUser('Maha');
-        setIsLoggedIn(true);
-        showToastMsg('Logged in as Counselor: Maha', 'success');
-        return { success: true };
-      }
-    }
-
-    return { success: false, reason: 'invalid' };
   };
 
-  const logout = () => {
-    setIsLoggedIn(false);
-    showToastMsg('Logged out successfully.', 'info');
+  const logout = async () => {
+    try {
+      await signOut(auth);
+      setIsLoggedIn(false);
+      setActiveRole(null);
+      setActiveUser(null);
+      showToastMsg('Logged out successfully.', 'info');
+    } catch (err) {
+      console.error("Logout error:", err);
+    }
   };
 
   useEffect(() => {
-    localStorage.setItem('crm_logged_in', isLoggedIn ? 'true' : 'false');
-  }, [isLoggedIn]);
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        setIsLoggedIn(true);
+        localStorage.setItem('crm_logged_in', 'true');
+        // Fetch user document from Firestore to get Role and Name
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          if (data.status === 'Inactive' || data.status === 'Deactivated') {
+            await signOut(auth);
+            setIsLoggedIn(false);
+            showToastMsg('This account has been deactivated. Please contact an Admin.', 'error');
+            return;
+          }
+          setActiveRole(data.role || 'Counselor');
+          setActiveUser(data.name || user.email);
+          localStorage.setItem('crm_active_role', JSON.stringify(data.role));
+          localStorage.setItem('crm_active_user', JSON.stringify(data.name));
+        }
+      } else {
+        setIsLoggedIn(false);
+        setActiveRole(null);
+        setActiveUser(null);
+        localStorage.setItem('crm_logged_in', 'false');
+        localStorage.removeItem('crm_active_role');
+        localStorage.removeItem('crm_active_user');
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Simulated Alert Notifications
   const [notifications, setNotifications] = useState([
@@ -624,14 +593,7 @@ export const CRMProvider = ({ children }) => {
       // 5. Users
       counselorsUnsub = onSnapshot(collection(db, 'users'), (snapshot) => {
         if (!active) return;
-        if (snapshot.empty) {
-          console.log("Firestore users collection is empty. Seeding with DEFAULT users...");
-          const batch = writeBatch(db);
-          DEFAULT_COUNSELORS.forEach((counselor) => {
-            batch.set(doc(db, 'users', counselor.id), counselor);
-          });
-          batch.commit().catch(err => console.error("Firestore seeding users failed:", err));
-        } else {
+        if (!snapshot.empty) {
           const counselorsData = snapshot.docs.map(doc => {
             const data = doc.data();
             return { status: 'Active', ...data };

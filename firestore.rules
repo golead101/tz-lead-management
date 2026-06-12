@@ -1,0 +1,30 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Function to check if user is logged in
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Function to check if the caller is an Admin
+    function isAdmin() {
+      return isAuthenticated() && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin';
+    }
+
+    // users collection:
+    // Any user can read their own profile.
+    // Only Admin can read everyone or create/edit users.
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow write: if isAdmin();
+    }
+
+    // Default rule for all other collections (leads, courses, pipelineStages, settings, etc.)
+    // Only logged in users can read and write.
+    match /{document=**} {
+      allow read, write: if isAuthenticated();
+    }
+  }
+}
