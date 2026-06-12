@@ -7,7 +7,8 @@ export default function FollowUps() {
   const [activeTab, setActiveTab] = useState('overdue'); // Default to overdue as in the mockup
 
   const [modalStep, setModalStep] = useState(1); // 1 = simple contact view, 2 = call outcome form
-  const [callStatus, setCallStatus] = useState('Connected');
+  const [callStatus, setCallStatus] = useState('');
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const [callInterest, setCallInterest] = useState('Interested');
   const [callQuestions, setCallQuestions] = useState([]);
   const [callNotes, setCallNotes] = useState('');
@@ -23,19 +24,20 @@ export default function FollowUps() {
   };
 
   const handleSubmitCall = (leadId) => {
+    const isFollowupSched = (callStatus === 'Interested' || callStatus === 'Call Later' || callStatus === 'No Answer') && !!callFollowupDate;
     logCall(leadId, {
       status: callStatus,
       interest: callInterest,
       questions: callQuestions,
       notes: callNotes,
       updateStage: callUpdateStage,
-      scheduleFollowup: callSchedFollowup,
-      followupDate: callFollowupDate,
-      followupReason: callFollowupReason
+      scheduleFollowup: isFollowupSched,
+      followupDate: isFollowupSched ? callFollowupDate : '',
+      followupReason: isFollowupSched ? (callFollowupReason || 'Scheduled callback') : ''
     });
 
     // Reset Form & Close
-    setCallStatus('Connected');
+    setCallStatus('');
     setCallInterest('Interested');
     setCallQuestions([]);
     setCallNotes('');
@@ -73,7 +75,7 @@ export default function FollowUps() {
   const handleCallClick = (lead) => {
     setSelectedLeadId(lead.id);
     setModalStep(1);
-    setCallStatus('Connected');
+    setCallStatus('');
     setCallInterest('Interested');
     setCallQuestions([]);
     setCallNotes('');
@@ -134,10 +136,10 @@ export default function FollowUps() {
             {displayedLeads.map(lead => {
               const isOverdue = activeTab === 'overdue';
               return (
-                <div key={lead.id} className={`followup-lead-card ${isOverdue ? 'card-overdue' : 'card-upcoming'}`} onClick={() => handleCallClick(lead)}>
+                <div key={lead.id} className="followup-lead-card" onClick={() => handleCallClick(lead)}>
                   <div className="card-left-icon-container">
-                    <div className={`calendar-icon-block ${isOverdue ? 'bg-red-light' : 'bg-blue-light'}`}>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <div className="calendar-icon-block-circle">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: '22px', height: '22px' }}>
                         <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
                         <line x1="16" y1="2" x2="16" y2="6" />
                         <line x1="8" y1="2" x2="8" y2="6" />
@@ -147,37 +149,47 @@ export default function FollowUps() {
                   </div>
 
                   <div className="card-middle-info">
-                    <div className="card-name-row">
-                      <span className="lead-name">{lead.name}</span>
-                      <span className={`status-pill ${isOverdue ? 'pill-late' : 'pill-scheduled'}`}>
-                        {isOverdue ? 'Late' : 'Scheduled'}
-                      </span>
+                    <div className="card-name-row" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span className="lead-name" style={{ fontSize: '15.5px', fontWeight: '750', color: '#111827' }}>{lead.name}</span>
+                      {isOverdue ? (
+                        <span className="followup-status-badge overdue">
+                          <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: '3px' }}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                          Overdue
+                        </span>
+                      ) : (
+                        <span className="followup-status-badge upcoming">
+                          <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: '3px' }}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                          Upcoming
+                        </span>
+                      )}
                     </div>
 
-                    <div className="card-detail-item" style={{ marginTop: '4px' }}>
-                      <svg viewBox="0 0 24 24" className="detail-icon" fill="none" stroke="currentColor" strokeWidth="2.5">
-                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-                      </svg>
-                      <span className="detail-text">{lead.phone}</span>
+                    <div className="card-meta-row" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginTop: '6px' }}>
+                      <div className="card-detail-inline" style={{ display: 'flex', alignItems: 'center' }}>
+                        <svg viewBox="0 0 24 24" className="detail-icon" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: '13px', height: '13px', marginRight: '4px', color: '#9ca3af' }}>
+                          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                        </svg>
+                        <span style={{ fontSize: '13px', color: '#6b7280' }}>{lead.phone}</span>
+                      </div>
+
+                      <div className="card-detail-inline" style={{ display: 'flex', alignItems: 'center' }}>
+                        <svg viewBox="0 0 24 24" className="detail-icon" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: '13px', height: '13px', marginRight: '4px', color: '#2563eb' }}>
+                          <circle cx="12" cy="12" r="10" />
+                          <polyline points="12 6 12 12 16 14" />
+                        </svg>
+                        <span style={{ fontSize: '13px', color: '#2563eb', fontWeight: '600' }}>{formatFollowupDate(lead.followupDate)}</span>
+                      </div>
                     </div>
 
-                    <div className="card-detail-item">
-                      <svg viewBox="0 0 24 24" className="detail-icon" fill="none" stroke="currentColor" strokeWidth="2.5">
-                        <circle cx="12" cy="12" r="10" />
-                        <polyline points="12 6 12 12 16 14" />
-                      </svg>
-                      <span className="detail-text text-semibold">{formatFollowupDate(lead.followupDate)}</span>
-                    </div>
-
-                    <p className="lead-note">
-                      "{lead.followupReason || 'No special note provided.'}"
+                    <p className="lead-note-line">
+                      {lead.followupReason || 'No special note provided.'}
                     </p>
                   </div>
 
                   <div className="card-right-actions" onClick={(e) => e.stopPropagation()}>
-                    <button type="button" className="call-now-btn" onClick={() => handleCallClick(lead)}>
-                      <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" style={{ marginRight: '4px' }}>
-                        <path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-2.2 2.2a15.045 15.045 0 0 1-6.59-6.59l2.2-2.21a.96.96 0 0 0 .25-1A11.36 11.36 0 0 1 8.5 4c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1 0 9.39 7.61 17 17 17 .55 0 1-.45 1-1v-3.58c0-.56-.45-1.04-1-1.04z" />
+                    <button type="button" className="call-now-btn-pill" onClick={() => handleCallClick(lead)}>
+                      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: '6px' }}>
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
                       </svg>
                       Call Now
                     </button>
@@ -194,12 +206,13 @@ export default function FollowUps() {
         const selectedLead = leads.find(l => l.id === selectedLeadId);
         return (
           <div className="lead-detail-modal-overlay" onClick={() => { setSelectedLeadId(null); setShowDetailModal(false); }}>
-            <div className="lead-detail-modal-content" onClick={(e) => e.stopPropagation()} style={modalStep === 1 ? { maxWidth: '440px', height: 'auto', padding: '36px 24px', textAlign: 'center' } : { maxWidth: '540px', height: 'auto', maxHeight: '90vh', overflowY: 'auto', padding: '0' }}>
+            <div className="lead-detail-modal-content" onClick={(e) => e.stopPropagation()} style={modalStep === 1 ? { maxWidth: '440px', height: 'auto', padding: '32px 24px', borderRadius: '24px', textAlign: 'left' } : { maxWidth: '540px', height: 'auto', maxHeight: '90vh', overflow: 'visible', padding: '0', borderRadius: '16px' }}>
               <button 
                 type="button" 
                 className="lead-detail-modal-close" 
                 onClick={() => { setSelectedLeadId(null); setShowDetailModal(false); }}
                 title="Close Details"
+                style={{ top: '8px', marginRight: '0px' }}
               >
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <line x1="18" y1="6" x2="6" y2="18"/>
@@ -208,202 +221,354 @@ export default function FollowUps() {
               </button>
 
               {modalStep === 1 && selectedLead && (
-                <div>
+                <div style={{ textAlign: 'left' }}>
+                  {/* Title Header Section */}
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', marginBottom: '6px', paddingRight: '24px' }}>
+                    <div style={{ color: '#0b4ec2', marginTop: '2px' }}>
+                      <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#1e293b', margin: '0 0 4px 0' }}>
+                        Call Lead
+                      </h3>
+                      <p style={{ fontSize: '13px', color: '#64748b', margin: '0', lineHeight: '1.4' }}>
+                        Use the details below to contact this lead. Click "Done" after your call.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Main Contact Card Container */}
                   <div style={{ 
-                    width: '64px', 
-                    height: '64px', 
-                    borderRadius: '50%', 
-                    background: 'var(--primary-glow, rgba(37, 99, 235, 0.08))', 
-                    color: 'var(--primary, #2563eb)', 
+                    background: '#ffffff', 
+                    border: '1px solid #e2e8f0', 
+                    borderRadius: '20px', 
+                    padding: '20px', 
+                    marginTop: '20px', 
+                    marginBottom: '24px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '16px'
+                  }}>
+                    {/* Top User Row */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                      <div style={{ 
+                        width: '54px', 
+                        height: '54px', 
+                        borderRadius: '50%', 
+                        background: '#eff6ff', 
+                        color: '#1e40af', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        fontSize: '18px', 
+                        fontWeight: '700' 
+                      }}>
+                        {selectedLead.name ? selectedLead.name.split(' ').map(n => n[0]).join('').toUpperCase() : '?'}
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontSize: '16px', fontWeight: '750', color: '#0f172a' }}>{selectedLead.name}</span>
+                        <span style={{ fontSize: '12.5px', color: '#64748b', fontWeight: '500' }}>Lead Contact</span>
+                      </div>
+                    </div>
+
+                    {/* Bottom Phone Details Subcard */}
+                    <div style={{ 
+                      background: '#f8fafc', 
+                      borderRadius: '16px', 
+                      padding: '14px 18px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '14px'
+                    }}>
+                      <div style={{ 
+                        width: '38px', 
+                        height: '38px', 
+                        borderRadius: '50%', 
+                        background: '#dbeafe', 
+                        color: '#1e40af', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center' 
+                      }}>
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                        </svg>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>Phone</span>
+                        <span style={{ fontSize: '16.5px', color: '#0b4ec2', fontWeight: '750' }}>{selectedLead.phone}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Buttons Action Bar */}
+                  <div style={{ 
                     display: 'flex', 
                     alignItems: 'center', 
                     justifyContent: 'center', 
-                    fontSize: '24px', 
-                    fontWeight: '700', 
-                    margin: '0 auto 16px' 
+                    gap: '14px' 
                   }}>
-                    {selectedLead.name ? selectedLead.name.split(' ').map(n => n[0]).join('').toUpperCase() : '?'}
-                  </div>
-                  <h3 style={{ fontSize: '20px', fontWeight: '800', color: 'var(--text-primary, #0f172a)', marginBottom: '8px' }}>
-                    {selectedLead.name}
-                  </h3>
-                  <div style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'center', 
-                    gap: '8px', 
-                    fontSize: '15px', 
-                    color: 'var(--text-secondary, #475569)',
-                    fontWeight: '600',
-                    marginBottom: '28px'
-                  }}>
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ color: 'var(--primary, #2563eb)' }}>
-                      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-                    </svg>
-                    {selectedLead.phone}
-                  </div>
-                  <button 
-                    type="button" 
-                    className="primary-btn" 
-                    onClick={() => setModalStep(2)}
-                    style={{ 
-                      margin: '0 auto', 
-                      padding: '8px 24px', 
-                      borderRadius: '8px', 
-                      fontSize: '13px', 
-                      fontWeight: '700',
-                      cursor: 'pointer',
-                      border: 'none',
-                      background: 'var(--primary, #2563eb)',
-                      color: '#fff'
-                    }}
-                  >
-                    Submit
-                  </button>
-                </div>
-              )}
-
-              {modalStep === 2 && selectedLead && (
-                <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
-                  {/* Header */}
-                  <div className="modal-header" style={{ padding: '16px 20px', borderBottom: '1px solid var(--glass-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f9fafb' }}>
-                    <h4 className="modal-title" style={{ margin: '0', fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)' }}>Log Phone/WhatsApp Call Outcome</h4>
-                  </div>
-
-                  {/* Body */}
-                  <div className="modal-body" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    <div className="form-group two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                      <div>
-                        <label className="form-label" style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>Call Connection Status</label>
-                        <select 
-                          className="form-control" 
-                          value={callStatus} 
-                          onChange={(e) => setCallStatus(e.target.value)}
-                          style={{ width: '100%', padding: '8px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
-                        >
-                          <option value="Connected">Connected / Talked</option>
-                          <option value="No Answer">No Answer / Ringing</option>
-                          <option value="Busy">Busy</option>
-                          <option value="Switched Off">Switched Off / Switched Off</option>
-                          <option value="Wrong Number">Wrong Number</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="form-label" style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>Interest Level</label>
-                        <select 
-                          className="form-control" 
-                          value={callInterest} 
-                          onChange={(e) => setCallInterest(e.target.value)}
-                          style={{ width: '100%', padding: '8px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
-                        >
-                          <option value="Highly Interested">🔥 Highly Interested</option>
-                          <option value="Interested">☀️ Interested</option>
-                          <option value="Needs Time">⏳ Needs Time</option>
-                          <option value="Not Interested">❄️ Not Interested</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* Key Topics / Student Inquiries */}
-                    <div className="form-group" style={{ display: 'flex', flexDirection: 'column' }}>
-                      <label className="form-label" style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>Key Topics / Student Inquiries</label>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12.5px', color: 'var(--text-primary)' }}>
-                        {['Fees Structure', 'Course Duration', 'Job Placements', 'Internships', 'Demo Class Required', 'Timing Batches'].map(q => (
-                          <label key={q} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}>
-                            <input 
-                              type="checkbox" 
-                              checked={callQuestions.includes(q)}
-                              onChange={() => handleQuestionToggle(q)}
-                            />
-                            {q}
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Detailed Interaction Notes */}
-                    <div className="form-group" style={{ display: 'flex', flexDirection: 'column' }}>
-                      <label className="form-label" style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>Detailed Interaction Notes</label>
-                      <textarea 
-                        className="form-control" 
-                        placeholder="Detail what was discussed..."
-                        value={callNotes}
-                        onChange={(e) => setCallNotes(e.target.value)}
-                        style={{ width: '100%', minHeight: '80px', padding: '8px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)', resize: 'vertical' }}
-                      />
-                    </div>
-
-                    {/* Pipeline Stage Shift (Optional) */}
-                    <div className="form-group" style={{ display: 'flex', flexDirection: 'column' }}>
-                      <label className="form-label" style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>Pipeline Stage Shift (Optional)</label>
-                      <select 
-                        className="form-control"
-                        value={callUpdateStage}
-                        onChange={(e) => setCallUpdateStage(e.target.value)}
-                        style={{ width: '100%', padding: '8px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
-                      >
-                        <option value="">Keep current stage ({selectedLead?.stage})</option>
-                        {pipelineStages.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
-                      </select>
-                    </div>
-
-                    {/* Schedule Follow-up callback? */}
-                    <div className="form-group" style={{ background: 'var(--bg-card-hover, rgba(0,0,0,0.01))', border: '1px solid var(--border-color)', padding: '12px 14px', borderRadius: 'var(--radius-md)' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '13px', color: 'var(--text-primary)', marginBottom: callSchedFollowup ? '10px' : '0' }}>
-                        <input 
-                          type="checkbox" 
-                          checked={callSchedFollowup}
-                          onChange={(e) => setCallSchedFollowup(e.target.checked)}
-                        />
-                        Schedule Follow-up callback?
-                      </label>
-
-                      {callSchedFollowup && (
-                        <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                          <div>
-                            <label className="form-label" style={{ display: 'block', fontSize: '11.5px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' }}>Callback Date & Time</label>
-                            <input 
-                              type="datetime-local" 
-                              className="form-control"
-                              required={callSchedFollowup}
-                              value={callFollowupDate}
-                              onChange={(e) => setCallFollowupDate(e.target.value)}
-                              style={{ width: '100%', padding: '6px 10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
-                            />
-                          </div>
-                          <div>
-                            <label className="form-label" style={{ display: 'block', fontSize: '11.5px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' }}>Follow-up Goal / Objective</label>
-                            <input 
-                              type="text" 
-                              className="form-control" 
-                              placeholder="e.g. brochures feedback check, Zoom call"
-                              value={callFollowupReason}
-                              onChange={(e) => setCallFollowupReason(e.target.value)}
-                              style={{ width: '100%', padding: '6px 10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Footer */}
-                  <div className="modal-footer" style={{ padding: '16px 20px', borderTop: '1px solid var(--glass-border)', display: 'flex', justifyContent: 'flex-end', gap: '12px', background: '#f9fafb' }}>
                     <button 
                       type="button" 
-                      className="secondary-btn" 
                       onClick={() => { setSelectedLeadId(null); setShowDetailModal(false); }}
-                      style={{ padding: '8px 16px', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', border: '1px solid var(--border-color)', background: '#fff', color: 'var(--text-secondary)' }}
+                      style={{ 
+                        padding: '10px 24px', 
+                        borderRadius: '9999px', 
+                        fontSize: '13px', 
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        background: '#ffffff',
+                        border: '1.5px solid #1e293b',
+                        color: '#1e293b',
+                        transition: 'background 0.2s'
+                      }}
                     >
                       Cancel
                     </button>
                     <button 
                       type="button" 
-                      className="primary-btn" 
-                      onClick={() => handleSubmitCall(selectedLead.id)}
-                      style={{ padding: '8px 16px', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', border: 'none', background: 'var(--primary, #2563eb)', color: '#fff' }}
+                      onClick={() => setModalStep(2)}
+                      style={{ 
+                        padding: '10px 24px', 
+                        borderRadius: '9999px', 
+                        fontSize: '13px', 
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        border: 'none',
+                        background: '#0b4ec2',
+                        color: '#ffffff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        transition: 'background 0.2s'
+                      }}
                     >
-                      Commit Log
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ background: 'transparent' }}>
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                      Done — Log Result
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {modalStep === 2 && selectedLead && (
+                <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left', background: '#fff', borderRadius: '16px', overflow: 'visible' }}>
+                  {/* Header */}
+                  <div className="modal-header" style={{ padding: '20px 24px 12px', borderBottom: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', background: '#fff' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#1e293b', fontFamily: 'var(--font-heading)' }}>Log Call Result</h3>
+                      <p style={{ margin: 0, fontSize: '13px', color: '#64748b', fontWeight: '500' }}>Record the outcome of your call with {selectedLead.name}.</p>
+                    </div>
+                  </div>
+
+                  {/* Body */}
+                  <div className="modal-body" style={{ padding: '12px 24px 20px', display: 'flex', flexDirection: 'column', gap: '20px', overflow: 'visible' }}>
+                    <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '6px', position: 'relative' }}>
+                      <label className="form-label" style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155' }}>
+                        Call Outcome <span style={{ color: '#ef4444' }}>*</span>
+                      </label>
+                      
+                      {/* Custom select trigger */}
+                      <div style={{ position: 'relative' }}>
+                        <button 
+                          type="button"
+                          onClick={() => setDropdownOpen(!dropdownOpen)}
+                          style={{ 
+                            width: '100%', 
+                            padding: '10px 14px', 
+                            borderRadius: '10px', 
+                            border: '1px solid #cbd5e1', 
+                            background: '#fff', 
+                            color: callStatus ? '#1e293b' : '#94a3b8', 
+                            fontSize: '14px', 
+                            fontWeight: '555',
+                            textAlign: 'left',
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'space-between',
+                            cursor: 'pointer',
+                            outline: 'none'
+                          }}
+                        >
+                          <span style={{ display: 'flex', alignItems: 'center' }}>
+                            {callStatus === '' && '— Select an outcome —'}
+                            {callStatus === 'Interested' && (
+                              <>
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#22c55e" strokeWidth="2.5" style={{ marginRight: '8px' }}><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" /></svg>
+                                Interested
+                              </>
+                            )}
+                            {callStatus === 'Converted' && (
+                              <>
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#f97316" strokeWidth="2.5" style={{ marginRight: '8px' }}><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.45 1-1 1H4v2h16v-2h-5c-.55 0-1-.45-1-1v-2.34" /><path d="M12 2a7 7 0 0 0-7 7c0 2.62 1.34 4.5 3 5.34V4.66" /></svg>
+                                Converted / Won
+                              </>
+                            )}
+                            {callStatus === 'Call Later' && (
+                              <>
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#2563eb" strokeWidth="2.5" style={{ marginRight: '8px' }}><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /><path d="M12 14v4M10 16h4" /></svg>
+                                Call Later / Follow up
+                              </>
+                            )}
+                            {callStatus === 'Not Interested' && (
+                              <>
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#ef4444" strokeWidth="2.5" style={{ marginRight: '8px' }}><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></svg>
+                                Not Interested
+                              </>
+                            )}
+                            {callStatus === 'No Answer' && (
+                              <>
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#ea580c" strokeWidth="2.5" style={{ marginRight: '8px' }}><path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91" /><line x1="23" y1="1" x2="1" y2="23" /></svg>
+                                No Answer
+                              </>
+                            )}
+                            {callStatus === 'Invalid Number' && (
+                              <>
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#64748b" strokeWidth="2.5" style={{ marginRight: '8px' }}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
+                                Invalid Number
+                              </>
+                            )}
+                          </span>
+                          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#64748b" strokeWidth="2.5" style={{ transform: dropdownOpen ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s' }}>
+                            <polyline points="6 9 12 15 18 9" />
+                          </svg>
+                        </button>
+
+                        {dropdownOpen && (
+                          <div 
+                            style={{ 
+                              position: 'absolute', 
+                              top: '100%', 
+                              left: 0, 
+                              right: 0, 
+                              marginTop: '6px', 
+                              background: '#fff', 
+                              border: '1px solid #cbd5e1', 
+                              borderRadius: '12px', 
+                              boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)', 
+                              zIndex: 1200,
+                              padding: '6px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '2px'
+                            }}
+                          >
+                            {[
+                              { val: 'Interested', label: 'Interested', stroke: '#22c55e', path: <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" /> },
+                              { val: 'Converted', label: 'Converted / Won', stroke: '#f97316', path: <><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.45 1-1 1H4v2h16v-2h-5c-.55 0-1-.45-1-1v-2.34" /><path d="M12 2a7 7 0 0 0-7 7c0 2.62 1.34 4.5 3 5.34V4.66" /></> },
+                              { val: 'Call Later', label: 'Call Later / Follow up', stroke: '#2563eb', path: <><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /><path d="M12 14v4M10 16h4" /></> },
+                              { val: 'Not Interested', label: 'Not Interested', stroke: '#ef4444', path: <><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></> },
+                              { val: 'No Answer', label: 'No Answer', stroke: '#ea580c', path: <><path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91" /><line x1="23" y1="1" x2="1" y2="23" /></> },
+                              { val: 'Invalid Number', label: 'Invalid Number', stroke: '#64748b', path: <><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></> }
+                            ].map(item => (
+                              <div 
+                                key={item.val}
+                                onClick={() => {
+                                  setCallStatus(item.val);
+                                  setDropdownOpen(false);
+                                }}
+                                style={{ 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  padding: '10px 12px', 
+                                  borderRadius: '8px', 
+                                  fontSize: '14px', 
+                                  fontWeight: '550',
+                                  color: '#1e293b',
+                                  cursor: 'pointer',
+                                  background: callStatus === item.val ? '#fef3c7' : 'transparent',
+                                  transition: 'all 0.15s'
+                                }}
+                                onMouseEnter={(e) => { if (callStatus !== item.val) e.currentTarget.style.background = '#f1f5f9'; }}
+                                onMouseLeave={(e) => { if (callStatus !== item.val) e.currentTarget.style.background = 'transparent'; }}
+                              >
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke={item.stroke} strokeWidth="2.5" style={{ marginRight: '8px' }}>
+                                  {item.path}
+                                </svg>
+                                {item.label}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label className="form-label" style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155' }}>Notes</label>
+                      <textarea 
+                        className="form-control" 
+                        placeholder="What was discussed?"
+                        value={callNotes}
+                        onChange={(e) => setCallNotes(e.target.value)}
+                        style={{ width: '100%', minHeight: '110px', padding: '12px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', background: '#fff', color: '#1e293b', fontSize: '14px', outline: 'none', resize: 'vertical' }}
+                      />
+                    </div>
+
+                    {/* Schedule Follow-up card */}
+                    {(callStatus === 'Interested' || callStatus === 'Call Later' || callStatus === 'No Answer') && (
+                      <div 
+                        className="fade-in" 
+                        style={{ 
+                          background: '#eff6ff', 
+                          border: '1px dashed #bfdbfe', 
+                          borderRadius: '16px', 
+                          padding: '16px', 
+                          display: 'flex', 
+                          flexDirection: 'column', 
+                          gap: '12px',
+                          marginTop: '4px'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#1e3a8a', fontWeight: '700', fontSize: '14px' }}>
+                          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                            <line x1="16" y1="2" x2="16" y2="6" />
+                            <line x1="8" y1="2" x2="8" y2="6" />
+                            <line x1="3" y1="10" x2="21" y2="10" />
+                          </svg>
+                          Schedule Follow-up
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <label style={{ fontSize: '12px', fontWeight: '600', color: '#64748b' }}>Follow-up Date</label>
+                          <input 
+                            type="date" 
+                            value={callFollowupDate}
+                            onChange={(e) => setCallFollowupDate(e.target.value)}
+                            style={{ 
+                              width: '100%', 
+                              padding: '10px 14px', 
+                              borderRadius: '10px', 
+                              border: '1px solid #cbd5e1', 
+                              background: '#fff', 
+                              color: '#1e293b', 
+                              fontSize: '14px', 
+                              outline: 'none' 
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Footer */}
+                  <div className="modal-footer" style={{ padding: '16px 24px 24px', borderTop: 'none', display: 'flex', justifyContent: 'flex-end', gap: '12px', background: '#fff' }}>
+                    <button 
+                      type="button" 
+                      onClick={() => setModalStep(1)}
+                      style={{ padding: '8px 24px', borderRadius: '24px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', border: '1px solid #cbd5e1', background: '#fff', color: '#334155', transition: 'all 0.2s' }}
+                    >
+                      Back
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={() => handleSubmitCall(selectedLead.id)}
+                      disabled={!callStatus}
+                      style={{ padding: '8px 24px', borderRadius: '24px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', border: 'none', background: '#0b57d0', color: '#fff', opacity: !callStatus ? 0.65 : 1, transition: 'all 0.2s' }}
+                    >
+                      Save Call Log
                     </button>
                   </div>
                 </div>

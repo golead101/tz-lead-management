@@ -75,7 +75,7 @@ export default function GridView() {
       } else if (selectedSource === 'website') {
         if (!srcLower.includes('website')) return false;
       } else if (selectedSource === 'call') {
-        if (!srcLower.includes('call') && !srcLower.includes('phone') && !srcLower.includes('referral')) return false;
+        if (!srcLower.includes('call') && !srcLower.includes('phone')) return false;
       } else if (selectedSource === 'walkin') {
         if (!srcLower.includes('walk-in') && !srcLower.includes('walkin')) return false;
       } else if (selectedSource === 'other') {
@@ -83,7 +83,7 @@ export default function GridView() {
         const isGoogle = srcLower.includes('google');
         const isWhatsapp = srcLower.includes('whatsapp');
         const isWebsite = srcLower.includes('website');
-        const isCall = srcLower.includes('call') || srcLower.includes('phone') || srcLower.includes('referral');
+        const isCall = srcLower.includes('call') || srcLower.includes('phone');
         const isWalkin = srcLower.includes('walk-in') || srcLower.includes('walkin');
         if (isMeta || isGoogle || isWhatsapp || isWebsite || isCall || isWalkin) return false;
       }
@@ -382,12 +382,12 @@ export default function GridView() {
             className="gv-filter-select"
           >
             <option value="All">All Sources</option>
-            <option value="meta">meta</option>
-            <option value="google">google</option>
-            <option value="whatsapp">whatsapp</option>
-            <option value="website">website</option>
-            <option value="call">call</option>
-            <option value="walkin">walkin</option>
+            <option value="meta">Meta</option>
+            <option value="google">Google</option>
+            <option value="whatsapp">WhatsApp</option>
+            <option value="website">Website</option>
+            <option value="call">Call</option>
+            <option value="walkin">Walk-in</option>
           </select>
         </div>
       </div>

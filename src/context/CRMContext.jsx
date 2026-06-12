@@ -196,7 +196,8 @@ const SEED_LEADS = [
     location: 'Kochi',
     education: 'BBA Completed',
     course: 'Digital Marketing',
-    source: 'Student Referral',
+    source: 'Walk-in',
+    subSource: 'Student Referral',
     counselor: 'Maha',
     stage: 'New Lead',
     createdDate: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(),
@@ -320,7 +321,8 @@ const SEED_LEADS = [
     location: 'Ahmedabad',
     education: 'Working Professional (Admin)',
     course: 'Cyber Security & Ethical Hacking',
-    source: 'Student Referral',
+    source: 'Walk-in',
+    subSource: 'Student Referral',
     counselor: 'Maha',
     stage: 'Follow-up Pending',
     createdDate: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).toISOString(),
@@ -358,9 +360,9 @@ const SEED_LEADS = [
 export const CRMProvider = ({ children }) => {
   // Database States
   const [leads, setLeads] = useState(() => {
-    const hasResetSeeds = localStorage.getItem('crm_leads_seed_reset_v7');
+    const hasResetSeeds = localStorage.getItem('crm_leads_seed_reset_v8');
     if (!hasResetSeeds) {
-      localStorage.setItem('crm_leads_seed_reset_v7', 'true');
+      localStorage.setItem('crm_leads_seed_reset_v8', 'true');
       localStorage.setItem('crm_leads', JSON.stringify(SEED_LEADS));
       return SEED_LEADS;
     }

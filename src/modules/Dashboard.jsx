@@ -106,7 +106,7 @@ export default function Dashboard() {
     const googleCount = activeLeads.filter(l => l.source === 'Google Search' || l.source === 'Google Ads' || l.source === 'Google').length;
     const whatsappCount = activeLeads.filter(l => l.source === 'WhatsApp Inbound' || l.source === 'WhatsApp').length;
     const websiteCount = activeLeads.filter(l => l.source === 'Website Form' || l.source === 'Website').length;
-    const callCount = activeLeads.filter(l => l.source === 'Call' || l.source === 'Inbound Call' || l.source === 'Outbound Call' || l.source === 'Phone' || l.source === 'Student Referral').length;
+    const callCount = activeLeads.filter(l => l.source === 'Call' || l.source === 'Inbound Call' || l.source === 'Outbound Call' || l.source === 'Phone').length;
     const walkinCount = activeLeads.filter(l => {
       const srcLower = (l.source || '').toLowerCase();
       return srcLower.includes('walk-in') || srcLower.includes('walkin');
@@ -118,7 +118,7 @@ export default function Dashboard() {
       const isGoogle = srcLower.includes('google');
       const isWhatsapp = srcLower.includes('whatsapp');
       const isWebsite = srcLower.includes('website');
-      const isCall = srcLower.includes('call') || srcLower.includes('phone') || srcLower.includes('referral');
+      const isCall = srcLower.includes('call') || srcLower.includes('phone');
       const isWalkin = srcLower.includes('walk-in') || srcLower.includes('walkin');
       return !(isMeta || isGoogle || isWhatsapp || isWebsite || isCall || isWalkin);
     }).length;
@@ -441,7 +441,7 @@ export default function Dashboard() {
               </svg>
             </div>
             <div className="db-source-details">
-              <span className="db-source-label">meta</span>
+              <span className="db-source-label">Meta</span>
               <span className="db-source-value">{activeStats.metaLeads.toLocaleString()}</span>
             </div>
           </div>
@@ -459,7 +459,7 @@ export default function Dashboard() {
               </svg>
             </div>
             <div className="db-source-details">
-              <span className="db-source-label">google</span>
+              <span className="db-source-label">Google</span>
               <span className="db-source-value">{activeStats.googleLeads.toLocaleString()}</span>
             </div>
           </div>
@@ -474,7 +474,7 @@ export default function Dashboard() {
               </svg>
             </div>
             <div className="db-source-details">
-              <span className="db-source-label">whatsapp</span>
+              <span className="db-source-label">WhatsApp</span>
               <span className="db-source-value">{activeStats.whatsappLeads.toLocaleString()}</span>
             </div>
           </div>
@@ -491,7 +491,7 @@ export default function Dashboard() {
               </svg>
             </div>
             <div className="db-source-details">
-              <span className="db-source-label">website</span>
+              <span className="db-source-label">Website</span>
               <span className="db-source-value">{activeStats.websiteLeads.toLocaleString()}</span>
             </div>
           </div>
@@ -506,7 +506,7 @@ export default function Dashboard() {
               </svg>
             </div>
             <div className="db-source-details">
-              <span className="db-source-label">call</span>
+              <span className="db-source-label">Call</span>
               <span className="db-source-value">{activeStats.callLeads.toLocaleString()}</span>
             </div>
           </div>
@@ -524,7 +524,7 @@ export default function Dashboard() {
               </svg>
             </div>
             <div className="db-source-details">
-              <span className="db-source-label">walkin</span>
+              <span className="db-source-label">Walk-in</span>
               <span className="db-source-value">{activeStats.walkinLeads.toLocaleString()}</span>
             </div>
           </div>
@@ -695,7 +695,7 @@ export default function Dashboard() {
               <div className="db-donut-legend-item">
                 <div className="db-donut-legend-left">
                   <div className="db-donut-legend-square" style={{ background: '#2563eb' }} />
-                  <span className="db-donut-legend-label">meta</span>
+                  <span className="db-donut-legend-label">Meta</span>
                 </div>
                 <span className="db-donut-legend-pct">{activeStats.metaPct}%</span>
               </div>
@@ -703,7 +703,7 @@ export default function Dashboard() {
               <div className="db-donut-legend-item">
                 <div className="db-donut-legend-left">
                   <div className="db-donut-legend-square" style={{ background: '#f97316' }} />
-                  <span className="db-donut-legend-label">google</span>
+                  <span className="db-donut-legend-label">Google</span>
                 </div>
                 <span className="db-donut-legend-pct">{activeStats.googlePct}%</span>
               </div>
@@ -711,7 +711,7 @@ export default function Dashboard() {
               <div className="db-donut-legend-item">
                 <div className="db-donut-legend-left">
                   <div className="db-donut-legend-square" style={{ background: '#10b981' }} />
-                  <span className="db-donut-legend-label">whatsapp</span>
+                  <span className="db-donut-legend-label">WhatsApp</span>
                 </div>
                 <span className="db-donut-legend-pct">{activeStats.whatsappPct}%</span>
               </div>
@@ -719,7 +719,7 @@ export default function Dashboard() {
               <div className="db-donut-legend-item">
                 <div className="db-donut-legend-left">
                   <div className="db-donut-legend-square" style={{ background: '#8b5cf6' }} />
-                  <span className="db-donut-legend-label">website</span>
+                  <span className="db-donut-legend-label">Website</span>
                 </div>
                 <span className="db-donut-legend-pct">{activeStats.websitePct}%</span>
               </div>
@@ -727,7 +727,7 @@ export default function Dashboard() {
               <div className="db-donut-legend-item">
                 <div className="db-donut-legend-left">
                   <div className="db-donut-legend-square" style={{ background: '#06b6d4' }} />
-                  <span className="db-donut-legend-label">call</span>
+                  <span className="db-donut-legend-label">Call</span>
                 </div>
                 <span className="db-donut-legend-pct">{activeStats.callPct}%</span>
               </div>
@@ -741,7 +741,7 @@ export default function Dashboard() {
                   <div className="db-donut-legend-left">
                     <div className="db-donut-legend-square" style={{ background: '#db2777' }} />
                     <span className="db-donut-legend-label" style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      walkin
+                      Walk-in
                       <span style={{ fontSize: '8px', opacity: 0.7, display: 'inline-block', transition: 'transform 0.2s', transform: walkinExpanded ? 'rotate(0deg)' : 'rotate(-90deg)' }}>▼</span>
                     </span>
                   </div>

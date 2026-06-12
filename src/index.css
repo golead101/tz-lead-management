@@ -4773,3 +4773,87 @@ textarea.form-control {
   from { transform: translateY(20px) scale(0.98); opacity: 0; }
   to { transform: translateY(0) scale(1); opacity: 1; }
 }
+
+/* Custom styles for Followups mockup matching user requirements */
+.calendar-icon-block-circle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #dbeafe;
+}
+
+.followup-status-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 12px;
+}
+
+.followup-status-badge.upcoming {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.followup-status-badge.overdue {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.card-detail-inline {
+  display: flex;
+  align-items: center;
+}
+
+.lead-note-line {
+  font-size: 13.5px;
+  color: #6b7280;
+  font-style: italic;
+  margin-top: 8px;
+  border-left: 2.5px solid #cbd5e1;
+  padding-left: 10px;
+  margin-left: 2px;
+}
+
+.call-now-btn-pill {
+  background: #0b4ec2;
+  color: #ffffff;
+  padding: 10px 22px;
+  border-radius: 9999px;
+  font-weight: 700;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(11, 78, 194, 0.2);
+}
+
+.call-now-btn-pill:hover {
+  background: #093da1;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(11, 78, 194, 0.3);
+}
+
+/* Custom override for follow up list container card */
+.followups-grid .followup-lead-card {
+  border-radius: 20px;
+  padding: 24px;
+  border-left: 1px solid var(--border-color);
+  border: 1px solid #f1f5f9;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.02);
+}
+.followups-grid .followup-lead-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
+  border-color: #e2e8f0;
+}
+
