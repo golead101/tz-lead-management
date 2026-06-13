@@ -719,16 +719,16 @@ export default function ConfigSettings() {
                           <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '4px' }}>
                             <span style={{ fontWeight: '700', color: 'var(--text-primary)', fontSize: '13.5px' }}>{c.name}</span>
                             <span style={{ 
-                              background: c.role === 'Admin' ? '#faf5ff' : c.role === 'Manager' ? '#fff7ed' : '#f0fdf4',
-                              color: c.role === 'Admin' ? '#6b21a8' : c.role === 'Manager' ? '#c2410c' : '#15803d',
+                              background: c.role === 'Admin' ? '#faf5ff' : (c.role === 'Manager' || c.role === 'Telecaller') ? '#fff7ed' : '#f0fdf4',
+                              color: c.role === 'Admin' ? '#6b21a8' : (c.role === 'Manager' || c.role === 'Telecaller') ? '#c2410c' : '#15803d',
                               fontSize: '10px',
                               fontWeight: '750',
                               padding: '2px 8px',
                               borderRadius: '12px',
-                              border: c.role === 'Admin' ? '1px solid #e9d5ff' : c.role === 'Manager' ? '1px solid #ffedd5' : '1px solid #bbf7d0',
+                              border: c.role === 'Admin' ? '1px solid #e9d5ff' : (c.role === 'Manager' || c.role === 'Telecaller') ? '1px solid #ffedd5' : '1px solid #bbf7d0',
                               marginLeft: '6px'
                             }}>
-                              {c.role || 'Counselor'}
+                              {c.role === 'Manager' || c.role === 'Telecaller' ? 'Telecaller' : (c.role || 'Counselor')}
                             </span>
                             {isActive ? (
                               <span style={{ background: '#ecfdf5', color: '#059669', fontSize: '10px', fontWeight: '700', padding: '2px 8px', borderRadius: '12px', border: '1px solid #a7f3d0', marginLeft: '6px' }}>
@@ -831,7 +831,7 @@ export default function ConfigSettings() {
                       onChange={(e) => setCRole(e.target.value)}
                     >
                       <option value="Counselor">Counselor</option>
-                      <option value="Manager">Manager</option>
+                      <option value="Telecaller">Telecaller</option>
                     </select>
                   </div>
                   <div>
@@ -848,7 +848,7 @@ export default function ConfigSettings() {
                 </div>
 
                 <div style={{ background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.15)', padding: '10px 14px', borderRadius: 'var(--radius-sm)', fontSize: '11px', color: '#3b82f6', marginTop: '16px' }}>
-                  <strong>🔔 User Assignment:</strong> Creating a new user registers them inside the CRM. Managers get cross-team monitoring access, and Counselors receive isolated queues.
+                  <strong>🔔 User Assignment:</strong> Creating a new user registers them inside the CRM. Telecallers get cross-team monitoring access, and Counselors receive isolated queues.
                 </div>
 
                 <button type="submit" className="primary-btn mt-4" disabled={isCreatingUser}>

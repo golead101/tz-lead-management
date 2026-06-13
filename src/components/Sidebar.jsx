@@ -88,6 +88,19 @@ export default function Sidebar() {
       )
     },
     {
+      id: 'history',
+      target: 'history',
+      label: 'History',
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+          <polyline points="3 3 3 8 8 8" />
+          <line x1="12" y1="7" x2="12" y2="12" />
+          <line x1="12" y1="12" x2="16" y2="14" />
+        </svg>
+      )
+    },
+    {
       id: 'settings',
       target: 'settings',
       label: 'Settings',
@@ -108,6 +121,7 @@ export default function Sidebar() {
     if (item.id === 'integrations') return activeView === 'integrations';
     if (item.id === 'reports') return activeView === 'analytics';
     if (item.id === 'automation') return activeView === 'whatsapp';
+    if (item.id === 'history') return activeView === 'history';
     if (item.id === 'settings') return activeView === 'settings';
     return activeView === item.target;
   };
@@ -181,10 +195,13 @@ export default function Sidebar() {
       <nav className="navigation-menu">
         {menuItems.map(item => {
           // Role-based tab exclusions
-          if (activeRole === 'Counselor' && (item.id === 'settings' || item.id === 'reports')) {
+          if (activeRole === 'Counselor' && (item.id === 'settings' || item.id === 'reports' || item.id === 'history')) {
             return null;
           }
-          if (activeRole === 'Manager' && (item.id === 'settings')) {
+          if (activeRole === 'Admin' && item.id === 'history') {
+            return null;
+          }
+          if ((activeRole === 'Manager' || activeRole === 'Telecaller') && (item.id === 'settings' || item.id === 'reports' || item.id === 'integrations')) {
             return null;
           }
           // Admin has all tabs access, no exclusions

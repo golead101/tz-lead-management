@@ -56,7 +56,7 @@ export default function Topbar() {
     setActiveRole(newRole);
     if (newRole === 'Counselor') {
       setActiveUser(counselors[0]?.name || 'Maha');
-    } else if (newRole === 'Manager') {
+    } else if (newRole === 'Manager' || newRole === 'Telecaller') {
       setActiveUser('Irfan');
     } else {
       setActiveUser('Stefan Salvatore');
@@ -114,7 +114,7 @@ export default function Topbar() {
             className="role-select"
           >
             <option value="Admin">Admin</option>
-            <option value="Manager">Manager</option>
+            <option value="Telecaller">Telecaller</option>
             <option value="Counselor">Counselor</option>
           </select>
         </div>

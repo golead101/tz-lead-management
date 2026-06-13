@@ -14,6 +14,7 @@ import ConfigSettings from './modules/ConfigSettings';
 import Integrations from './modules/Integrations';
 import FollowUps from './modules/FollowUps';
 import LiveFormEmbed from './modules/LiveFormEmbed';
+import History from './modules/History';
 
 // Beautiful visual page skeleton shimmer loader
 function ShimmerLoader() {
@@ -51,12 +52,14 @@ function MainAppContent() {
   useEffect(() => {
     // Guard check: redirect if role tries to access a restricted view
     const isCounselor = activeRole === 'Counselor';
-    const isManager = activeRole === 'Manager';
+    const isManager = activeRole === 'Manager' || activeRole === 'Telecaller';
+    const isAdmin = activeRole === 'Admin';
 
-    const isCounselorRestricted = isCounselor && ['analytics', 'sandbox', 'settings'].includes(activeView);
-    const isManagerRestricted = isManager && ['sandbox', 'settings'].includes(activeView);
+    const isCounselorRestricted = isCounselor && ['analytics', 'sandbox', 'settings', 'history'].includes(activeView);
+    const isManagerRestricted = isManager && ['sandbox', 'settings', 'analytics', 'integrations'].includes(activeView);
+    const isAdminRestricted = isAdmin && ['history'].includes(activeView);
 
-    if (isCounselorRestricted || isManagerRestricted) {
+    if (isCounselorRestricted || isManagerRestricted || isAdminRestricted) {
       setActiveView('dashboard');
       return;
     }
@@ -98,6 +101,8 @@ function MainAppContent() {
         return <Integrations />;
       case 'settings':
         return <ConfigSettings />;
+      case 'history':
+        return <History />;
       default:
         return <Dashboard />;
     }

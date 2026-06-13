@@ -172,7 +172,7 @@ export default function Analytics() {
           <div className="chart-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', textAlign: 'center', padding: '30px' }}>
             <svg viewBox="0 0 24 24" width="48" height="48" stroke="currentColor" strokeWidth="1.5" fill="none" style={{ color: 'var(--primary)', marginBottom: '8px' }}><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
             <h4 style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '4px' }}>Access Restricted</h4>
-            <p style={{ fontSize: '11.5px', maxWidth: '280px', lineHeight: '1.5' }}>Detailed comparative counselor leaderboard rankings are restricted to Managers & Administrators.</p>
+            <p style={{ fontSize: '11.5px', maxWidth: '280px', lineHeight: '1.5' }}>Detailed comparative counselor leaderboard rankings are restricted to Telecallers & Administrators.</p>
           </div>
         )}
       </div>
