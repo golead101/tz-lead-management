@@ -409,7 +409,7 @@ export default function GridView() {
                 <div className="gv-popover">
                   <label className="form-label" style={{ fontSize: '11px' }}>Assign to Counselor</label>
                   <select className="gv-filter-select" style={{ width: '100%' }} value={bulkCounselorName} onChange={(e) => setBulkCounselorName(e.target.value)}>
-                    {counselors.filter(c => c.status === 'Active').map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                    {counselors.filter(c => c.status === 'Active' && c.role !== 'Admin' && c.name.toLowerCase() !== 'admin').map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                   </select>
                   <button className="gv-btn-primary gv-btn-sm" style={{ width: '100%', marginTop: '8px', justifyContent: 'center' }} onClick={executeBulkReassign}>Apply</button>
                 </div>
@@ -858,10 +858,6 @@ export default function GridView() {
                       <div>
                         <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase', marginBottom: '2px', letterSpacing: '0.03em' }}>Email</div>
                         <div style={{ fontSize: '13px', color: '#1e293b', fontWeight: '600' }}>{lead.email || 'Not Provided'}</div>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase', marginBottom: '2px', letterSpacing: '0.03em' }}>Location</div>
-                        <div style={{ fontSize: '13px', color: '#1e293b', fontWeight: '600' }}>{lead.location || 'Not Provided'}</div>
                       </div>
                       <div>
                         <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase', marginBottom: '2px', letterSpacing: '0.03em' }}>Education</div>

@@ -1,45 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { useCRM } from '../context/CRMContext';
 import { functions } from '../firebase';
 import { httpsCallable } from 'firebase/functions';
-function ColorField({ label, desc, value, onChange, icon }) {
-  const pickerRef = useRef(null);
-  return (
-    <div className="branding-item-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <div className="branding-item-icon-box" style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb' }}>
-          {icon}
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#1e293b' }}>{label}</span>
-          <span style={{ fontSize: '11px', color: '#64748b' }}>{desc}</span>
-        </div>
-      </div>
-      <div className="custom-picker-field" style={{ width: '220px', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #cbd5e1', borderRadius: '8px', cursor: 'pointer', background: '#fff', position: 'relative' }} onClick={() => pickerRef.current?.click()}>
-        <div className="custom-swatch" style={{ backgroundColor: value || '#ffffff', width: '20px', height: '20px', borderRadius: '4px', border: '1px solid rgba(0,0,0,0.1)' }} />
-        <input 
-          type="text" 
-          className="custom-picker-hex" 
-          value={value} 
-          onChange={(e) => onChange(e.target.value)}
-          onClick={(e) => e.stopPropagation()}
-          style={{ fontSize: '12px', width: '100%', border: 'none', outline: 'none', fontFamily: 'monospace' }}
-        />
-        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ color: '#94a3b8' }}>
-          <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
-          <path d="M18.5 2.5a2.121 2.121 0 113 3L12 15l-4 1 1-4 9.5-9.5z" />
-        </svg>
-        <input 
-          type="color" 
-          ref={pickerRef}
-          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
-          value={value && value.startsWith('#') && value.length === 7 ? value : '#ffffff'} 
-          onChange={(e) => onChange(e.target.value)}
-        />
-      </div>
-    </div>
-  );
-}
 
 export default function ConfigSettings() {
   const {
@@ -64,10 +26,6 @@ export default function ConfigSettings() {
   // Customizer States
   const [instName, setInstName] = useState(branding.instituteName);
   const [logoUrl, setLogoUrl] = useState(branding.logoUrl || '');
-  const [bgCol, setBgCol] = useState(branding.sidebarBg || '#0A1E44');
-  const [textCol, setTextCol] = useState(branding.sidebarText || '#ffffff');
-  const [activeCol, setActiveCol] = useState(branding.sidebarActiveBg || '#2F6BFF');
-  const [hoverCol, setHoverCol] = useState(branding.sidebarHoverBg || '#173B7A');
 
   // New Course State
   const [courseName, setCourseName] = useState('');
@@ -111,29 +69,21 @@ export default function ConfigSettings() {
     changeBrandingColors({
       instituteName: instName,
       logoUrl: logoUrl,
-      sidebarBg: bgCol,
-      sidebarText: textCol,
-      sidebarActiveBg: activeCol,
-      sidebarHoverBg: hoverCol
+      sidebarBg: branding.sidebarBg || '#0A1E44',
+      sidebarText: branding.sidebarText || '#ffffff',
+      sidebarActiveBg: branding.sidebarActiveBg || '#2F6BFF',
+      sidebarHoverBg: branding.sidebarHoverBg || '#173B7A'
     });
   };
 
   const handleResetToDefault = () => {
     setInstName('TechZone Academy');
     setLogoUrl('');
-    setBgCol('#0A1E44');
-    setTextCol('#ffffff');
-    setActiveCol('#2F6BFF');
-    setHoverCol('#173B7A');
   };
 
   const handleCancelChanges = () => {
     setInstName(branding.instituteName);
     setLogoUrl(branding.logoUrl || '');
-    setBgCol(branding.sidebarBg || '#0A1E44');
-    setTextCol(branding.sidebarText || '#ffffff');
-    setActiveCol(branding.sidebarActiveBg || '#2F6BFF');
-    setHoverCol(branding.sidebarHoverBg || '#173B7A');
   };
 
   const handleLogoUpload = (e) => {
@@ -153,11 +103,7 @@ export default function ConfigSettings() {
 
   const hasChanges = 
     instName !== branding.instituteName ||
-    logoUrl !== (branding.logoUrl || '') ||
-    bgCol !== (branding.sidebarBg || '#0A1E44') ||
-    textCol !== (branding.sidebarText || '#ffffff') ||
-    activeCol !== (branding.sidebarActiveBg || '#2F6BFF') ||
-    hoverCol !== (branding.sidebarHoverBg || '#173B7A');
+    logoUrl !== (branding.logoUrl || '');
 
   const handleAddCourse = (e) => {
     e.preventDefault();
@@ -323,11 +269,11 @@ export default function ConfigSettings() {
                       </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <div style={{ width: '110px', height: '32px', borderRadius: '6px', background: bgCol || '#0A1E44', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: '4px', border: '1px solid rgba(0,0,0,0.08)' }}>
+                      <div style={{ width: '110px', height: '32px', borderRadius: '6px', background: branding.sidebarBg || '#0A1E44', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: '4px', border: '1px solid rgba(0,0,0,0.08)' }}>
                         {logoUrl ? (
                           <img src={logoUrl} alt="Logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
                         ) : (
-                          <span style={{ fontSize: '9px', fontWeight: '700', color: textCol || '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{instName}</span>
+                          <span style={{ fontSize: '9px', fontWeight: '700', color: branding.sidebarText || '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{instName}</span>
                         )}
                       </div>
                       <button 
@@ -353,63 +299,7 @@ export default function ConfigSettings() {
                     </div>
                   </div>
 
-                  {/* Row 3: Sidebar Background Color */}
-                  <ColorField 
-                    label="Sidebar Background Color" 
-                    desc="Background color of the sidebar." 
-                    value={bgCol} 
-                    onChange={setBgCol} 
-                    icon={(
-                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5">
-                        <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/>
-                        <path d="M7.5 10.5c.828 0 1.5-.672 1.5-1.5s-.672-1.5-1.5-1.5-1.5.672-1.5 1.5.672 1.5 1.5 1.5z"/>
-                        <path d="M11.5 7.5c.828 0 1.5-.672 1.5-1.5S11.828 4.5 11 4.5s-1.5.672-1.5 1.5.672 1.5 1.5 1.5z"/>
-                        <path d="M16.5 9.5c.828 0 1.5-.672 1.5-1.5s-.672-1.5-1.5-1.5-1.5.672-1.5 1.5.672 1.5 1.5 1.5z"/>
-                      </svg>
-                    )}
-                  />
 
-                  {/* Row 4: Sidebar Text & Icon Color */}
-                  <ColorField 
-                    label="Sidebar Text & Icon Color" 
-                    desc="Color for menu text and icons." 
-                    value={textCol} 
-                    onChange={setTextCol} 
-                    icon={(
-                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5">
-                        <polyline points="4 7 4 4 20 4 20 7" />
-                        <line x1="9" y1="20" x2="15" y2="20" />
-                        <line x1="12" y1="4" x2="12" y2="20" />
-                      </svg>
-                    )}
-                  />
-
-                  {/* Row 5: Sidebar Active Menu Color */}
-                  <ColorField 
-                    label="Sidebar Active Menu Color" 
-                    desc="Background color for active menu." 
-                    value={activeCol} 
-                    onChange={setActiveCol} 
-                    icon={(
-                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5">
-                        <rect x="3" y="3" width="18" height="18" rx="2" />
-                        <path d="M9 11l3 3 5-5" />
-                      </svg>
-                    )}
-                  />
-
-                  {/* Row 6: Sidebar Hover Color */}
-                  <ColorField 
-                    label="Sidebar Hover Color" 
-                    desc="Background color on menu hover." 
-                    value={hoverCol} 
-                    onChange={setHoverCol} 
-                    icon={(
-                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5">
-                        <path d="M21 11L3 3l8 18 3-7 7-3z" />
-                      </svg>
-                    )}
-                  />
 
                   {/* Notice Informational Box */}
                   <div className="modern-alert-blue" style={{ marginTop: '24px', display: 'flex', gap: '12px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '12px', padding: '16px' }}>
@@ -475,50 +365,21 @@ export default function ConfigSettings() {
                 </div>
                 <p style={{ fontSize: '11.5px', color: '#64748b', marginBottom: '24px' }}>This is how your sidebar will look.</p>
 
-                {/* Dotted lines & overlay tags */}
-                <div className="preview-callouts-layer">
-                  {/* Background Tag */}
-                  <div className="callout-swatch-tag" style={{ top: '15%', right: '5%', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <div className="callout-dot" style={{ backgroundColor: bgCol, width: '8px', height: '8px', borderRadius: '50%' }} />
-                    <span style={{ fontSize: '10.5px', fontWeight: '750' }}>Sidebar Background</span>
-                  </div>
-                  <div className="callout-pointing-line" style={{ top: '18.5%', right: '35%', width: '22%' }} />
 
-                  {/* Active Menu Tag */}
-                  <div className="callout-swatch-tag" style={{ top: '35%', right: '5%', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <div className="callout-dot" style={{ backgroundColor: activeCol, width: '8px', height: '8px', borderRadius: '50%' }} />
-                    <span style={{ fontSize: '10.5px', fontWeight: '750' }}>Active Menu Color</span>
-                  </div>
-                  <div className="callout-pointing-line" style={{ top: '38.5%', right: '35%', width: '16%' }} />
-
-                  {/* Text & Icon Tag */}
-                  <div className="callout-swatch-tag" style={{ top: '55%', right: '5%', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <div className="callout-dot" style={{ backgroundColor: textCol, width: '8px', height: '8px', borderRadius: '50%' }} />
-                    <span style={{ fontSize: '10.5px', fontWeight: '750' }}>Text & Icon Color</span>
-                  </div>
-                  <div className="callout-pointing-line" style={{ top: '58.5%', right: '35%', width: '20%' }} />
-
-                  {/* Hover Tag */}
-                  <div className="callout-swatch-tag" style={{ top: '75%', right: '5%', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <div className="callout-dot" style={{ backgroundColor: hoverCol, width: '8px', height: '8px', borderRadius: '50%' }} />
-                    <span style={{ fontSize: '10.5px', fontWeight: '750' }}>Hover Color</span>
-                  </div>
-                  <div className="callout-pointing-line" style={{ top: '78.5%', right: '35%', width: '20%' }} />
-                </div>
 
                 {/* Sidebar Mockup Frame */}
-                <div className="preview-sidebar-frame" style={{ width: '200px', backgroundColor: bgCol, borderRadius: '12px', height: '480px', display: 'flex', flexDirection: 'column', padding: '16px 12px', zIndex: 1, boxShadow: '0 4px 14px rgba(0,0,0,0.15)' }}>
+                <div className="preview-sidebar-frame" style={{ width: '200px', backgroundColor: branding.sidebarBg || '#0A1E44', borderRadius: '12px', height: '480px', display: 'flex', flexDirection: 'column', padding: '16px 12px', zIndex: 1, boxShadow: '0 4px 14px rgba(0,0,0,0.15)' }}>
                   
                   {/* Brand Preview */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingBottom: '16px', borderBottom: `1px solid ${hoverCol}33` }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingBottom: '16px', borderBottom: `1px solid ${(branding.sidebarHoverBg || '#173B7A')}33` }}>
                     {logoUrl ? (
                       <img src={logoUrl} alt="Logo" style={{ maxHeight: '24px', maxWidth: '80px', objectFit: 'contain' }} />
                     ) : (
                       <>
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke={activeCol} strokeWidth="2.5">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke={branding.sidebarActiveBg || '#2F6BFF'} strokeWidth="2.5">
                           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                         </svg>
-                        <span style={{ fontSize: '11px', fontWeight: '800', color: textCol, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{instName}</span>
+                        <span style={{ fontSize: '11px', fontWeight: '800', color: branding.sidebarText || '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{instName}</span>
                       </>
                     )}
                   </div>
@@ -526,38 +387,38 @@ export default function ConfigSettings() {
                   {/* Navigation list */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '16px', flex: 1 }}>
                     {/* Dashboard */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', color: textCol, opacity: 0.7, fontSize: '11.5px', borderRadius: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', color: branding.sidebarText || '#ffffff', opacity: 0.7, fontSize: '11.5px', borderRadius: '6px' }}>
                       <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg>
                       <span>Dashboard</span>
                     </div>
 
                     {/* Leads - Active */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', backgroundColor: activeCol, color: textCol, fontSize: '11.5px', borderRadius: '6px', fontWeight: '600' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', backgroundColor: branding.sidebarActiveBg || '#2F6BFF', color: branding.sidebarText || '#ffffff', fontSize: '11.5px', borderRadius: '6px', fontWeight: '600' }}>
                       <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                       <span>Leads</span>
                     </div>
 
                     {/* Follow Ups - Hovered */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', backgroundColor: hoverCol, color: textCol, fontSize: '11.5px', borderRadius: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', backgroundColor: branding.sidebarHoverBg || '#173B7A', color: branding.sidebarText || '#ffffff', fontSize: '11.5px', borderRadius: '6px' }}>
                       <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L21 8"/><path d="M21 3v5h-5"/></svg>
                       <span>Follow Ups</span>
                     </div>
 
                     {/* Courses */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', color: textCol, opacity: 0.7, fontSize: '11.5px', borderRadius: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', color: branding.sidebarText || '#ffffff', opacity: 0.7, fontSize: '11.5px', borderRadius: '6px' }}>
                       <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
                       <span>Courses</span>
                     </div>
                   </div>
 
                   {/* Bottom section */}
-                  <div style={{ borderTop: `1px solid ${hoverCol}33`, paddingTop: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: `${textCol}22`, color: textCol, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '8px', fontWeight: '700' }}>
+                  <div style={{ borderTop: `1px solid ${(branding.sidebarHoverBg || '#173B7A')}33`, paddingTop: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: `${branding.sidebarText || '#ffffff'}22`, color: branding.sidebarText || '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '8px', fontWeight: '700' }}>
                       SS
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
-                      <span style={{ fontSize: '9px', fontWeight: '600', color: textCol, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Stefan Salvatore</span>
-                      <span style={{ fontSize: '7px', color: textCol, opacity: 0.6 }}>Admin</span>
+                      <span style={{ fontSize: '9px', fontWeight: '600', color: branding.sidebarText || '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Stefan Salvatore</span>
+                      <span style={{ fontSize: '7px', color: branding.sidebarText || '#ffffff', opacity: 0.6 }}>Admin</span>
                     </div>
                   </div>
                 </div>

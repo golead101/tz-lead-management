@@ -134,7 +134,7 @@ export default function Analytics() {
               Comparative leaderboard ranking team enrollment speed and conversion rates.
             </p>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '380px', overflowY: 'auto', paddingRight: '4px' }}>
               {counselorPerformance.map((perf, index) => {
                 // Gold, Silver, Bronze badges for leaderboard ranks
                 const rankColor = index === 0 ? '#fbbf24' : index === 1 ? '#9ca3af' : '#d97706';
