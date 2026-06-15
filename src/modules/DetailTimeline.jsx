@@ -834,7 +834,7 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
                         {isCollapsed ? (
                           <div className="node-collapsed-hint">+ Click to expand details...</div>
                         ) : (
-                          <div className="node-body">{node.content}</div>
+                          <div className="node-body" style={{ whiteSpace: 'pre-line' }}>{node.content}</div>
                         )}
                       </div>
                     );

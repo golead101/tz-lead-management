@@ -777,26 +777,96 @@ export const CRMProvider = ({ children }) => {
           id: `log-call-${Date.now()}`,
           type: 'call',
           title: `Call Logged: ${callDetails.status}`,
-          content: `Interest Level: ${callDetails.interest}. outcome: ${callDetails.notes}. Questions asked: ${callDetails.questions.length ? callDetails.questions.join(', ') : 'None'}.`,
+          content: `Call Outcome: ${callDetails.status}${callDetails.notes ? `\nNotes: ${callDetails.notes}` : ''}${callDetails.scheduleFollowup && callDetails.followupDate ? `\nFollow-up: Scheduled for ${new Date(callDetails.followupDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}`,
           timestamp: new Date().toISOString(),
           user: activeUser
         };
         const nextTimeline = [...(lead.timeline || []), callLog];
         let nextStage = lead.stage;
-        let nextFollowupDate = lead.followupDate;
-        let nextFollowupReason = lead.followupReason;
+        let nextFollowupDate = null;
+        let nextFollowupReason = null;
+        let whatsappHistory = [...(lead.whatsappMessages || [])];
 
-        // If outcome requires status change
-        if (callDetails.updateStage && callDetails.updateStage !== '') {
-          nextStage = callDetails.updateStage;
+        // Determine if outcome maps to a pipeline stage shift
+        let targetStage = callDetails.updateStage;
+        if (!targetStage || targetStage === '') {
+          if (callDetails.status === 'Converted') {
+            targetStage = 'Converted';
+          } else if (callDetails.status === 'Not Interested') {
+            targetStage = 'Not Interested';
+          } else if (callDetails.status === 'Interested') {
+            targetStage = 'Interested';
+          } else if (callDetails.status === 'Call Later') {
+            targetStage = 'Follow-up Pending';
+          }
+        }
+
+        // Apply stage change and log it
+        if (targetStage && targetStage !== '' && targetStage !== lead.stage) {
+          nextStage = targetStage;
           nextTimeline.push({
             id: `log-stage-${Date.now()}`,
             type: 'system',
             title: 'Stage Shifted',
-            content: `Changed dynamically via call outcome logging to "${callDetails.updateStage}"`,
+            content: `Changed dynamically via call outcome logging to "${nextStage}"`,
             timestamp: new Date().toISOString(),
             user: activeUser
           });
+
+          // Trigger automated simulated WhatsApp messages if applicable
+          let autoMsg = null;
+          if (nextStage === 'Demo Scheduled') {
+            autoMsg = `Hi ${lead.name}, your online demo session has been scheduled successfully! Click here to join: meet.google.com/abc-defg-hij`;
+          } else if (nextStage === 'Converted') {
+            autoMsg = `Congratulations ${lead.name}! Welcome to the institute family. We have successfully registered you in the database.`;
+          }
+
+          if (autoMsg) {
+            whatsappHistory.push({
+              id: `msg-auto-${Date.now()}`,
+              sender: 'counselor',
+              text: autoMsg,
+              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            });
+            nextTimeline.push({
+              id: `log-auto-${Date.now()}`,
+              type: 'whatsapp',
+              title: 'Automated WhatsApp Dispatched',
+              content: `Triggered message: "${autoMsg}"`,
+              timestamp: new Date().toISOString(),
+              user: 'Automation Server'
+            });
+
+            // Dispatch to real WhatsApp API if integration is active
+            if (integrations.whatsapp.enabled && lead.phone) {
+              const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'leads-management-tz';
+              const url = `https://us-central1-${projectId}.cloudfunctions.net/sendWhatsAppMessage`;
+              
+              fetch(url, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  leadId: leadId,
+                  recipientPhone: lead.phone,
+                  messageText: autoMsg,
+                  counselorName: 'Automation Server'
+                })
+              })
+              .then(async (res) => {
+                const data = await res.json();
+                if (res.ok && data.success) {
+                  console.log('Automated WhatsApp message delivered in real-time!');
+                } else {
+                  console.error('Automated WhatsApp API failed:', data.error || data.details);
+                }
+              })
+              .catch((err) => {
+                console.error('Error dispatching automated WhatsApp to Cloud Function:', err);
+              });
+            }
+          }
         }
 
         // Setup dynamic follow-up inside lead profile if scheduled
@@ -819,7 +889,8 @@ export const CRMProvider = ({ children }) => {
           followupDate: nextFollowupDate,
           followupReason: nextFollowupReason,
           lastContacted: new Date().toISOString(),
-          timeline: nextTimeline
+          timeline: nextTimeline,
+          whatsappMessages: whatsappHistory
         };
         return updatedLead;
       }
@@ -1316,7 +1387,15 @@ export const CRMProvider = ({ children }) => {
 
   // Course Remover
   const removeCourse = (courseId) => {
-    setCourses(prev => prev.filter(c => c.id !== courseId));
+    if (isFirebaseEnabled) {
+      deleteDoc(doc(db, 'courses', courseId))
+        .catch(err => {
+          console.error("Firestore removeCourse failed, falling back to local delete:", err);
+          setCourses(prev => prev.filter(c => c.id !== courseId));
+        });
+    } else {
+      setCourses(prev => prev.filter(c => c.id !== courseId));
+    }
     showToastMsg('Course removed successfully.', 'error');
   };
 

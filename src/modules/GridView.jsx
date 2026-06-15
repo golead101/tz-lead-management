@@ -800,16 +800,6 @@ export default function GridView() {
                 </div>
                 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  {/* Add Lead Option */}
-                  <button 
-                    type="button" 
-                    onClick={() => { setSelectedLeadId(null); setTimelineNoteText(''); setIsEditing(false); }}
-                    className="gv-btn-outline"
-                    style={{ padding: '6px 12px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', height: '36px' }}
-                  >
-                    <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" strokeWidth="2.5" fill="none"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                    Add Lead
-                  </button>
 
                   {/* Edit Lead Option */}
                   {!isEditing && (
@@ -1093,7 +1083,7 @@ export default function GridView() {
                   <h4 style={{ margin: '0 0 16px 0', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#475569', letterSpacing: '0.05em' }}>Activity Timeline</h4>
                   
                   {/* Timeline stream */}
-                  <div style={{ flex: 1, overflowY: 'auto', paddingRight: '4px', display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '16px' }}>
+                  <div style={{ flex: 1, overflowY: 'auto', paddingRight: '4px', display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '0px' }}>
                     {(() => {
                       const timelineNodes = [...(lead.timeline || [])].reverse();
                       if (timelineNodes.length === 0) {
@@ -1119,7 +1109,7 @@ export default function GridView() {
                             
                             {/* Log card */}
                             <div style={{ flex: 1, padding: '12px 16px', borderRadius: '8px', border: '1px solid #f1f5f9', background: '#f8fafc' }}>
-                              <div style={{ fontSize: '13.5px', color: '#1e293b', fontWeight: '600', lineHeight: '1.4', wordBreak: 'break-word' }}>
+                              <div style={{ fontSize: '13.5px', color: '#1e293b', fontWeight: '600', lineHeight: '1.4', wordBreak: 'break-word', whiteSpace: 'pre-line' }}>
                                 {node.content || node.title}
                               </div>
                               <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '6px', fontWeight: '500' }}>
@@ -1132,44 +1122,7 @@ export default function GridView() {
                     })()}
                   </div>
 
-                  {/* Add note input form */}
-                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder="Add a note or log activity..."
-                      style={{ flex: 1, borderRadius: '8px', padding: '10px 14px', fontSize: '13px' }}
-                      value={timelineNoteText}
-                      onChange={(e) => setTimelineNoteText(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          handleAddNoteSubmit();
-                        }
-                      }}
-                    />
-                    <button
-                      onClick={handleAddNoteSubmit}
-                      style={{
-                        width: '36px',
-                        height: '36px',
-                        borderRadius: '50%',
-                        background: '#2563eb',
-                        border: 'none',
-                        color: '#ffffff',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                        flexShrink: 0,
-                        transition: 'transform 0.1s ease'
-                      }}
-                    >
-                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ transform: 'rotate(45deg) translate(-1px, 1px)' }}>
-                        <line x1="22" y1="2" x2="11" y2="13"/>
-                        <polygon points="22 2 15 22 11 13 2 9 22 2"/>
-                      </svg>
-                    </button>
-                  </div>
+
                 </div>
               </div>
 
