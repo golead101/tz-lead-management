@@ -1140,28 +1140,9 @@ exports.whatsappWebhook = functions.https.onRequest((req, res) => {
             const newLead = {
               id: newLeadId,
               name: senderName,
-              email: `${senderName.toLowerCase().replace(/[^a-z0-9]/g, '.')}@wa-inbound.com`,
               phone: formattedPhone,
-              location: 'WhatsApp Inquiry',
-              education: 'Not Provided',
-              course: 'Full-Stack Web Development',
-              source: 'WhatsApp Inbound',
-              stage: 'New Lead',
-              counselor: 'Maha',
-              createdDate: new Date().toISOString(),
-              lastContacted: new Date().toISOString(),
-              customFields: {
-                waMessageId: message.id || null
-              },
-              timeline: [{
-                id: `log-${Date.now()}`,
-                type: 'system',
-                title: 'Lead Captured via WhatsApp Webhook',
-                content: `Real-time WhatsApp inquiry received. Text: "${messageText}"`,
-                timestamp: new Date().toISOString(),
-                user: 'WhatsApp Server'
-              }],
-              whatsappMessages: [inboundMsg]
+              whatsappMessages: [inboundMsg],
+              createdDate: new Date().toISOString()
             };
 
             await db.collection('leads').doc(newLeadId).set(newLead);

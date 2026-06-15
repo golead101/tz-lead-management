@@ -93,265 +93,8 @@ const DEFAULT_INTEGRATIONS = {
   }
 };
 
-// Rich Seed Data of 12 Leads
-const SEED_LEADS = [
-  {
-    id: 'lead-1',
-    name: 'Aarav Sharma',
-    email: 'aarav.sharma@gmail.com',
-    phone: '+91 98765 43210',
-    location: 'Mumbai',
-    education: 'Final Year B.Tech',
-    course: 'Full-Stack Web Development',
-    source: 'Meta Ads',
-    counselor: 'Maha',
-    stage: 'New Lead',
-    createdDate: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
-    lastContacted: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    customFields: {},
-    timeline: [
-      { id: 'log-1-1', type: 'system', title: 'Lead Captured', content: 'Lead created automatically via Facebook Lead Ads webhook.', timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), user: 'System' }
-    ],
-    whatsappMessages: [
-      { id: 'msg-1-1', sender: 'lead', text: 'Hi, I saw your ad on Instagram. Can I get details on the Full Stack course?', time: '10:00 AM' }
-    ]
-  },
-  {
-    id: 'lead-2',
-    name: 'Neha Patel',
-    email: 'neha.patel@yahoo.com',
-    phone: '+91 98123 45678',
-    location: 'Ahmedabad',
-    education: 'Graduate (B.Sc Computer Science)',
-    course: 'Data Science & Artificial Intelligence',
-    source: 'Google Search',
-    counselor: 'Irfan',
-    stage: 'New Lead',
-    createdDate: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // 1 day ago
-    lastContacted: new Date(Date.now() - 18 * 60 * 60 * 1000).toISOString(),
-    customFields: {},
-    timeline: [
-      { id: 'log-2-1', type: 'system', title: 'Lead Captured', content: 'Form submission completed via website contact page.', timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), user: 'System' },
-      { id: 'log-2-2', type: 'call', title: 'Outbound Call - Connected', content: 'Spoke with Neha. She wants to shift careers from general science to AI. Sent details and course brochure to her email.', timestamp: new Date(Date.now() - 18 * 60 * 60 * 1000).toISOString(), user: 'Irfan' }
-    ],
-    whatsappMessages: [
-      { id: 'msg-2-1', sender: 'counselor', text: 'Hello Neha! Thank you for inquiring about our Data Science & AI program. Here is our detailed brochure.', time: '02:30 PM' },
-      { id: 'msg-2-2', sender: 'lead', text: 'Thank you! Can you tell me what the total fee is?', time: '02:40 PM' }
-    ]
-  },
-  {
-    id: 'lead-3',
-    name: 'Rahul Verma',
-    email: 'rahul.verma@outlook.com',
-    phone: '+91 91234 56789',
-    location: 'Delhi',
-    education: 'Working Professional (Sales)',
-    course: 'UI/UX Product Design',
-    source: 'Website Form',
-    counselor: 'Maha',
-    stage: 'New Lead',
-    createdDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-    lastContacted: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
-    customFields: {},
-    timeline: [
-      { id: 'log-3-1', type: 'system', title: 'Lead Captured', content: 'Google Landing Page form inquiry received.', timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), user: 'System' },
-      { id: 'log-3-2', type: 'call', title: 'Intro Call - Interested', content: 'Highly enthusiastic about UI/UX. Currently in digital sales, wants to shift to design. Discussed fees and batches.', timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), user: 'Maha' },
-      { id: 'log-3-3', type: 'whatsapp', title: 'WhatsApp Sent', content: 'Sent Figma syllabus presentation link via WhatsApp.', timestamp: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(), user: 'Maha' }
-    ],
-    whatsappMessages: [
-      { id: 'msg-3-1', sender: 'counselor', text: 'Hey Rahul, as discussed on call, here is the syllabus layout for UI/UX. Let me know what you think!', time: '11:15 AM' },
-      { id: 'msg-3-2', sender: 'lead', text: 'This looks fantastic! Do you have weekend batches available?', time: '11:20 AM' },
-      { id: 'msg-3-3', sender: 'counselor', text: 'Yes, we have a specialized weekend batch starting this Saturday from 10 AM to 2 PM.', time: '11:22 AM' }
-    ]
-  },
-  {
-    id: 'lead-4',
-    name: 'Sneha Reddy',
-    email: 'sneha.reddy@gmail.com',
-    phone: '+91 88888 77777',
-    location: 'Bangalore',
-    education: '12th Standard Completed',
-    course: 'Full-Stack Web Development',
-    source: 'Walk-in',
-    counselor: 'Maha',
-    stage: 'New Lead',
-    createdDate: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
-    lastContacted: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-    customFields: {},
-    timeline: [
-      { id: 'log-4-1', type: 'system', title: 'Walk-In Profile Created', content: 'Sneha visited the institute location with her parents.', timestamp: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(), user: 'Maha' },
-      { id: 'log-4-2', type: 'demo', title: 'Demo Classroom Scheduled', content: 'Scheduled demo session for Web Dev on Tuesday at 4:00 PM.', timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), user: 'Maha' }
-    ],
-    whatsappMessages: []
-  },
-  {
-    id: 'lead-5',
-    name: 'Aditya Nair',
-    email: 'aditya.nair@gmail.com',
-    phone: '+91 99000 88000',
-    location: 'Kochi',
-    education: 'BBA Completed',
-    course: 'Digital Marketing',
-    source: 'Walk-in',
-    subSource: 'Student Referral',
-    counselor: 'Maha',
-    stage: 'New Lead',
-    createdDate: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(),
-    lastContacted: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    customFields: {},
-    timeline: [
-      { id: 'log-5-1', type: 'system', title: 'Referred Lead Logged', content: 'Referred by active student Rohan Malhotra.', timestamp: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(), user: 'System' },
-      { id: 'log-5-2', type: 'demo', title: 'Demo Classroom Attended', content: 'Attended the Digital Marketing SEO overview class. Feedback was excellent.', timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), user: 'Maha' }
-    ],
-    whatsappMessages: []
-  },
-  {
-    id: 'lead-6',
-    name: 'Ananya Sen',
-    email: 'ananya.sen@gmail.com',
-    phone: '+91 77776 66655',
-    location: 'Kolkata',
-    education: 'Final Year BCA',
-    course: 'Cyber Security & Ethical Hacking',
-    source: 'Google Search',
-    counselor: 'Irfan',
-    stage: 'New Lead',
-    createdDate: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(),
-    lastContacted: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-    customFields: {},
-    timeline: [
-      { id: 'log-6-1', type: 'system', title: 'Lead Captured', content: 'Form submission completed via website contact page.', timestamp: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(), user: 'System' },
-      { id: 'log-6-2', type: 'call', title: 'Intro Call - Connected', content: 'Discussed Ethical Hacking career path. Ananya wants to enroll but has exams until the end of the month. Requested a call back next Monday.', timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), user: 'Irfan' }
-    ],
-    whatsappMessages: [],
-    followupDate: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(), // 1 hour ago (OVERDUE!)
-    followupReason: 'Call back to schedule batch seat after her BCA exams.'
-  },
-  {
-    id: 'lead-7',
-    name: 'Vikram Malhotra',
-    email: 'vikram.m@gmail.com',
-    phone: '+91 99999 88888',
-    location: 'Pune',
-    education: 'B.Tech Graduate',
-    course: 'Cloud & DevOps Engineering',
-    source: 'Meta Ads',
-    counselor: 'Maha',
-    stage: 'Converted',
-    createdDate: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
-    lastContacted: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-    customFields: {},
-    timeline: [
-      { id: 'log-7-1', type: 'system', title: 'Lead Captured', content: 'Instagram Lead Form inquiry.', timestamp: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(), user: 'System' },
-      { id: 'log-7-2', type: 'call', title: 'Discussed AWS Path', content: 'Highly focused on AWS/Kubernetes. Eager to join immediate batch.', timestamp: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).toISOString(), user: 'Maha' },
-      { id: 'log-7-3', type: 'demo', title: 'Demo Classroom Attended', content: 'Attended the Docker live seminar.', timestamp: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(), user: 'Maha' },
-      { id: 'log-7-4', type: 'system', title: 'Fees Paid - Converted', content: 'Paid booking amount of ₹25,000. Registration generated.', timestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), user: 'System' }
-    ],
-    whatsappMessages: []
-  },
-  {
-    id: 'lead-8',
-    name: 'Pooja Gupta',
-    email: 'pooja.gupta@yahoo.co.in',
-    phone: '+91 88998 89988',
-    location: 'Mumbai',
-    education: 'B.Com Completed',
-    course: 'Digital Marketing',
-    source: 'Walk-in',
-    counselor: 'Maha',
-    stage: 'Not Interested',
-    createdDate: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-    lastContacted: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(),
-    customFields: {},
-    timeline: [
-      { id: 'log-8-1', type: 'system', title: 'In-person Entry Created', content: 'Manual Walk-In card logged.', timestamp: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(), user: 'Maha' },
-      { id: 'log-8-2', type: 'call', title: 'Follow-up Call - Declined', content: 'She decided to pursue an MBA in marketing instead of a diploma course. Marked as Not Interested.', timestamp: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(), user: 'Maha' }
-    ],
-    whatsappMessages: []
-  },
-  {
-    id: 'lead-9',
-    name: 'Karan Johar',
-    email: 'karan.j@gmail.com',
-    phone: '+91 95432 10987',
-    location: 'Mumbai',
-    education: 'Working Professional (HR)',
-    course: 'UI/UX Product Design',
-    source: 'Meta Ads',
-    counselor: 'Irfan',
-    stage: 'Interested',
-    createdDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-    lastContacted: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-    customFields: {},
-    timeline: [
-      { id: 'log-9-1', type: 'system', title: 'Lead Captured', content: 'Facebook inquiry details synced.', timestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), user: 'System' },
-      { id: 'log-9-2', type: 'call', title: 'Call Connected', content: 'Karan is curious about shifting to UX research. Sent curriculum link.', timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), user: 'Irfan' }
-    ],
-    whatsappMessages: []
-  },
-  {
-    id: 'lead-10',
-    name: 'Riya Sen',
-    email: 'riya.sen@outlook.com',
-    phone: '+91 82345 67890',
-    location: 'Pune',
-    education: 'B.Sc Graduate',
-    course: 'Data Science & Artificial Intelligence',
-    source: 'Website Form',
-    counselor: 'Maha',
-    stage: 'Demo Scheduled',
-    createdDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    lastContacted: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-    customFields: {},
-    timeline: [
-      { id: 'log-10-1', type: 'system', title: 'Lead Captured', content: 'Landing Page submission.', timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), user: 'System' },
-      { id: 'log-10-2', type: 'demo', title: 'Demo Classroom Scheduled', content: 'Demo scheduled for today at 5:30 PM.', timestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), user: 'Maha' }
-    ],
-    whatsappMessages: []
-  },
-  {
-    id: 'lead-11',
-    name: 'Amit Trivedi',
-    email: 'amit.t@gmail.com',
-    phone: '+91 93333 44444',
-    location: 'Ahmedabad',
-    education: 'Working Professional (Admin)',
-    course: 'Cyber Security & Ethical Hacking',
-    source: 'Walk-in',
-    subSource: 'Student Referral',
-    counselor: 'Maha',
-    stage: 'Follow-up Pending',
-    createdDate: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).toISOString(),
-    lastContacted: new Date(Date.now() - 4 * 60 * 1000).toISOString(),
-    customFields: {},
-    timeline: [
-      { id: 'log-11-1', type: 'system', title: 'Lead Captured', content: 'Logged as referral.', timestamp: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).toISOString(), user: 'System' }
-    ],
-    whatsappMessages: [],
-    followupDate: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(), // 2 hours in the future
-    followupReason: 'Verify brochure reading and schedule demo batch.'
-  },
-  {
-    id: 'lead-12',
-    name: 'Tanvi Shah',
-    email: 'tanvi.shah@gmail.com',
-    phone: '+91 95555 44444',
-    location: 'Baroda',
-    education: 'Final Year B.Tech IT',
-    course: 'Full-Stack Web Development',
-    source: 'Google Search',
-    counselor: 'Irfan',
-    stage: 'Converted',
-    createdDate: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
-    lastContacted: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-    customFields: {},
-    timeline: [
-      { id: 'log-12-1', type: 'system', title: 'Lead Created', content: 'Search lead.', timestamp: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(), user: 'System' },
-      { id: 'log-12-2', type: 'system', title: 'Full Fees Paid', content: 'Paid full admission amount ₹75,000. Registration completed.', timestamp: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(), user: 'System' }
-    ],
-    whatsappMessages: []
-  }
-];
+// Rich Seed Data of 12 Leads (Cleaned/Removed)
+const SEED_LEADS = [];
 
 export const CRMProvider = ({ children }) => {
   // Database States
@@ -363,7 +106,26 @@ export const CRMProvider = ({ children }) => {
       return SEED_LEADS;
     }
     const local = localStorage.getItem('crm_leads');
-    return local ? JSON.parse(local) : SEED_LEADS;
+    if (local) {
+      try {
+        const parsed = JSON.parse(local);
+        return parsed.map(lead => ({
+          email: '',
+          course: '',
+          education: '',
+          source: 'WhatsApp Inbound',
+          stage: 'New Lead',
+          counselor: 'Unassigned',
+          lastContacted: lead.createdDate || new Date().toISOString(),
+          timeline: [],
+          customFields: {},
+          ...lead
+        }));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return SEED_LEADS;
   });
 
   const [courses, setCourses] = useState(() => {
@@ -553,7 +315,21 @@ export const CRMProvider = ({ children }) => {
             .then(() => console.log("Firestore leads successfully seeded."))
             .catch(err => console.error("Firestore leads seeding failed:", err));
         } else {
-          const leadsData = snapshot.docs.map(doc => doc.data());
+          const leadsData = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+              email: '',
+              course: '',
+              education: '',
+              source: 'WhatsApp Inbound',
+              stage: 'New Lead',
+              counselor: 'Unassigned',
+              lastContacted: data.createdDate || new Date().toISOString(),
+              timeline: [],
+              customFields: {},
+              ...data
+            };
+          });
           leadsData.sort((a, b) => new Date(b.createdDate) - new Date(a.createdDate));
           setLeads(leadsData);
           setIsFirebaseEnabled(true);
