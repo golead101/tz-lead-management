@@ -576,14 +576,16 @@ export default function GridView() {
                           >
                             <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" strokeWidth="2" fill="none"/><circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" fill="none"/></svg>
                           </button>
-                          <button
-                            className="gv-action-icon"
-                            title="WhatsApp Chat"
-                            onClick={() => { setSelectedLeadId(lead.id); setActiveView('whatsapp'); }}
-                            style={{ color: '#059669' }}
-                          >
-                            <svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" stroke="currentColor" strokeWidth="2" fill="none"/></svg>
-                          </button>
+                          {activeRole !== 'Telecaller' && (
+                            <button
+                              className="gv-action-icon"
+                              title="WhatsApp Chat"
+                              onClick={() => { setSelectedLeadId(lead.id); setActiveView('whatsapp'); }}
+                              style={{ color: '#059669' }}
+                            >
+                              <svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" stroke="currentColor" strokeWidth="2" fill="none"/></svg>
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -770,41 +772,11 @@ export default function GridView() {
                   
                   {/* Lead Status Section */}
                   <div>
-                    <h4 style={{ margin: '0 0 12px 0', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#475569', letterSpacing: '0.05em' }}>Lead Status</h4>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {[
-                        { label: 'New', dbStage: 'New Lead' },
-                        { label: 'Contacted', dbStage: 'Contacted' },
-                        { label: 'Qualified', dbStage: 'Interested' },
-                        { label: 'Closed Won', dbStage: 'Converted' },
-                        { label: 'Closed Lost', dbStage: 'Not Interested' }
-                      ].map(item => {
-                        const isCurrent = lead.stage === item.dbStage || (item.dbStage === 'Interested' && ['Interested', 'Demo Scheduled', 'Demo Attended', 'Follow-up Pending'].includes(lead.stage));
-                        return (
-                          <button
-                            key={item.label}
-                            onClick={() => updateLeadStage(lead.id, item.dbStage)}
-                            style={{
-                              width: '100%',
-                              padding: '10px 16px',
-                              borderRadius: '8px',
-                              border: 'none',
-                              textAlign: 'left',
-                              fontSize: '13px',
-                              fontWeight: '600',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              background: isCurrent ? '#f1f5f9' : 'transparent',
-                              color: isCurrent ? '#1e293b' : '#64748b',
-                              transition: 'all 0.15s ease'
-                            }}
-                          >
-                            {item.label}
-                          </button>
-                        );
-                      })}
+                    <h4 style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#475569', letterSpacing: '0.05em' }}>Lead Status</h4>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px', borderRadius: '8px', border: '1px solid #f1f5f9', background: '#f8fafc' }}>
+                      <span className={`status-badge status-${lead.stage.toLowerCase().replace(/ /g, '-')}`} style={{ fontSize: '12px', padding: '3px 9px', fontWeight: '700' }}>
+                        {lead.stage}
+                      </span>
                     </div>
                   </div>
 

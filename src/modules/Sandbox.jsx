@@ -4,7 +4,7 @@ import { db } from '../firebase';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 
 export default function Sandbox() {
-  const { courses } = useCRM();
+  const { courses, setActiveView } = useCRM();
 
   // Initial field definitions
   const initialFields = [
@@ -131,6 +131,18 @@ export default function Sandbox() {
         .sandbox-split { -ms-overflow-style: none; scrollbar-width: none; }
         .sandbox-split * { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
+      <div style={{ marginBottom: '14px', display: 'flex', alignItems: 'center' }}>
+        <button
+          className="secondary-btn"
+          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '12px', fontWeight: '600' }}
+          onClick={() => setActiveView('integrations')}
+        >
+          <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+          Back to Integrations & Plugins
+        </button>
+      </div>
       <div className="welcome-header">
         <h2 className="welcome-title">Form Builder & Integrations</h2>
         <p className="welcome-subtitle">Build custom lead capture forms and embed them on any website. Directly synced with Firestore.</p>

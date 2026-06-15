@@ -195,13 +195,16 @@ export default function Sidebar() {
       <nav className="navigation-menu">
         {menuItems.map(item => {
           // Role-based tab exclusions
-          if (activeRole === 'Counselor' && (item.id === 'settings' || item.id === 'reports' || item.id === 'history')) {
+          if (activeRole === 'Counselor' && (item.id === 'settings' || item.id === 'reports' || item.id === 'history' || item.id === 'integrations')) {
             return null;
           }
           if (activeRole === 'Admin' && item.id === 'history') {
             return null;
           }
           if ((activeRole === 'Manager' || activeRole === 'Telecaller') && (item.id === 'settings' || item.id === 'reports' || item.id === 'integrations')) {
+            return null;
+          }
+          if (activeRole === 'Telecaller' && item.id === 'automation') {
             return null;
           }
           // Admin has all tabs access, no exclusions

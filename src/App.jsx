@@ -55,11 +55,12 @@ function MainAppContent() {
     const isManager = activeRole === 'Manager' || activeRole === 'Telecaller';
     const isAdmin = activeRole === 'Admin';
 
-    const isCounselorRestricted = isCounselor && ['analytics', 'sandbox', 'settings', 'history'].includes(activeView);
+    const isCounselorRestricted = isCounselor && ['analytics', 'sandbox', 'settings', 'history', 'integrations'].includes(activeView);
     const isManagerRestricted = isManager && ['sandbox', 'settings', 'analytics', 'integrations'].includes(activeView);
     const isAdminRestricted = isAdmin && ['history'].includes(activeView);
+    const isTelecallerRestricted = activeRole === 'Telecaller' && activeView === 'whatsapp';
 
-    if (isCounselorRestricted || isManagerRestricted || isAdminRestricted) {
+    if (isCounselorRestricted || isManagerRestricted || isAdminRestricted || isTelecallerRestricted) {
       setActiveView('dashboard');
       return;
     }
