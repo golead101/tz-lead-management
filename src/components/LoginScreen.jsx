@@ -138,7 +138,7 @@ export default function LoginScreen() {
 
               <button 
                 type="submit" 
-                className="primary-btn w-full mt-4 justify-center" 
+                className="primary-btn mt-4 justify-center" 
                 style={{ 
                   height: '42px', 
                   fontSize: '13.5px', 
@@ -147,10 +147,13 @@ export default function LoginScreen() {
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: 'var(--sidebar-radius, 8px)',
-                  boxShadow: '0 4px 14px var(--primary-glow)'
+                  boxShadow: '0 4px 14px var(--primary-glow)',
+                  alignSelf: 'center',
+                  padding: '0 40px',
+                  minWidth: '160px'
                 }}
               >
-                Authenticate Session
+                Login
               </button>
             </form>
 
