@@ -18,14 +18,12 @@ const BRAND_BLUE = '#2563eb';
 
 const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard, view: 'dashboard' },
-  { label: 'Analytics', icon: TrendingUp, view: 'analytics' },
   { label: 'Inbox', icon: Inbox, view: 'inbox' },
   { label: 'New Campaign', icon: Send, view: 'new-campaign' },
   { label: 'Campaigns', icon: TrendingUp, view: 'campaigns' }, // Wait, in friend's code it used BarChart3 for campaigns, we can use TrendingUp or other icons
   { label: 'Contacts', icon: Users, view: 'contacts' },
   { label: 'Templates', icon: FileText, view: 'templates' },
-  { label: 'Chatbot', icon: Bot, view: 'chatbot' },
-  { label: 'Settings', icon: Settings, view: 'settings' }
+  { label: 'Chatbot', icon: Bot, view: 'chatbot' }
 ];
 
 const GoWhatsAppLayout = ({ children, subView, setSubView }) => {
