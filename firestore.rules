@@ -21,9 +21,39 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // Default rule for all other collections (leads, courses, pipelineStages, settings, etc.)
+    // settings collection:
+    // Any user (even unauthenticated) can read the public live_form configuration.
+    // Only Admin can read other configurations (like integrations) and write settings.
+    match /settings/{documentId} {
+      allow read: if (documentId == 'live_form') || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // googleAdsLogs collection:
+    // Only Admin can read/write API validation/sync logs.
+    match /googleAdsLogs/{documentId} {
+      allow read, write: if isAdmin();
+    }
+
+    // i-frame collection:
+    // Public can submit leads, but only authenticated users can read/modify them.
+    match /i-frame/{documentId} {
+      allow create: if true;
+      allow read, update, delete: if isAuthenticated();
+    }
+
+    // crm collections (leads, courses, pipelineStages, customFields, etc.):
     // Only logged in users can read and write.
-    match /{document=**} {
+    match /leads/{documentId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /courses/{documentId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /pipelineStages/{documentId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /customFields/{documentId} {
       allow read, write: if isAuthenticated();
     }
   }

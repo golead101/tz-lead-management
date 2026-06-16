@@ -101,7 +101,7 @@ exports.googleAdsValidate = functions.https.onRequest((req, res) => {
 
       // 2. Query Google Ads API (fetch single campaign to test token and access status)
       const query = 'SELECT campaign.id, campaign.name FROM campaign LIMIT 1';
-      
+
       const headers = {
         'Authorization': `Bearer ${accessToken}`,
         'developer-token': developerToken,
@@ -621,7 +621,7 @@ exports.metaValidate = functions.https.onRequest((req, res) => {
     }
     try {
       let { verifyToken } = req.body;
-      
+
       if (!verifyToken || verifyToken.includes('•••')) {
         const stored = await getDecryptedMetaCredentials();
         verifyToken = stored.verifyToken;
@@ -630,6 +630,9 @@ exports.metaValidate = functions.https.onRequest((req, res) => {
       if (!verifyToken) {
         return res.status(400).json({ error: 'Verify Token is required.' });
       }
+
+      // Decrypt if it was passed as encrypted string
+      verifyToken = cryptoHelper.decrypt(verifyToken);
 
       // Query Meta Graph API /me endpoint to check token validity
       let response;
@@ -647,17 +650,17 @@ exports.metaValidate = functions.https.onRequest((req, res) => {
           throw meErr;
         }
       }
-      
+
       if (response.data && response.data.id) {
         const displayName = response.data.name ? `${response.data.name} (App)` : `Account ID: ${response.data.id}`;
-        return res.status(200).json({ 
-          success: true, 
-          message: `Successfully connected to Meta. Connected to ${displayName}` 
+        return res.status(200).json({
+          success: true,
+          message: `Successfully connected to Meta. Connected to ${displayName}`
         });
       } else {
-        return res.status(400).json({ 
-          success: false, 
-          error: 'Verification response did not return a valid ID.' 
+        return res.status(400).json({
+          success: false,
+          error: 'Verification response did not return a valid ID.'
         });
       }
     } catch (err) {
@@ -685,9 +688,9 @@ exports.metaWebhook = functions.https.onRequest(async (req, res) => {
       const challenge = req.query['hub.challenge'];
 
       // Quick validation using env variables to prevent function execution timeouts
-      const expectedToken = process.env.META_WEBHOOK_VERIFY_TOKEN || 
-                            process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || 
-                            'techzone_secret_verify_2026';
+      const expectedToken = process.env.META_WEBHOOK_VERIFY_TOKEN ||
+        process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN ||
+        'techzone_secret_verify_2026';
 
       if (mode === 'subscribe' && token === expectedToken) {
         console.log('Meta Webhook verified successfully via env token.');
@@ -827,7 +830,7 @@ exports.createUserAccount = functions.https.onCall(async (data, context) => {
   // Check if the caller is an Admin
   const callerUid = context.auth.uid;
   const callerDoc = await db.collection('users').doc(callerUid).get();
-  
+
   if (!callerDoc.exists || callerDoc.data().role !== 'Admin') {
     throw new functions.https.HttpsError(
       'permission-denied',
@@ -891,7 +894,7 @@ async function getDecryptedWhatsAppCredentials() {
   if (!whatsapp) {
     throw new Error('WhatsApp settings not found.');
   }
-  
+
   // Support both encrypted and plaintext access tokens
   let accessToken = whatsapp.accessToken || whatsapp.systemToken || '';
   if (accessToken && cryptoHelper && typeof cryptoHelper.decrypt === 'function') {
@@ -942,36 +945,65 @@ exports.sendWhatsAppMessage = functions.https.onRequest((req, res) => {
         return res.status(400).json({ error: 'WhatsApp integration credentials are not fully configured.' });
       }
 
-      const cleanPhone = recipientPhone.replace(/[^0-9]/g, '');
+      // ⚙️ BULLETPROOF PHONE NUMBER CLEANING (Spaces aur symbols sab saaf)
+      let cleanPhone = recipientPhone.replace(/[^0-9]/g, '').trim();
 
-      // 2. Dispatch Meta Graph API request
-      const url = `https://graph.facebook.com/${creds.apiVersion}/${creds.phoneNumberId}/messages`;
-      const payload = {
+      // Agar number sirf 10 digit ka hai toh aage 91 jodiye
+      if (cleanPhone.length === 10) {
+        cleanPhone = '91' + cleanPhone;
+      }
+      // Agar kisi wajah se number ke aage 0091 lag gaya ho toh use clean karke strict 12 digits karein
+      if (cleanPhone.startsWith('00')) {
+        cleanPhone = cleanPhone.substring(2);
+      }
+
+      // 2. SMART PAYLOAD ROUTING
+      let payload = {
         messaging_product: 'whatsapp',
         recipient_type: 'individual',
-        to: cleanPhone,
-        type: 'text',
-        text: { body: messageText }
+        to: cleanPhone
       };
 
-      console.log(`[WhatsApp CF] Sending message to ${cleanPhone}. URL: ${url}`);
+      // Rules to automatically fire approved Meta Template layout
+      if (
+        messageText.includes("demo session has been scheduled") ||
+        messageText.includes("Welcome to the institute family") ||
+        messageText.toLowerCase().includes("welcome")
+      ) {
+        payload.type = 'template';
+        payload.template = {
+          name: 'welcome_yuva',
+          language: { code: 'en_US' } // Strict locale configuration for Yuva profile
+        };
+        console.log(`[WhatsApp CF] Production trigger detected. Compiling payload via template.`);
+      } else {
+        // Normal conversation messaging layer
+        payload.type = 'text';
+        payload.text = { body: messageText };
+      }
+
+      const url = `https://graph.facebook.com/${creds.apiVersion}/${creds.phoneNumberId}/messages`;
+
+      console.log('[WhatsApp CF] Target URL:', url);
+      console.log('[WhatsApp CF] Dispatched Payload:', JSON.stringify(payload));
+
       const response = await axios.post(url, payload, {
         headers: {
-          'Authorization': `Bearer ${creds.accessToken}`,
+          'Authorization': `Bearer ${creds.accessToken.trim()}`,
           'Content-Type': 'application/json'
         }
       });
 
-      console.log('[WhatsApp CF] Meta response:', response.status, JSON.stringify(response.data));
+      console.log('[WhatsApp CF] Meta Success Response:', JSON.stringify(response.data));
       const messageId = response.data.messages?.[0]?.id;
 
-      // 3. Update lead data in Firestore
+      // 3. Update execution history records inside Firestore
       if (leadId) {
         const leadRef = db.collection('leads').doc(leadId);
         const leadSnap = await leadRef.get();
         if (leadSnap.exists) {
           const leadData = leadSnap.data();
-          
+
           const outboundMsg = {
             id: `msg-sent-${Date.now()}`,
             sender: 'counselor',
@@ -986,7 +1018,7 @@ exports.sendWhatsAppMessage = functions.https.onRequest((req, res) => {
           const nextTimeline = [...(leadData.timeline || []), {
             id: `log-wa-${Date.now()}`,
             type: 'whatsapp',
-            title: 'WhatsApp Dispatched',
+            title: payload.type === 'template' ? 'WhatsApp Template Logs' : 'WhatsApp Chat Logs',
             content: messageText,
             timestamp: new Date().toISOString(),
             user: req.body.counselorName || 'Counselor'
@@ -1004,7 +1036,7 @@ exports.sendWhatsAppMessage = functions.https.onRequest((req, res) => {
 
     } catch (err) {
       const errorMsg = err.response ? JSON.stringify(err.response.data) : err.message;
-      console.error('[WhatsApp CF] Error sending WhatsApp message:', errorMsg);
+      console.error('[WhatsApp CF] Execution Crash Stack:', errorMsg);
       return res.status(400).json({
         success: false,
         error: 'Failed to send WhatsApp message.',
@@ -1089,9 +1121,9 @@ exports.whatsappWebhook = functions.https.onRequest((req, res) => {
             const lead = doc.data();
             if (lead.phone) {
               const cleanedLeadPhone = lead.phone.replace(/[^0-9]/g, '');
-              if (cleanedLeadPhone === cleanedSenderPhone || 
-                  (cleanedLeadPhone.length >= 10 && cleanedSenderPhone.length >= 10 && 
-                   cleanedLeadPhone.slice(-10) === cleanedSenderPhone.slice(-10))) {
+              if (cleanedLeadPhone === cleanedSenderPhone ||
+                (cleanedLeadPhone.length >= 10 && cleanedSenderPhone.length >= 10 &&
+                  cleanedLeadPhone.slice(-10) === cleanedSenderPhone.slice(-10))) {
                 matchedLeadRef = doc.ref;
                 matchedLeadData = lead;
               }
@@ -1109,7 +1141,7 @@ exports.whatsappWebhook = functions.https.onRequest((req, res) => {
 
           if (matchedLeadRef && matchedLeadData) {
             console.log(`[WhatsApp Webhook] Appending to lead: ${matchedLeadData.name}`);
-            
+
             const updatedChat = [...(matchedLeadData.whatsappMessages || []), inboundMsg];
             const nextTimeline = [...(matchedLeadData.timeline || []), {
               id: `log-wa-in-${Date.now()}`,
@@ -1128,7 +1160,7 @@ exports.whatsappWebhook = functions.https.onRequest((req, res) => {
 
           } else {
             console.log(`[WhatsApp Webhook] Creating new lead for phone ${senderPhoneRaw}`);
-            
+
             let formattedPhone = senderPhoneRaw;
             if (senderPhoneRaw.startsWith('91') && senderPhoneRaw.length === 12) {
               formattedPhone = `+91 ${senderPhoneRaw.slice(2, 7)} ${senderPhoneRaw.slice(7)}`;

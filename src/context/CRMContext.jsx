@@ -54,11 +54,11 @@ const DEFAULT_INTEGRATIONS = {
   meta: {
     enabled: false,
     status: 'Setup Required',
-    appId: '',
-    appSecret: '',
-    webhookVerifyToken: '',
-    verifyToken: '',
-    redirectUri: '',
+    appId: import.meta.env.META_APP_ID || '',
+    appSecret: import.meta.env.META_APP_SECRET || '',
+    webhookVerifyToken: import.meta.env.META_WEBHOOK_VERIFY_TOKEN || '',
+    verifyToken: import.meta.env.VERIFY_TOKEN || '',
+    redirectUri: import.meta.env.META_REDIRECT_URI || '',
     simulatedLeadsCount: 1247
   },
   google: {
@@ -74,14 +74,14 @@ const DEFAULT_INTEGRATIONS = {
     simulatedLeadsCount: 892
   },
   whatsapp: {
-    enabled: false,
-    status: 'Setup Required',
-    phoneNumberId: '',
-    businessAccountId: '',
-    systemToken: '',
-    accessToken: '',
-    apiVersion: 'v20.0',
-    webhookVerifyToken: '',
+    enabled: true,
+    status: 'Connected',
+    phoneNumberId: import.meta.env.WHATSAPP_PHONE_NUMBER_ID || '',
+    businessAccountId: import.meta.env.WHATSAPP_BUSINESS_ACCOUNT_ID || '',
+    systemToken: import.meta.env.WHATSAPP_ACCESS_TOKEN || '',
+    accessToken: import.meta.env.WHATSAPP_ACCESS_TOKEN || '',
+    apiVersion: import.meta.env.WHATSAPP_API_VERSION || 'v20.0',
+    webhookVerifyToken: import.meta.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || '',
     simulatedLeadsCount: 645
   },
   webhooks: {
@@ -425,7 +425,56 @@ export const CRMProvider = ({ children }) => {
       integrationsUnsub = onSnapshot(doc(db, 'settings', 'integrations'), (snapshot) => {
         if (!active) return;
         if (snapshot.exists()) {
-          setIntegrations(snapshot.data());
+          const data = snapshot.data();
+          const whatsappData = data.whatsapp || {};
+          const metaData = data.meta || {};
+          const hasEnvConfig = import.meta.env.WHATSAPP_PHONE_NUMBER_ID && import.meta.env.WHATSAPP_ACCESS_TOKEN;
+          const hasMetaEnv = import.meta.env.META_APP_ID;
+
+          const whatsappNeedsSync = hasEnvConfig && (
+            !whatsappData.enabled || 
+            whatsappData.phoneNumberId !== import.meta.env.WHATSAPP_PHONE_NUMBER_ID ||
+            (whatsappData.accessToken || whatsappData.systemToken) !== import.meta.env.WHATSAPP_ACCESS_TOKEN
+          );
+
+          const metaNeedsSync = hasMetaEnv && (
+            metaData.appId !== import.meta.env.META_APP_ID
+          );
+
+          if (whatsappNeedsSync || metaNeedsSync) {
+            const updatedWhatsapp = whatsappNeedsSync ? {
+              ...whatsappData,
+              enabled: true,
+              status: 'Connected',
+              phoneNumberId: import.meta.env.WHATSAPP_PHONE_NUMBER_ID,
+              businessAccountId: import.meta.env.WHATSAPP_BUSINESS_ACCOUNT_ID || whatsappData.businessAccountId || '',
+              accessToken: import.meta.env.WHATSAPP_ACCESS_TOKEN,
+              systemToken: import.meta.env.WHATSAPP_ACCESS_TOKEN,
+              apiVersion: import.meta.env.WHATSAPP_API_VERSION || whatsappData.apiVersion || 'v20.0',
+              webhookVerifyToken: import.meta.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || whatsappData.webhookVerifyToken || ''
+            } : whatsappData;
+
+            const updatedMeta = metaNeedsSync ? {
+              ...metaData,
+              appId: import.meta.env.META_APP_ID,
+              appSecret: import.meta.env.META_APP_SECRET || metaData.appSecret || '',
+              webhookVerifyToken: import.meta.env.META_WEBHOOK_VERIFY_TOKEN || metaData.webhookVerifyToken || '',
+              verifyToken: import.meta.env.VERIFY_TOKEN || metaData.verifyToken || '',
+              redirectUri: import.meta.env.META_REDIRECT_URI || metaData.redirectUri || ''
+            } : metaData;
+
+            const updatedData = {
+              ...data,
+              whatsapp: updatedWhatsapp,
+              meta: updatedMeta
+            };
+
+            setDoc(doc(db, 'settings', 'integrations'), updatedData)
+              .then(() => console.log("Automatically synchronized WhatsApp/Meta env credentials to Firestore."))
+              .catch(err => console.error("Auto-syncing credentials failed:", err));
+          } else {
+            setIntegrations(data);
+          }
         } else {
           setDoc(doc(db, 'settings', 'integrations'), DEFAULT_INTEGRATIONS)
             .catch(err => console.error("Firestore settings/integrations initialization failed:", err));
@@ -1214,13 +1263,11 @@ export const CRMProvider = ({ children }) => {
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
 
-    let updatedLead = null;
-    const nextLeads = leads.map(lead => {
-      if (lead.id === leadId) {
-        updatedLead = {
-          ...lead,
-          whatsappMessages: [...(lead.whatsappMessages || []), inboundMsg],
-          timeline: [
+    setLeads(prevLeads => {
+      return prevLeads.map(lead => {
+        if (lead.id === leadId) {
+          const updatedChat = [...(lead.whatsappMessages || []), inboundMsg];
+          const nextTimeline = [
             ...(lead.timeline || []),
             {
               id: `log-wa-in-${Date.now()}`,
@@ -1230,22 +1277,25 @@ export const CRMProvider = ({ children }) => {
               timestamp: new Date().toISOString(),
               user: 'System'
             }
-          ]
-        };
-        return updatedLead;
-      }
-      return lead;
-    });
+          ];
 
-    if (isFirebaseEnabled && updatedLead) {
-      setDoc(doc(db, 'leads', leadId), updatedLead)
-        .catch(err => {
-          console.error("Firestore triggerSimulatedBotReply failed, falling back to local update:", err);
-          setLeads(nextLeads);
-        });
-    } else {
-      setLeads(nextLeads);
-    }
+          const updatedLead = {
+            ...lead,
+            whatsappMessages: updatedChat,
+            timeline: nextTimeline
+          };
+
+          if (isFirebaseEnabled) {
+            setDoc(doc(db, 'leads', leadId), updatedLead).catch(err => {
+              console.error("Firestore triggerSimulatedBotReply failed:", err);
+            });
+          }
+
+          return updatedLead;
+        }
+        return lead;
+      });
+    });
 
     // Trigger local alert
     setNotifications(prev => [
