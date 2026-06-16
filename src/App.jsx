@@ -9,6 +9,7 @@ import GridView from './modules/GridView';
 import DetailTimeline from './modules/DetailTimeline';
 import WhatsAppConsole from './modules/WhatsAppConsole';
 import Analytics from './modules/Analytics';
+import GoWhatsApp from './modules/gowhatsapp/GoWhatsApp';
 import Sandbox from './modules/Sandbox';
 import ConfigSettings from './modules/ConfigSettings';
 import Integrations from './modules/Integrations';
@@ -58,7 +59,7 @@ function MainAppContent() {
     const isCounselorRestricted = isCounselor && ['analytics', 'sandbox', 'settings', 'history', 'integrations'].includes(activeView);
     const isManagerRestricted = isManager && ['sandbox', 'settings', 'analytics', 'integrations'].includes(activeView);
     const isAdminRestricted = isAdmin && ['history'].includes(activeView);
-    const isTelecallerRestricted = activeRole === 'Telecaller' && activeView === 'whatsapp';
+    const isTelecallerRestricted = activeRole === 'Telecaller' && (activeView === 'whatsapp' || activeView === 'gowhatsapp');
 
     if (isCounselorRestricted || isManagerRestricted || isAdminRestricted || isTelecallerRestricted) {
       setActiveView('dashboard');
@@ -94,6 +95,8 @@ function MainAppContent() {
         return <FollowUps />;
       case 'whatsapp':
         return <WhatsAppConsole />;
+      case 'gowhatsapp':
+        return <GoWhatsApp />;
       case 'analytics':
         return <Analytics />;
       case 'sandbox':
@@ -112,13 +115,13 @@ function MainAppContent() {
   return (
     <div className="app-container">
       {/* Visual Navigation Sidebar */}
-      <Sidebar />
+      {activeView !== 'gowhatsapp' && <Sidebar />}
 
       {/* Core main dashboard panel */}
-      <div className="main-wrapper">
+      <div className="main-wrapper" style={activeView === 'gowhatsapp' ? { padding: 0 } : {}}>
         {/* Responsive Scrolling Canvas */}
-        <main className="content-area">
-          <div className="fade-in">
+        <main className="content-area" style={activeView === 'gowhatsapp' ? { padding: 0 } : {}}>
+          <div className="fade-in" style={activeView === 'gowhatsapp' ? { height: '100%' } : {}}>
             {renderView()}
           </div>
         </main>
