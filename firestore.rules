@@ -1,60 +1,207 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Function to check if user is logged in
+
+    // ─────────────────────────────────────────────
+    // Helper: check authentication
+    // ─────────────────────────────────────────────
     function isAuthenticated() {
       return request.auth != null;
     }
-    
-    // Function to check if the caller is an Admin
+
+    // Helper: fetch the calling user's document from Firestore
+    function userData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // Helper: role checks (roles: Admin, Counselor, Telecaller)
     function isAdmin() {
-      return isAuthenticated() && 
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin';
+      return isAuthenticated() && userData().role == 'Admin';
     }
 
-    // users collection:
-    // Any user can read their own profile.
-    // Only Admin can read everyone or create/edit users.
+    function isCounselor() {
+      return isAuthenticated() && userData().role == 'Counselor';
+    }
+
+    function isTelecaller() {
+      return isAuthenticated() && userData().role == 'Telecaller';
+    }
+
+    // Any internal staff member
+    function isStaff() {
+      return isAdmin() || isCounselor() || isTelecaller();
+    }
+
+    // ─────────────────────────────────────────────
+    // /users collection
+    //  Admin       → full read/write on all user documents
+    //  Counselor/Telecaller → read their own profile only
+    // ─────────────────────────────────────────────
     match /users/{userId} {
-      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
-      allow write: if isAdmin();
+      allow read: if isAuthenticated() &&
+                     (request.auth.uid == userId || isAdmin());
+      allow create, update, delete: if isAdmin();
     }
 
-    // settings collection:
-    // Any user (even unauthenticated) can read the public live_form configuration.
-    // Only Admin can read other configurations (like integrations) and write settings.
+    // ─────────────────────────────────────────────
+    // /leads collection
+    //  Admin      → full read & write on all leads
+    //  Counselor  → read & update only their assigned leads
+    //               (lead.counselor == their display name)
+    //  Telecaller → read all leads (to call them),
+    //               update allowed fields only (stage, followUpDate,
+    //               timeline, notes, whatsappMessages, lastContacted,
+    //               callAttempts, status)
+    //               cannot delete or create leads
+    // ─────────────────────────────────────────────
+    match /leads/{leadId} {
+      // Read access
+      allow read: if isAdmin();
+      allow read: if isCounselor() &&
+                     resource.data.counselor == userData().name;
+      allow read: if isTelecaller(); // Telecallers read all leads to call
+
+      // Create: Admin only
+      allow create: if isAdmin();
+
+      // Update: Admin unrestricted
+      allow update: if isAdmin();
+      // Counselor: only their assigned leads
+      allow update: if isCounselor() &&
+                       resource.data.counselor == userData().name;
+      // Telecaller: only safe fields
+      allow update: if isTelecaller() &&
+                       request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['stage', 'followUpDate', 'timeline',
+                                   'notes', 'whatsappMessages', 'lastContacted',
+                                   'callAttempts', 'status']);
+
+      // Delete: Admin only
+      allow delete: if isAdmin();
+    }
+
+    // ─────────────────────────────────────────────
+    // /settings collection
+    //  live_form       → public read (contact form on website)
+    //  whatsapp/other  → Admin read/write;
+    //                    Counselor & Telecaller can read chatbot settings
+    // ─────────────────────────────────────────────
     match /settings/{documentId} {
-      allow read: if (documentId == 'live_form') || isAdmin();
+      // Public: live_form config readable by anyone (website iframe)
+      allow read: if documentId == 'live_form';
+
+      // WhatsApp chatbot settings readable by all staff
+      allow read: if isStaff() &&
+                     (documentId == 'whatsapp_chatbot' ||
+                      documentId == 'whatsapp_api');
+
+      // Admin reads and writes everything
+      allow read:  if isAdmin();
       allow write: if isAdmin();
     }
 
-    // googleAdsLogs collection:
-    // Only Admin can read/write API validation/sync logs.
+    // ─────────────────────────────────────────────
+    // /whatsapp_templates collection
+    //  Admin      → full CRUD (create, edit, delete templates)
+    //  Counselor  → read only (to select templates when messaging)
+    //  Telecaller → read only
+    // ─────────────────────────────────────────────
+    match /whatsapp_templates/{templateId} {
+      allow read:  if isStaff();
+      allow write: if isAdmin();
+    }
+
+    // ─────────────────────────────────────────────
+    // /whatsapp_campaigns collection
+    //  Admin      → full CRUD
+    //  Counselor  → read only (view campaign results)
+    //  Telecaller → read only
+    // ─────────────────────────────────────────────
+    match /whatsapp_campaigns/{campaignId} {
+      allow read:  if isStaff();
+      allow write: if isAdmin();
+    }
+
+    // ─────────────────────────────────────────────
+    // /whatsapp_contact_lists collection
+    //  Admin      → full CRUD
+    //  Counselor  → read only (to pick a list when sending)
+    //  Telecaller → read only
+    // ─────────────────────────────────────────────
+    match /whatsapp_contact_lists/{listId} {
+      allow read:  if isStaff();
+      allow write: if isAdmin();
+    }
+
+    // ─────────────────────────────────────────────
+    // /whatsapp_contacts collection
+    //  Admin      → full CRUD
+    //  Counselor  → read only
+    //  Telecaller → read only
+    // ─────────────────────────────────────────────
+    match /whatsapp_contacts/{docId} {
+      allow read:  if isStaff();
+      allow write: if isAdmin();
+    }
+
+    // ─────────────────────────────────────────────
+    // /whatsapp_recipients collection
+    //  Admin      → full CRUD
+    //  Counselor  → read only (view who received campaign messages)
+    //  Telecaller → read only
+    // ─────────────────────────────────────────────
+    match /whatsapp_recipients/{docId} {
+      allow read:  if isStaff();
+      allow write: if isAdmin();
+    }
+
+    // ─────────────────────────────────────────────
+    // /courses collection
+    //  Admin              → full CRUD
+    //  Counselor/Telecaller → read only
+    // ─────────────────────────────────────────────
+    match /courses/{courseId} {
+      allow read:  if isStaff();
+      allow write: if isAdmin();
+    }
+
+    // ─────────────────────────────────────────────
+    // /pipelineStages collection
+    //  Admin              → full CRUD
+    //  Counselor/Telecaller → read only
+    // ─────────────────────────────────────────────
+    match /pipelineStages/{stageId} {
+      allow read:  if isStaff();
+      allow write: if isAdmin();
+    }
+
+    // ─────────────────────────────────────────────
+    // /customFields collection
+    //  Admin              → full CRUD
+    //  Counselor/Telecaller → read only
+    // ─────────────────────────────────────────────
+    match /customFields/{fieldId} {
+      allow read:  if isStaff();
+      allow write: if isAdmin();
+    }
+
+    // ─────────────────────────────────────────────
+    // /googleAdsLogs collection
+    //  Admin only — API sync logs are sensitive
+    // ─────────────────────────────────────────────
     match /googleAdsLogs/{documentId} {
       allow read, write: if isAdmin();
     }
 
-    // i-frame collection:
-    // Public can submit leads, but only authenticated users can read/modify them.
+    // ─────────────────────────────────────────────
+    // /i-frame collection (live enquiry form submissions)
+    //  Anyone can submit a new lead (create)
+    //  Only authenticated staff can read/update/delete
+    // ─────────────────────────────────────────────
     match /i-frame/{documentId} {
       allow create: if true;
-      allow read, update, delete: if isAuthenticated();
+      allow read, update, delete: if isStaff();
     }
 
-    // crm collections (leads, courses, pipelineStages, customFields, etc.):
-    // Only logged in users can read and write.
-    match /leads/{documentId} {
-      allow read, write: if isAuthenticated();
-    }
-    match /courses/{documentId} {
-      allow read, write: if isAuthenticated();
-    }
-    match /pipelineStages/{documentId} {
-      allow read, write: if isAuthenticated();
-    }
-    match /customFields/{documentId} {
-      allow read, write: if isAuthenticated();
-    }
   }
 }
