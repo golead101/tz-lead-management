@@ -766,7 +766,8 @@ export const CRMProvider = ({ children }) => {
           if (integrations.whatsapp.enabled && lead.phone) {
             const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'leads-management-tz';
             const url = `https://us-central1-${projectId}.cloudfunctions.net/sendWhatsAppMessage`;
-            
+            // Normalize to E.164: remove all non-digits, then prepend single '+'
+            const normalizedPhone1 = `+${lead.phone.replace(/\D/g, '')}`;
             fetch(url, {
               method: 'POST',
               headers: {
@@ -774,7 +775,7 @@ export const CRMProvider = ({ children }) => {
               },
               body: JSON.stringify({
                 leadId: leadId,
-                recipientPhone: lead.phone,
+                recipientPhone: normalizedPhone1,
                 messageText: autoMsg,
                 counselorName: 'Automation Server'
               })
@@ -890,7 +891,8 @@ export const CRMProvider = ({ children }) => {
             if (integrations.whatsapp.enabled && lead.phone) {
               const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'leads-management-tz';
               const url = `https://us-central1-${projectId}.cloudfunctions.net/sendWhatsAppMessage`;
-              
+              // Normalize to E.164: remove all non-digits, then prepend single '+'
+              const normalizedPhone2 = `+${lead.phone.replace(/\D/g, '')}`;
               fetch(url, {
                 method: 'POST',
                 headers: {
@@ -898,7 +900,7 @@ export const CRMProvider = ({ children }) => {
                 },
                 body: JSON.stringify({
                   leadId: leadId,
-                  recipientPhone: lead.phone,
+                  recipientPhone: normalizedPhone2,
                   messageText: autoMsg,
                   counselorName: 'Automation Server'
                 })
@@ -1169,7 +1171,13 @@ export const CRMProvider = ({ children }) => {
       if (activeLead && activeLead.phone) {
         const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'leads-management-tz';
         const url = `https://us-central1-${projectId}.cloudfunctions.net/sendWhatsAppMessage`;
-        
+
+        // Normalize phone to valid E.164: strip everything except digits, then prepend a single '+'
+        // This fixes numbers like "++91 95154 77327", "+91-98765-43210", "0091...", etc.
+        const rawPhone = activeLead.phone;
+        const digitsOnly = rawPhone.replace(/\D/g, '');
+        const normalizedPhone = digitsOnly ? `+${digitsOnly}` : rawPhone;
+
         fetch(url, {
           method: 'POST',
           headers: {
@@ -1177,7 +1185,7 @@ export const CRMProvider = ({ children }) => {
           },
           body: JSON.stringify({
             leadId: leadId,
-            recipientPhone: activeLead.phone,
+            recipientPhone: normalizedPhone,
             messageText: messageText,
             counselorName: activeUser
           })
@@ -1246,14 +1254,31 @@ export const CRMProvider = ({ children }) => {
   };
 
   const triggerSimulatedBotReply = (leadId, studentName, outgoingText) => {
+    let coursesText = 'We offer the following programs:\n1. Full-Stack Web Development (6 Months)\n2. Data Science & AI (8 Months)\n3. Cloud & DevOps Engineering (5 Months)\n4. Cyber Security (6 Months)\n5. UI/UX Product Design (4 Months)\n\nReply with the course number to get fee details!';
+    let feeDetails = 'Our program fee structures are:\n- Web Development: ₹75,000\n- Data Science & AI: ₹95,000\n- Cloud & DevOps: ₹80,000\n- Cyber Security: ₹85,000\n- UI/UX Design: ₹60,000\n\nScholarships and monthly installment plans (EMIs starting at ₹5,000/month) are available. Let us know if you want to speak to a counselor.';
+    
+    try {
+      const storedSettings = localStorage.getItem('gowha_chatbot');
+      if (storedSettings) {
+        const parsed = JSON.parse(storedSettings);
+        if (parsed.coursesText) coursesText = parsed.coursesText;
+        if (parsed.feeDetails) feeDetails = parsed.feeDetails;
+      }
+    } catch (e) {
+      console.error("Failed to parse chatbot settings:", e);
+    }
+
     let reply = `Thanks for sending that over! I am checking it out now. Let me know when is the best time to speak.`;
     
-    if (outgoingText.includes('syllabus') || outgoingText.includes('brochure') || outgoingText.toLowerCase().includes('pdf')) {
+    const lowerText = outgoingText.toLowerCase();
+    if (lowerText.includes('syllabus') || lowerText.includes('brochure') || lowerText.includes('pdf')) {
       reply = `Got the syllabus details, thank you! The module outline look really exhaustive. Can you tell me if there are internship placements after graduation?`;
-    } else if (outgoingText.includes('demo') || outgoingText.includes('join') || outgoingText.includes('Zoom')) {
+    } else if (lowerText.includes('demo') || lowerText.includes('join') || lowerText.includes('zoom')) {
       reply = `Yes, I have noted down the time. I will definitely attend the demo session. Thanks!`;
-    } else if (outgoingText.includes('fees') || outgoingText.includes('fee') || outgoingText.includes('payment')) {
-      reply = `Okay, the fees structure is clear. Do you offer monthly EMI payments or a student loan option?`;
+    } else if (lowerText.includes('fees') || lowerText.includes('fee') || lowerText.includes('payment') || lowerText.includes('cost') || lowerText.includes('price')) {
+      reply = feeDetails;
+    } else if (lowerText.includes('course') || lowerText.includes('program') || lowerText.includes('learn') || lowerText.includes('study')) {
+      reply = coursesText;
     }
 
     const inboundMsg = {

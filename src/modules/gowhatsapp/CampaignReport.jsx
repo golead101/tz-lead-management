@@ -4,10 +4,10 @@ import {
   CheckCheck, ArrowRight, AlertTriangle, MessageSquare, Download
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { mockDb } from './mockData';
+import { whatsappDb } from './whatsappDb';
+import { useCRM } from '../../context/CRMContext';
 
 const BRAND_BLUE = '#2563eb';
-
 export default function CampaignReport({ campaignId, setSubView }) {
   const [campaign, setCampaign] = useState(null);
   const [recipients, setRecipients] = useState([]);
@@ -22,9 +22,11 @@ export default function CampaignReport({ campaignId, setSubView }) {
   const [extractListName, setExtractListName] = useState('');
   const [extractSubmitting, setExtractSubmitting] = useState(false);
 
+  const { leads } = useCRM();
+
   useEffect(() => {
     loadCampaign();
-  }, [campaignId]);
+  }, [campaignId, leads]);
 
   const loadCampaign = () => {
     if (!campaignId) {
@@ -33,13 +35,64 @@ export default function CampaignReport({ campaignId, setSubView }) {
     }
 
     try {
-      const camps = mockDb.getCampaigns();
+      const camps = whatsappDb.getCampaigns();
       const targetCamp = camps.find(c => c.id === campaignId);
-      setCampaign(targetCamp || null);
+      if (!targetCamp) {
+        setCampaign(null);
+        setLoading(false);
+        return;
+      }
 
-      const allRecipients = mockDb.getRecipients();
+      const allRecipients = whatsappDb.getRecipients();
       const list = allRecipients[campaignId] || [];
-      setRecipients(list);
+
+      const campaignTime = targetCamp.createdAt?._seconds 
+        ? targetCamp.createdAt._seconds * 1000 
+        : new Date(targetCamp.createdAt).getTime();
+
+      const getMsgTimestamp = (msg) => {
+        if (msg.timestamp) {
+          return typeof msg.timestamp === 'object' && msg.timestamp._seconds
+            ? msg.timestamp._seconds * 1000
+            : new Date(msg.timestamp).getTime();
+        }
+        const match = msg.id ? msg.id.match(/\d+$/) : null;
+        return match ? parseInt(match[0], 10) : Date.now();
+      };
+
+      const updatedList = list.map(r => {
+        const cleanRepPhone = r.phone.replace(/\D/g, '');
+        const lead = leads.find(l => l.phone && l.phone.replace(/\D/g, '') === cleanRepPhone);
+        const msgs = lead?.whatsappMessages || [];
+        const hasReplied = msgs.some(m => {
+          const isIncoming = m.sender === 'lead' || m.direction === 'inbound';
+          if (!isIncoming) return false;
+          const msgTime = getMsgTimestamp(m);
+          return msgTime >= campaignTime - 5000; // 5s buffer
+        });
+        return {
+          ...r,
+          replied: hasReplied
+        };
+      });
+
+      setRecipients(updatedList);
+
+      const repliedCount = updatedList.filter(r => r.replied).length;
+      const updatedCamp = {
+        ...targetCamp,
+        replied: repliedCount
+      };
+      setCampaign(updatedCamp);
+
+      // Save back to db if changed to keep dashboard/analytics synced
+      if (targetCamp.replied !== repliedCount) {
+        const updatedCamps = camps.map(c => c.id === campaignId ? updatedCamp : c);
+        whatsappDb.saveCampaigns(updatedCamps);
+        
+        allRecipients[campaignId] = updatedList;
+        whatsappDb.saveRecipients(allRecipients);
+      }
     } catch (error) {
       console.error('Failed to load campaign report:', error);
     } finally {
@@ -123,7 +176,7 @@ export default function CampaignReport({ campaignId, setSubView }) {
       const newListName = extractListName || `${campaign.name} - Extracted`;
       
       const newLists = [
-        ...mockDb.getContactLists(),
+        ...whatsappDb.getContactLists(),
         {
           id: listId,
           name: newListName,
@@ -133,11 +186,11 @@ export default function CampaignReport({ campaignId, setSubView }) {
         }
       ];
 
-      const allContacts = mockDb.getContacts();
+      const allContacts = whatsappDb.getContacts();
       allContacts[listId] = extracted.map((r, i) => ({ id: `c-${Date.now()}-${i}`, name: r.name, phone: r.phone }));
 
-      mockDb.saveContactLists(newLists);
-      mockDb.saveContacts(allContacts);
+      whatsappDb.saveContactLists(newLists);
+      whatsappDb.saveContacts(allContacts);
 
       setExtractSubmitting(false);
       setExtractOpen(false);

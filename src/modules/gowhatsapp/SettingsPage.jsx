@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Settings, CheckCircle, XCircle, Phone, Send, AlertCircle, ExternalLink } from 'lucide-react';
-import { mockDb } from './mockData';
+import { whatsappDb } from './whatsappDb';
 
 const BRAND_BLUE = '#2563eb';
 
@@ -21,7 +21,7 @@ export default function SettingsPage() {
 
   const checkStatus = () => {
     try {
-      const statusData = mockDb.getApiStatus();
+      const statusData = whatsappDb.getApiStatus();
       setStatus(statusData);
     } catch (error) {
       setStatus({ ok: false, error: 'Failed to connect' });

@@ -3,7 +3,8 @@ import {
   Users, Upload, Trash2, FileSpreadsheet, Eye, Edit3, Plus, Save, X, Check, Download, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { mockDb } from './mockData';
+import { whatsappDb } from './whatsappDb';
+import { useCRM } from '../../context/CRMContext';
 
 const BRAND_BLUE = '#2563eb';
 
@@ -35,19 +36,49 @@ export default function ContactsPage() {
   const [manualRows, setManualRows] = useState([{}, {}, {}]);
   const [savingManual, setSavingManual] = useState(false);
 
+  const { leads, addLead, updateLead, deleteLead } = useCRM();
+
   useEffect(() => {
     loadLists();
-  }, []);
+  }, [leads.length]);
 
   const loadLists = () => {
     try {
-      const data = mockDb.getContactLists();
-      setLists(data);
+      const data = whatsappDb.getContactLists();
+      
+      const crmList = {
+        id: 'crm-leads-all',
+        name: 'Active CRM Leads (Live)',
+        contactCount: leads.length,
+        columns: ['name', 'phone', 'course', 'stage', 'counselor'],
+        createdAt: new Date().toISOString(),
+        isLive: true
+      };
+
+      setLists([crmList, ...data]);
     } catch (error) {
       console.error('Failed to load lists:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const importContactsAsCRMLeads = (contactsList, sourceName) => {
+    contactsList.forEach(contact => {
+      let phone = String(contact.phone || contact.Phone || '').trim();
+      if (!phone) return;
+      const cleanPhone = phone.replace(/\D/g, '');
+      const existing = leads.find(l => l.phone.replace(/\D/g, '') === cleanPhone);
+      if (!existing) {
+        addLead({
+          name: contact.name || contact.Name || 'Campaign Contact',
+          phone: phone,
+          course: contact.course || contact.Course || '',
+          source: 'WhatsApp Upload',
+          subSource: sourceName
+        });
+      }
+    });
   };
 
   const handleFileUpload = (e) => {
@@ -75,7 +106,7 @@ export default function ContactsPage() {
         const listName = file.name.replace(/\.[^.]+$/, '');
 
         // Save list record
-        const currentLists = mockDb.getContactLists();
+        const currentLists = whatsappDb.getContactLists();
         const updatedLists = [
           ...currentLists,
           {
@@ -86,12 +117,15 @@ export default function ContactsPage() {
             createdAt: new Date().toISOString()
           }
         ];
-        mockDb.saveContactLists(updatedLists);
+        whatsappDb.saveContactLists(updatedLists);
 
         // Save contacts details
-        const allContacts = mockDb.getContacts();
+        const allContacts = whatsappDb.getContacts();
         allContacts[listId] = jsonData.map((c, i) => ({ id: `c-${Date.now()}-${i}`, ...c }));
-        mockDb.saveContacts(allContacts);
+        whatsappDb.saveContacts(allContacts);
+
+        // Import into active leads
+        importContactsAsCRMLeads(jsonData, listName);
 
         setLists(updatedLists);
         alert(`Successfully uploaded "${listName}" with ${jsonData.length} contacts.`);
@@ -122,7 +156,7 @@ export default function ContactsPage() {
       const listName = manualListName.trim() || `Manual List - ${new Date().toLocaleDateString()}`;
 
       const updatedLists = [
-        ...lists,
+        ...whatsappDb.getContactLists(),
         {
           id: listId,
           name: listName,
@@ -132,11 +166,14 @@ export default function ContactsPage() {
         }
       ];
 
-      const allContacts = mockDb.getContacts();
+      const allContacts = whatsappDb.getContacts();
       allContacts[listId] = validRows.map((r, i) => ({ id: `c-${Date.now()}-${i}`, ...r }));
 
-      mockDb.saveContactLists(updatedLists);
-      mockDb.saveContacts(allContacts);
+      whatsappDb.saveContactLists(updatedLists);
+      whatsappDb.saveContacts(allContacts);
+
+      // Import into active leads
+      importContactsAsCRMLeads(validRows, listName);
 
       setLists(updatedLists);
       setCreatingManual(false);
@@ -147,13 +184,14 @@ export default function ContactsPage() {
   const handleDelete = (id) => {
     if (!confirm('Delete this contact list?')) return;
     try {
-      const updated = lists.filter(l => l.id !== id);
-      mockDb.saveContactLists(updated);
+      const currentLists = whatsappDb.getContactLists();
+      const updated = currentLists.filter(l => l.id !== id);
+      whatsappDb.saveContactLists(updated);
       setLists(updated);
 
-      const allContacts = mockDb.getContacts();
+      const allContacts = whatsappDb.getContacts();
       delete allContacts[id];
-      mockDb.saveContacts(allContacts);
+      whatsappDb.saveContacts(allContacts);
     } catch (error) {
       alert('Failed to delete list');
     }
@@ -167,9 +205,13 @@ export default function ContactsPage() {
     setViewPage(1);
 
     setTimeout(() => {
-      const allContacts = mockDb.getContacts();
-      const contacts = allContacts[list.id] || [];
-      setViewContacts(contacts);
+      if (list.isLive) {
+        setViewContacts(leads);
+      } else {
+        const allContacts = whatsappDb.getContacts();
+        const contacts = allContacts[list.id] || [];
+        setViewContacts(contacts);
+      }
       setViewLoading(false);
     }, 300);
   };
@@ -180,7 +222,7 @@ export default function ContactsPage() {
       return;
     }
     const cols = (list.columns && list.columns.length ? list.columns : Object.keys(contacts[0] || {}))
-      .filter(c => c !== 'id');
+      .filter(c => c !== 'id' && c !== 'timeline' && c !== 'whatsappMessages');
     const safeName = (list.name || 'contacts').replace(/[\\/:*?"<>|]+/g, '_').slice(0, 80);
     const stringify = (v) => (v === null || v === undefined) ? '' : String(v);
 
@@ -239,9 +281,13 @@ export default function ContactsPage() {
   const handleExportList = (list, format = 'xlsx') => {
     setExportingListId(list.id);
     setTimeout(() => {
-      const allContacts = mockDb.getContacts();
-      const contacts = allContacts[list.id] || [];
-      downloadContacts(list, contacts, format);
+      if (list.isLive) {
+        downloadContacts(list, leads, format);
+      } else {
+        const allContacts = whatsappDb.getContacts();
+        const contacts = allContacts[list.id] || [];
+        downloadContacts(list, contacts, format);
+      }
       setExportingListId(null);
     }, 500);
   };
@@ -261,15 +307,20 @@ export default function ContactsPage() {
     setSavingContact(true);
 
     setTimeout(() => {
-      const updatedContacts = viewContacts.map(c => 
-        c.id === editingContactId ? { ...c, ...editValues } : c
-      );
-      
-      const allContacts = mockDb.getContacts();
-      allContacts[viewingList.id] = updatedContacts;
-      mockDb.saveContacts(allContacts);
+      if (viewingList.isLive) {
+        updateLead(editingContactId, editValues);
+        setViewContacts(prev => prev.map(c => c.id === editingContactId ? { ...c, ...editValues } : c));
+      } else {
+        const updatedContacts = viewContacts.map(c => 
+          c.id === editingContactId ? { ...c, ...editValues } : c
+        );
+        
+        const allContacts = whatsappDb.getContacts();
+        allContacts[viewingList.id] = updatedContacts;
+        whatsappDb.saveContacts(allContacts);
 
-      setViewContacts(updatedContacts);
+        setViewContacts(updatedContacts);
+      }
       setEditingContactId(null);
       setSavingContact(false);
     }, 500);
@@ -278,16 +329,19 @@ export default function ContactsPage() {
   const deleteContact = (contactId) => {
     if (!viewingList || !confirm('Delete this contact?')) return;
     try {
-      const updatedContacts = viewContacts.filter(c => c.id !== contactId);
-      
-      const allContacts = mockDb.getContacts();
-      allContacts[viewingList.id] = updatedContacts;
-      mockDb.saveContacts(allContacts);
+      if (viewingList.isLive) {
+        deleteLead(contactId);
+        setViewContacts(prev => prev.filter(c => c.id !== contactId));
+      } else {
+        const updatedContacts = viewContacts.filter(c => c.id !== contactId);
+        
+        const allContacts = whatsappDb.getContacts();
+        allContacts[viewingList.id] = updatedContacts;
+        whatsappDb.saveContacts(allContacts);
 
-      // Update count on card list
-      setLists(prev => prev.map(l => l.id === viewingList.id ? { ...l, contactCount: updatedContacts.length } : l));
-
-      setViewContacts(updatedContacts);
+        setViewContacts(updatedContacts);
+      }
+      setLists(prev => prev.map(l => l.id === viewingList.id ? { ...l, contactCount: viewingList.isLive ? leads.length - 1 : viewContacts.length - 1 } : l));
     } catch {
       alert('Failed to delete contact');
     }
@@ -308,15 +362,20 @@ export default function ContactsPage() {
     setSavingContact(true);
 
     setTimeout(() => {
-      const newContact = { id: `c-${Date.now()}`, ...newContactValues };
-      const updatedContacts = [...viewContacts, newContact];
+      if (viewingList.isLive) {
+        const created = addLead(newContactValues);
+        setViewContacts(prev => [...prev, created]);
+      } else {
+        const newContact = { id: `c-${Date.now()}`, ...newContactValues };
+        const updatedContacts = [...viewContacts, newContact];
 
-      const allContacts = mockDb.getContacts();
-      allContacts[viewingList.id] = updatedContacts;
-      mockDb.saveContacts(allContacts);
+        const allContacts = whatsappDb.getContacts();
+        allContacts[viewingList.id] = updatedContacts;
+        whatsappDb.saveContacts(allContacts);
 
-      setLists(prev => prev.map(l => l.id === viewingList.id ? { ...l, contactCount: updatedContacts.length } : l));
-      setViewContacts(updatedContacts);
+        setViewContacts(updatedContacts);
+      }
+      setLists(prev => prev.map(l => l.id === viewingList.id ? { ...l, contactCount: viewingList.isLive ? leads.length + 1 : viewContacts.length + 1 } : l));
       setAddingNew(false);
       setNewContactValues({});
       setSavingContact(false);
@@ -407,13 +466,15 @@ export default function ContactsPage() {
                 >
                   <Download size={18} />
                 </button>
-                <button
-                  onClick={() => handleDelete(list.id)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, color: '#ef4444' }}
-                  title="Delete"
-                >
-                  <Trash2 size={18} />
-                </button>
+                {!list.isLive && (
+                  <button
+                    onClick={() => handleDelete(list.id)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, color: '#ef4444' }}
+                    title="Delete"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                )}
               </div>
             </div>
           ))}

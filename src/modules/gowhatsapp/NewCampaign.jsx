@@ -3,9 +3,82 @@ import {
   Upload, FileSpreadsheet, Users, Eye, AlertCircle, CheckCircle, Image, Link, Loader2
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { mockDb } from './mockData';
+import { whatsappDb } from './whatsappDb';
+import { useCRM } from '../../context/CRMContext';
 
 const BRAND_BLUE = '#2563eb';
+
+const autoDetectTemplateVariables = (tmplName, bodyText, columns) => {
+  const mapping = {};
+  if (!bodyText || !columns || columns.length === 0) return mapping;
+
+  const vars = [...new Set(bodyText.match(/\{\{(\d+)\}\}/g) || [])].map(m => m.replace(/[{}]/g, ''));
+  const colsLower = columns.map(c => c.toLowerCase());
+
+  const findColumnIndex = (keywords) => {
+    for (const kw of keywords) {
+      const idx = colsLower.findIndex(c => c.includes(kw));
+      if (idx !== -1) return columns[idx];
+    }
+    return null;
+  };
+
+  const nameCol = findColumnIndex(['name', 'first_name', 'fullname', 'firstname', 'client', 'lead_name']);
+  const phoneCol = findColumnIndex(['phone', 'mobile', 'contact', 'number', 'tel']);
+  const courseCol = findColumnIndex(['course', 'program', 'class', 'batch', 'subject']);
+  const feeCol = findColumnIndex(['fee', 'amount', 'payment', 'price', 'cost', 'due']);
+  const dateCol = findColumnIndex(['date', 'due_date', 'time', 'day', 'deadline', 'created_at']);
+
+  vars.forEach(v => {
+    const regex = new RegExp(`(?:\\b\\w+\\s+){0,3}\\{\\{${v}\\}\\}(?:\\s+\\w+){0,3}`, 'i');
+    const match = bodyText.match(regex);
+    const context = match ? match[0].toLowerCase() : '';
+
+    if (/hi\s+\{\{|\bhello\s+\{\{|\bdear\s+\{\{|\bhey\s+\{\{|\bto:\s*\{\{/i.test(context)) {
+      if (nameCol) {
+        mapping[v] = nameCol;
+        return;
+      }
+    }
+
+    if (/\{\{\d+\}\}\s+course|\{\{\d+\}\}\s+program|enrolled\s+in\s+\{\{|\bfor\s+\{\{|\bclass\s+\{\{/i.test(context)) {
+      if (courseCol) {
+        mapping[v] = courseCol;
+        return;
+      }
+    }
+
+    if (/payment\s+of\s+\{\{|\bfee\s+of\s+\{\{|\bamount\s*\{\{|\brs\.*\s*\{\{|₹\s*\{\{|\$\s*\{\{|\bpay\s+\{\{|\bdue\s+of\s+\{\{/i.test(context)) {
+      if (feeCol) {
+        mapping[v] = feeCol;
+        return;
+      }
+    }
+
+    if (/due\s+on\s+\{\{|\bdate\s+\{\{|\bby\s+\{\{|\bon\s+\{\{|\bbefore\s+\{\{/i.test(context)) {
+      if (dateCol) {
+        mapping[v] = dateCol;
+        return;
+      }
+    }
+
+    // Fallbacks
+    if (v === '1' && nameCol) {
+      mapping[v] = nameCol;
+    } else if (v === '2' && feeCol) {
+      mapping[v] = feeCol;
+    } else if (v === '3' && courseCol) {
+      mapping[v] = courseCol;
+    } else if (v === '4' && dateCol) {
+      mapping[v] = dateCol;
+    } else {
+      if (v === '1' && nameCol) mapping[v] = nameCol;
+      else mapping[v] = '';
+    }
+  });
+
+  return mapping;
+};
 
 export default function NewCampaign({ setSubView }) {
   const fileInputRef = useRef(null);
@@ -47,18 +120,55 @@ export default function NewCampaign({ setSubView }) {
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState(null);
 
+  const { leads, addLead, sendWhatsAppMsg } = useCRM();
+
   useEffect(() => {
     loadExistingLists();
     loadTemplates();
-  }, []);
+  }, [leads.length]);
+
+  // Real-time auto-detect mapping for template variables when template, columns, or templates load
+  useEffect(() => {
+    if (!selectedTemplate) return;
+    const tmpl = templates.find(t => t.name === selectedTemplate);
+    if (!tmpl) return;
+
+    const bodyText = tmpl.components?.find(c => c.type === 'BODY')?.text || '';
+    const detectedMapping = autoDetectTemplateVariables(selectedTemplate, bodyText, columns);
+    
+    setVariableMapping(prev => ({
+      ...detectedMapping,
+      // preserve manually mapped fields if they are still present in current columns
+      ...Object.fromEntries(
+        Object.entries(prev).filter(([v, col]) => columns.includes(col))
+      )
+    }));
+
+    const vars = [...new Set(bodyText.match(/\{\{(\d+)\}\}/g) || [])].map(m => m.replace(/[{}]/g, ''));
+    setVariableMode(prev => {
+      const modes = { ...prev };
+      vars.forEach(v => {
+        if (!modes[v]) modes[v] = 'column';
+      });
+      return modes;
+    });
+  }, [selectedTemplate, columns, templates]);
 
   const loadExistingLists = () => {
-    const lists = mockDb.getContactLists();
-    setExistingLists(lists);
+    const lists = whatsappDb.getContactLists();
+    const crmList = {
+      id: 'crm-leads-all',
+      name: 'Active CRM Leads (Live)',
+      contactCount: leads.length,
+      columns: ['name', 'phone', 'course', 'stage', 'counselor'],
+      createdAt: new Date().toISOString(),
+      isLive: true
+    };
+    setExistingLists([crmList, ...lists]);
   };
 
   const loadTemplates = () => {
-    const tmpls = mockDb.getTemplates();
+    const tmpls = whatsappDb.getTemplates();
     setTemplates(tmpls);
   };
 
@@ -66,6 +176,7 @@ export default function NewCampaign({ setSubView }) {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setPhoneColumn('');
     setUploadName(file.name.replace(/\.[^.]+$/, ''));
     const reader = new FileReader();
 
@@ -113,11 +224,11 @@ export default function NewCampaign({ setSubView }) {
         }
       ];
 
-      const allContacts = mockDb.getContacts();
+      const allContacts = whatsappDb.getContacts();
       allContacts[newListId] = uploadedContacts.map((c, i) => ({ id: `c-${Date.now()}-${i}`, ...c }));
 
-      mockDb.saveContactLists(newLists);
-      mockDb.saveContacts(allContacts);
+      whatsappDb.saveContactLists(newLists);
+      whatsappDb.saveContacts(allContacts);
 
       setSelectedListId(newListId);
       setExistingLists(newLists);
@@ -129,11 +240,22 @@ export default function NewCampaign({ setSubView }) {
   const handleSelectExistingList = (listId) => {
     setSelectedListId(listId);
     setUploadedContacts([]);
-    const allContacts = mockDb.getContacts();
-    const listContacts = allContacts[listId] || [];
-    setPreviewContacts(listContacts.slice(0, 3));
-    const targetList = existingLists.find(l => l.id === listId);
-    setColumns(targetList ? targetList.columns : []);
+    setPhoneColumn('');
+    if (listId === 'crm-leads-all') {
+      setPreviewContacts(leads.slice(0, 3));
+      setColumns(['name', 'phone', 'course', 'stage', 'counselor']);
+    } else {
+      const allContacts = whatsappDb.getContacts();
+      const listContacts = allContacts[listId] || [];
+      setPreviewContacts(listContacts.slice(0, 3));
+      const targetList = existingLists.find(l => l.id === listId);
+      setColumns(targetList ? targetList.columns : []);
+    }
+  };
+
+  const getContactPhone = (contact) => {
+    if (phoneColumn) return String(contact[phoneColumn] || '').trim();
+    return String(contact.phone || contact.Phone || contact.mobile || contact.Mobile || contact.number || contact.Number || '').trim();
   };
 
   const insertVariable = (col) => {
@@ -202,8 +324,16 @@ export default function NewCampaign({ setSubView }) {
     }, 1000);
   };
 
+  const getMessageForContact = (contact) => {
+    if (messageType === 'text') {
+      return getPreviewMessage(contact);
+    } else {
+      return getTemplatePreview(contact);
+    }
+  };
+
   const handleSendCampaign = () => {
-    if (!selectedListId) {
+    if (!selectedListId && uploadedContacts.length === 0) {
       alert('Please select or upload a contact list first');
       return;
     }
@@ -218,9 +348,47 @@ export default function NewCampaign({ setSubView }) {
 
     setSending(true);
     setTimeout(() => {
-      const totalCount = previewContacts.length || 10;
-      const sentCount = Math.round(totalCount * 0.95);
-      const failedCount = totalCount - sentCount;
+      let targetContacts = [];
+      if (selectedListId === 'crm-leads-all') {
+        targetContacts = leads;
+      } else if (selectedListId) {
+        const allContacts = whatsappDb.getContacts();
+        targetContacts = allContacts[selectedListId] || [];
+      } else {
+        targetContacts = uploadedContacts;
+      }
+
+      const totalCount = targetContacts.length;
+      let sentCount = 0;
+      let failedCount = 0;
+
+      targetContacts.forEach((contact, idx) => {
+        let phone = getContactPhone(contact);
+        const cleanPhone = phone ? phone.replace(/\D/g, '') : '';
+        const isValid = cleanPhone.length >= 9 && cleanPhone.length <= 15;
+
+        if (!isValid) {
+          failedCount++;
+          return;
+        }
+        sentCount++;
+        let existingLead = leads.find(l => l.phone.replace(/\D/g, '') === cleanPhone);
+        const messageToDeliver = getMessageForContact(contact);
+
+        if (existingLead) {
+          sendWhatsAppMsg(existingLead.id, messageToDeliver);
+        } else {
+          const newLead = addLead({
+            name: contact.name || contact.Name || 'Campaign Contact',
+            phone: phone,
+            course: contact.course || contact.Course || '',
+            source: 'WhatsApp Campaign',
+            subSource: campaignName || 'Bulk Campaign'
+          });
+          sendWhatsAppMsg(newLead.id, messageToDeliver);
+        }
+      });
+
       const newCamp = {
         id: `camp-${Date.now()}`,
         name: campaignName || `Campaign - ${new Date().toLocaleDateString()}`,
@@ -228,35 +396,42 @@ export default function NewCampaign({ setSubView }) {
         totalRecipients: totalCount,
         sent: sentCount,
         failed: failedCount,
-        delivered: Math.round(sentCount * 0.9),
-        read: Math.round(sentCount * 0.75),
-        replied: Math.round(sentCount * 0.1),
+        delivered: sentCount,
+        read: Math.round(sentCount * 0.95), // simulate some reads for stats
+        replied: 0,
         type: messageType,
         templateName: selectedTemplate || null,
         languageCode: templateLanguage || null,
         message: messageType === 'text' ? messageText : getTemplateBody(),
         createdAt: { _seconds: Math.floor(Date.now() / 1000) },
-        completedAt: { _seconds: Math.floor(Date.now() / 1000) + 60 }
+        completedAt: { _seconds: Math.floor(Date.now() / 1000) + 10 }
       };
 
-      const campaigns = mockDb.getCampaigns();
-      mockDb.saveCampaigns([newCamp, ...campaigns]);
+      const campaignsList = whatsappDb.getCampaigns();
+      whatsappDb.saveCampaigns([newCamp, ...campaignsList]);
       
       // Save recipient list details for report
-      const allRecipients = mockDb.getRecipients();
-      allRecipients[newCamp.id] = previewContacts.map((c, i) => ({
-        id: `r-${newCamp.id}-${i}`,
-        name: c.name || `Recipient ${i+1}`,
-        phone: c.phone || '919999999999',
-        status: i === 0 ? 'failed' : i % 3 === 0 ? 'delivered' : 'read',
-        error: i === 0 ? 'Inactive WhatsApp account' : null,
-        errorCode: i === 0 ? '131026' : null,
-        messageId: `msg-${Date.now()}-${i}`,
-        deliveredAt: Date.now(),
-        readAt: i % 3 !== 0 ? Date.now() + 500 : null,
-        replied: i % 4 === 0
-      }));
-      mockDb.saveRecipients(allRecipients);
+      const allRecipients = whatsappDb.getRecipients();
+      allRecipients[newCamp.id] = targetContacts.map((c, i) => {
+        let phone = getContactPhone(c);
+        const cleanPhone = phone ? phone.replace(/\D/g, '') : '';
+        const isValid = cleanPhone.length >= 9 && cleanPhone.length <= 15;
+        const msg = getMessageForContact(c);
+        const isFailed = !isValid;
+        return {
+          id: `r-${newCamp.id}-${i}`,
+          name: c.name || `Recipient ${i+1}`,
+          phone: phone || 'N/A',
+          status: isFailed ? 'failed' : i % 3 === 0 ? 'delivered' : 'read',
+          error: isFailed ? (phone ? 'Invalid phone number format' : 'Missing phone number') : null,
+          errorCode: isFailed ? '131030' : '131026',
+          messageId: isFailed ? null : `msg-${Date.now()}-${i}`,
+          deliveredAt: isFailed ? null : Date.now(),
+          readAt: isFailed || i % 3 === 0 ? null : Date.now() + 100,
+          replied: false
+        };
+      });
+      whatsappDb.saveRecipients(allRecipients);
 
       setSending(false);
       setResult({ totalRecipients: totalCount });
@@ -421,6 +596,34 @@ export default function NewCampaign({ setSubView }) {
             </>
           )}
 
+          {(selectedListId || uploadedContacts.length > 0) && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 24, borderTop: '1px solid #e2e8f0', paddingTop: 20 }}>
+              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>
+                Which column contains the phone numbers?
+              </label>
+              <select
+                value={phoneColumn}
+                onChange={(e) => setPhoneColumn(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  border: '1px solid #cbd5e1',
+                  fontSize: '0.9rem',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                  background: '#fff',
+                  cursor: 'pointer',
+                }}
+              >
+                <option value="">Auto-detect (phone, Phone, number, mobile...)</option>
+                {columns.map(col => (
+                  <option key={col} value={col}>{col}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div style={{ marginTop: 24, display: 'flex', justifyContent: 'flex-end' }}>
             <button
               onClick={() => setStep(2)}
@@ -440,11 +643,11 @@ export default function NewCampaign({ setSubView }) {
 
       {/* STEP 2: Compose Message */}
       {step === 2 && (
-        <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', padding: 24 }}>
-          <h2 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: 16, color: '#0f172a' }}>Compose Message</h2>
+        <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', padding: 32 }}>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: 16, color: '#0f172a' }}>Compose Message</h2>
 
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, color: '#475569', marginBottom: 6 }}>
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: 6 }}>
               Campaign Name
             </label>
             <input
@@ -454,25 +657,44 @@ export default function NewCampaign({ setSubView }) {
               style={{
                 width: '100%', padding: '10px 14px', borderRadius: 8,
                 border: '1px solid #d1d5db', outline: 'none', boxSizing: 'border-box',
+                background: '#f8fafc'
               }}
             />
           </div>
 
-          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-            {['text', 'template'].map(t => (
-              <button
-                key={t}
-                onClick={() => setMessageType(t)}
-                style={{
-                  padding: '8px 20px', borderRadius: 8, fontWeight: 600, fontSize: '0.85rem',
-                  background: messageType === t ? BRAND_BLUE : '#f1f5f9',
-                  color: messageType === t ? '#fff' : '#64748b',
-                  border: 'none', cursor: 'pointer', textTransform: 'capitalize',
-                }}
-              >
-                {t === 'text' ? 'Custom Message' : 'WhatsApp Template'}
-              </button>
-            ))}
+          <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
+            <button
+              onClick={() => setMessageType('text')}
+              style={{
+                padding: '10px 24px',
+                borderRadius: 24,
+                fontWeight: 600,
+                fontSize: '0.9rem',
+                cursor: 'pointer',
+                background: messageType === 'text' ? BRAND_BLUE : '#fff',
+                color: messageType === 'text' ? '#fff' : '#1f2937',
+                border: messageType === 'text' ? `1px solid ${BRAND_BLUE}` : '1px solid #d1d5db',
+                transition: 'all 0.2s',
+              }}
+            >
+              Custom Message
+            </button>
+            <button
+              onClick={() => setMessageType('template')}
+              style={{
+                padding: '10px 24px',
+                borderRadius: 24,
+                fontWeight: 600,
+                fontSize: '0.9rem',
+                cursor: 'pointer',
+                background: messageType === 'template' ? BRAND_BLUE : '#fff',
+                color: messageType === 'template' ? '#fff' : '#1f2937',
+                border: messageType === 'template' ? `1px solid ${BRAND_BLUE}` : '1px solid #d1d5db',
+                transition: 'all 0.2s',
+              }}
+            >
+              WhatsApp Template
+            </button>
           </div>
 
           {messageType === 'text' ? (
@@ -522,17 +744,35 @@ export default function NewCampaign({ setSubView }) {
                 }}
                 style={{
                   width: '100%', padding: '10px 14px', borderRadius: 8,
-                  border: '1px solid #d1d5db', outline: 'none', fontSize: '0.95rem',
+                  border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.95rem',
+                  background: '#fff', cursor: 'pointer'
                 }}
               >
                 <option value="">Choose a template...</option>
                 {templates.filter(t => t.status === 'APPROVED').map(t => (
-                  <option key={t.name} value={t.name}>{t.name} ({t.category})</option>
+                  <option key={t.name} value={t.name}>{t.name} - {t.language} ({t.category})</option>
                 ))}
               </select>
 
               {selectedTemplate && (
-                <div style={{ marginTop: 16 }}>
+                <div style={{ marginTop: 20 }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: 8 }}>
+                    Template Preview
+                  </label>
+                  <div style={{
+                    background: '#e8f9e0',
+                    color: '#2e631d',
+                    padding: 16,
+                    borderRadius: 12,
+                    border: '1px solid #cceec1',
+                    fontSize: '0.95rem',
+                    lineHeight: 1.5,
+                    whiteSpace: 'pre-wrap',
+                    marginBottom: 20
+                  }}>
+                    {getTemplateBody()}
+                  </div>
+
                   {/* Media Header If Needed */}
                   {['IMAGE', 'VIDEO', 'DOCUMENT'].includes(getTemplateHeaderType()) && (
                     <div style={{ background: '#fffbeb', borderRadius: 10, padding: 16, border: '1px solid #fde68a', marginBottom: 16 }}>
@@ -562,26 +802,75 @@ export default function NewCampaign({ setSubView }) {
                     </div>
                   )}
 
-                  {/* Body Variables Mapping */}
-                  {getTemplateVariables().map(v => (
-                    <div key={v} style={{ marginBottom: 12 }}>
-                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#475569', marginBottom: 6 }}>
-                        Variable {`{{${v}}}`} Mapping
-                      </label>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <select
-                          value={variableMode[v] || 'column'}
-                          onChange={e => setVariableMode(prev => ({ ...prev, [v]: e.target.value }))}
-                          style={{ padding: 8, borderRadius: 6, border: '1px solid #cbd5e1' }}
-                        >
-                          <option value="column">Map to Column</option>
-                          <option value="manual">Fixed Text</option>
-                        </select>
+                  {/* Set Template Variables Card */}
+                  <div style={{
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: 16,
+                    padding: 24,
+                    marginTop: 20
+                  }}>
+                    <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#0f172a', margin: 0 }}>
+                      Set Template Variables
+                    </h3>
+                    <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: 4, marginBottom: 20 }}>
+                      For each variable, choose to map from a CSV column (personalized per contact) or enter a fixed value (same for all).
+                    </p>
+
+                    {getTemplateVariables().map(v => (
+                      <div key={v} style={{ marginBottom: 16 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                          <span style={{
+                            background: '#eff6ff',
+                            color: BRAND_BLUE,
+                            padding: '4px 10px',
+                            borderRadius: 8,
+                            fontWeight: 600,
+                            fontSize: '0.85rem'
+                          }}>
+                            {`{{${v}}}`}
+                          </span>
+                          <span style={{ color: '#94a3b8', fontWeight: 500 }}>→</span>
+                          
+                          <div style={{ display: 'inline-flex', background: '#e2e8f0', borderRadius: 20, padding: 2 }}>
+                            <button
+                              onClick={() => setVariableMode(prev => ({ ...prev, [v]: 'column' }))}
+                              style={{
+                                padding: '6px 14px', borderRadius: 18, border: 'none', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer',
+                                background: (variableMode[v] || 'column') === 'column' ? BRAND_BLUE : 'transparent',
+                                color: (variableMode[v] || 'column') === 'column' ? '#fff' : '#475569',
+                                transition: 'all 0.2s',
+                              }}
+                            >
+                              From Column
+                            </button>
+                            <button
+                              onClick={() => setVariableMode(prev => ({ ...prev, [v]: 'manual' }))}
+                              style={{
+                                padding: '6px 14px', borderRadius: 18, border: 'none', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer',
+                                background: (variableMode[v] || 'column') === 'manual' ? BRAND_BLUE : 'transparent',
+                                color: (variableMode[v] || 'column') === 'manual' ? '#fff' : '#475569',
+                                transition: 'all 0.2s',
+                              }}
+                            >
+                              Manual Value
+                            </button>
+                          </div>
+                        </div>
+
                         {(variableMode[v] || 'column') === 'column' ? (
                           <select
                             value={variableMapping[v] || ''}
                             onChange={e => setVariableMapping(prev => ({ ...prev, [v]: e.target.value }))}
-                            style={{ flex: 1, padding: 8, borderRadius: 6, border: '1px solid #cbd5e1' }}
+                            style={{
+                              width: '100%',
+                              padding: '10px 14px',
+                              borderRadius: 8,
+                              border: '1px solid #cbd5e1',
+                              outline: 'none',
+                              fontSize: '0.9rem',
+                              background: '#fff',
+                            }}
                           >
                             <option value="">Select column...</option>
                             {columns.map(col => <option key={col} value={col}>{col}</option>)}
@@ -592,27 +881,73 @@ export default function NewCampaign({ setSubView }) {
                             value={manualVariables[v] || ''}
                             onChange={e => setManualVariables(prev => ({ ...prev, [v]: e.target.value }))}
                             placeholder="Enter fixed text value..."
-                            style={{ flex: 1, padding: 8, borderRadius: 6, border: '1px solid #cbd5e1' }}
+                            style={{
+                              width: '100%',
+                              padding: '10px 14px',
+                              borderRadius: 8,
+                              border: '1px solid #cbd5e1',
+                              outline: 'none',
+                              fontSize: '0.9rem',
+                              boxSizing: 'border-box',
+                            }}
                           />
                         )}
                       </div>
+                    ))}
+
+                    <div style={{ marginTop: 24 }}>
+                      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, color: '#64748b', marginBottom: 8 }}>
+                        Preview (first contact):
+                      </label>
+                      <div style={{
+                        background: '#e8f9e0',
+                        color: '#2e631d',
+                        padding: 16,
+                        borderRadius: 12,
+                        border: '1px solid #cceec1',
+                        fontSize: '0.95rem',
+                        lineHeight: 1.5,
+                        whiteSpace: 'pre-wrap'
+                      }}>
+                        {previewContacts.length > 0 ? getTemplatePreview(previewContacts[0]) : getTemplateBody()}
+                      </div>
                     </div>
-                  ))}
+                  </div>
                 </div>
               )}
             </>
           )}
 
-          <div style={{ marginTop: 24, display: 'flex', justifyContent: 'space-between' }}>
-            <button onClick={() => setStep(1)} style={{ padding: '10px 24px', borderRadius: 10, background: '#f1f5f9', color: '#475569', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Back</button>
+          <div style={{ marginTop: 32, display: 'flex', justifyContent: 'space-between' }}>
+            <button
+              onClick={() => setStep(1)}
+              style={{
+                padding: '10px 24px',
+                borderRadius: 24,
+                background: '#fff',
+                color: '#1e293b',
+                border: '1px solid #cbd5e1',
+                cursor: 'pointer',
+                fontWeight: 600,
+                fontSize: '0.9rem',
+                transition: 'all 0.2s',
+              }}
+            >
+              Back
+            </button>
             <button
               onClick={() => setStep(3)}
               disabled={messageType === 'template' && !selectedTemplate}
               style={{
-                padding: '10px 24px', borderRadius: 10, fontWeight: 600,
+                padding: '10px 24px',
+                borderRadius: 24,
+                fontWeight: 600,
+                fontSize: '0.9rem',
                 background: (messageType === 'text' || selectedTemplate) ? BRAND_BLUE : '#e2e8f0',
                 color: (messageType === 'text' || selectedTemplate) ? '#fff' : '#94a3b8',
-                border: 'none', cursor: 'pointer',
+                border: 'none',
+                cursor: (messageType === 'text' || selectedTemplate) ? 'pointer' : 'not-allowed',
+                transition: 'all 0.2s',
               }}
             >
               Next: Preview & Send
@@ -632,7 +967,7 @@ export default function NewCampaign({ setSubView }) {
                 Sample Preview
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: '0.85rem' }}>
-                <span style={{ fontWeight: 600 }}>To: {previewContacts[0].name || 'Recipient'} ({previewContacts[0].phone || 'Number'})</span>
+                <span style={{ fontWeight: 600 }}>To: {previewContacts[0].name || 'Recipient'} ({getContactPhone(previewContacts[0]) || 'Number'})</span>
                 <div style={{
                   background: '#dcf8c6', padding: '10px 14px', borderRadius: '10px 10px 4px 10px',
                   maxWidth: 500, fontSize: '0.9rem', lineHeight: 1.5, whiteSpace: 'pre-wrap', marginTop: 10,

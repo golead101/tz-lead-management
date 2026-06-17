@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Bot, Save, Loader2, FileText, Phone, List, CheckCircle } from 'lucide-react';
-import { mockDb } from './mockData';
+import { whatsappDb } from './whatsappDb';
 
 const BRAND_BLUE = '#2563eb';
 
@@ -49,7 +49,7 @@ export default function ChatbotSettingsPage() {
 
   const fetchSettings = () => {
     try {
-      const data = mockDb.getChatbotSettings();
+      const data = whatsappDb.getChatbotSettings();
       setSettings(data);
     } catch (error) {
       console.error('Failed to fetch chatbot settings:', error);
@@ -62,7 +62,7 @@ export default function ChatbotSettingsPage() {
   const handleSave = () => {
     try {
       setSaving(true);
-      mockDb.saveChatbotSettings(settings);
+      whatsappDb.saveChatbotSettings(settings);
       showToast('Settings saved successfully', 'success');
     } catch (error) {
       console.error('Failed to save chatbot settings:', error);

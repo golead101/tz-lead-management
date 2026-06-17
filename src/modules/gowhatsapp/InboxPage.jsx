@@ -3,7 +3,8 @@ import {
   MessageCircle, Send, Search, Check, CheckCheck, Clock,
   AlertCircle, Paperclip
 } from 'lucide-react';
-import { mockDb } from './mockData';
+import { whatsappDb } from './whatsappDb';
+import { useCRM } from '../../context/CRMContext';
 
 const BRAND_BLUE = '#2563eb';
 
@@ -32,10 +33,15 @@ function formatMessageTime(ts) {
 
 function formatPhone(phone) {
   if (!phone) return '';
-  if (phone.length === 12 && phone.startsWith('91')) {
-    return `+${phone.slice(0, 2)} ${phone.slice(2, 7)} ${phone.slice(7)}`;
+  // Strip ALL leading '+' signs first (handles ++91, +91, etc.)
+  const clean = phone.replace(/^\++/, '');
+  if (clean.length === 12 && clean.startsWith('91')) {
+    return `+${clean.slice(0, 2)} ${clean.slice(2, 7)} ${clean.slice(7)}`;
   }
-  return `+${phone}`;
+  if (clean.length === 10) {
+    return `+91 ${clean.slice(0, 5)} ${clean.slice(5)}`;
+  }
+  return `+${clean}`;
 }
 
 function StatusIcon({ status, size = 14 }) {
@@ -49,162 +55,104 @@ function StatusIcon({ status, size = 14 }) {
     case 'failed':
       return <AlertCircle size={size} color="#ef4444" />;
     default:
-      return <Clock size={size} color="#94a3b8" />;
+      return <CheckCheck size={size} color="#53bdeb" />; // Default to read/delivered for simulated messages
   }
 }
 
 export default function InboxPage() {
-  const [conversations, setConversations] = useState([]);
-  const [selectedPhone, setSelectedPhone] = useState(null);
-  const [messages, setMessages] = useState([]);
+  const { leads, sendWhatsAppMsg, updateLead, activeRole, activeUser } = useCRM();
+  const [selectedLeadId, setSelectedLeadId] = useState(null);
   const [replyText, setReplyText] = useState('');
-  const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [inboxFilter, setInboxFilter] = useState('all');
   const messagesEndRef = useRef(null);
 
+  // Dynamically compute conversations from CRM leads
+  const conversations = React.useMemo(() => {
+    const contactLeads = leads.filter(lead => {
+      if (activeRole === 'Counselor') {
+        return lead.counselor === activeUser;
+      }
+      return true;
+    });
+
+    const mapped = contactLeads.map(lead => {
+      const msgs = lead.whatsappMessages || [];
+      const lastMsg = msgs[msgs.length - 1];
+      
+      let lastMessageAt = null;
+      if (lastMsg) {
+        const match = lastMsg.id ? lastMsg.id.match(/\d+$/) : null;
+        lastMessageAt = match ? { _seconds: Math.floor(parseInt(match[0], 10) / 1000) } : { _seconds: Math.floor(Date.now() / 1000) };
+      } else {
+        lastMessageAt = { _seconds: Math.floor(new Date(lead.createdDate || Date.now()).getTime() / 1000) };
+      }
+
+      const unreadCount = msgs.reduce((acc, m) => {
+        if (m.sender === 'lead' && !m.read) return acc + 1;
+        return acc;
+      }, 0);
+
+      return {
+        id: lead.id,
+        phone: lead.phone,
+        contactName: lead.name,
+        lastMessage: lastMsg ? lastMsg.text : 'No messages yet',
+        lastMessageAt,
+        lastDirection: lastMsg ? (lastMsg.sender === 'counselor' ? 'outbound' : 'inbound') : null,
+        unreadCount,
+        repliedToCampaign: lead.source === 'WhatsApp Campaign' || msgs.some(m => m.sender === 'lead' && msgs.some(om => om.sender === 'counselor' && om.id.includes('campaign'))),
+        lead
+      };
+    });
+
+    return mapped.sort((a, b) => {
+      const timeA = a.lastMessageAt?._seconds || 0;
+      const timeB = b.lastMessageAt?._seconds || 0;
+      return timeB - timeA;
+    });
+  }, [leads, activeRole, activeUser]);
+
+  const selectedConvo = conversations.find(c => c.id === selectedLeadId);
+  const messages = selectedConvo?.lead?.whatsappMessages || [];
+
+  // Automatically select first contact if none is active and there are contacts
   useEffect(() => {
-    loadConversations();
-  }, []);
+    if (!selectedLeadId && conversations.length > 0) {
+      setSelectedLeadId(conversations[0].id);
+    }
+  }, [selectedLeadId, conversations]);
 
   useEffect(() => {
-    if (selectedPhone) {
-      loadMessages(selectedPhone);
-      markAsRead(selectedPhone);
-    } else {
-      setMessages([]);
+    if (selectedLeadId) {
+      markAsRead(selectedLeadId);
     }
-  }, [selectedPhone]);
+  }, [selectedLeadId, messages.length]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const loadConversations = () => {
-    try {
-      const convos = mockDb.getConversations();
-      setConversations(convos);
-      setLoading(false);
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  const loadMessages = (phone) => {
-    try {
-      const allMsgs = mockDb.getMessages();
-      const chatMsgs = allMsgs[phone] || [];
-      setMessages(chatMsgs);
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  const markAsRead = (phone) => {
-    try {
-      const updated = conversations.map(c => 
-        c.phone === phone ? { ...c, unreadCount: 0 } : c
-      );
-      mockDb.saveConversations(updated);
-      setConversations(updated);
-    } catch (error) {
-      console.error(error);
+  const markAsRead = (leadId) => {
+    const lead = leads.find(l => l.id === leadId);
+    if (!lead) return;
+    const msgs = lead.whatsappMessages || [];
+    const hasUnread = msgs.some(m => m.sender === 'lead' && !m.read);
+    if (hasUnread) {
+      const updatedMsgs = msgs.map(m => m.sender === 'lead' ? { ...m, read: true } : m);
+      updateLead(leadId, { whatsappMessages: updatedMsgs });
     }
   };
 
   const handleSendReply = () => {
-    if (!replyText.trim() || !selectedPhone || sending) return;
+    if (!replyText.trim() || !selectedLeadId || sending) return;
     setSending(true);
-
     const text = replyText.trim();
     setReplyText('');
 
-    setTimeout(() => {
-      const newMsg = {
-        id: `m-${Date.now()}`,
-        waMessageId: `wam-${Date.now()}`,
-        direction: 'outbound',
-        phone: selectedPhone,
-        type: 'text',
-        text: text,
-        timestamp: { _seconds: Math.floor(Date.now() / 1000) },
-        status: 'read',
-        read: true
-      };
-
-      // Update message list
-      const allMsgs = mockDb.getMessages();
-      const chatMsgs = [...(allMsgs[selectedPhone] || []), newMsg];
-      allMsgs[selectedPhone] = chatMsgs;
-      mockDb.saveMessages(allMsgs);
-
-      // Update conversation last message preview
-      const updatedConvos = conversations.map(c => {
-        if (c.phone === selectedPhone) {
-          return {
-            ...c,
-            lastMessage: text,
-            lastMessageAt: { _seconds: Math.floor(Date.now() / 1000) },
-            lastDirection: 'outbound',
-            unreadCount: 0
-          };
-        }
-        return c;
-      });
-      mockDb.saveConversations(updatedConvos);
-
-      setMessages(chatMsgs);
-      setConversations(updatedConvos);
-      setSending(false);
-
-      // Trigger mock inbound reply from user after 1.5 seconds!
-      setTimeout(() => {
-        const contactObj = conversations.find(c => c.phone === selectedPhone);
-        const contactName = contactObj ? contactObj.contactName : 'Student';
-        
-        const responseMsg = {
-          id: `m-reply-${Date.now()}`,
-          waMessageId: `wam-reply-${Date.now()}`,
-          direction: 'inbound',
-          phone: selectedPhone,
-          type: 'text',
-          text: `Hi! Thank you for details. This is ${contactName}. I will review this information and check with my counselor.`,
-          timestamp: { _seconds: Math.floor(Date.now() / 1000) },
-          status: 'delivered',
-          read: false
-        };
-
-        const updatedAllMsgs = mockDb.getMessages();
-        const updatedChatMsgs = [...(updatedAllMsgs[selectedPhone] || []), responseMsg];
-        updatedAllMsgs[selectedPhone] = updatedChatMsgs;
-        mockDb.saveMessages(updatedAllMsgs);
-
-        const finalConvos = mockDb.getConversations().map(c => {
-          if (c.phone === selectedPhone) {
-            return {
-              ...c,
-              lastMessage: responseMsg.text,
-              lastMessageAt: responseMsg.timestamp,
-              lastDirection: 'inbound',
-              unreadCount: 1
-            };
-          }
-          return c;
-        });
-        mockDb.saveConversations(finalConvos);
-
-        // Only update active screen if user is still viewing this contact!
-        setSelectedPhone(prev => {
-          if (prev === selectedPhone) {
-            setMessages(updatedChatMsgs);
-          }
-          return prev;
-        });
-        setConversations(finalConvos);
-      }, 1500);
-
-    }, 800);
+    sendWhatsAppMsg(selectedLeadId, text);
+    setSending(false);
   };
 
   const filteredConversations = conversations.filter(c => {
@@ -215,21 +163,11 @@ export default function InboxPage() {
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return (
-      c.phone.includes(q) ||
+      (c.phone || '').includes(q) ||
       (c.contactName || '').toLowerCase().includes(q) ||
       (c.lastMessage || '').toLowerCase().includes(q)
     );
   });
-
-  const selectedConvo = conversations.find(c => c.phone === selectedPhone);
-
-  if (loading) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh', color: '#64748b' }}>
-        Loading...
-      </div>
-    );
-  }
 
   return (
     <div className="whatsapp-inbox-container" style={{ height: '100%', overflow: 'hidden' }}>
@@ -275,61 +213,67 @@ export default function InboxPage() {
 
         {/* Conversation list */}
         <div style={{ flex: 1, overflowY: 'auto' }}>
-          {filteredConversations.map(convo => (
-            <div
-              key={convo.phone}
-              onClick={() => setSelectedPhone(convo.phone)}
-              className={`sidebar-item ${selectedPhone === convo.phone ? 'active' : ''}`}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 12,
-                padding: '12px 16px', cursor: 'pointer',
-                borderBottom: '1px solid #f1f5f9',
-              }}
-            >
-              <div style={{
-                width: 48, height: 48, borderRadius: '50%',
-                background: '#dfe5e7', display: 'flex',
-                alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-              }}>
-                <span style={{ fontWeight: 500, color: '#54656f', fontSize: '1.1rem' }}>
-                  {(convo.contactName || convo.phone).charAt(0).toUpperCase()}
-                </span>
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ fontWeight: 500, fontSize: '15px', color: '#111b21' }}>
-                    {convo.contactName || formatPhone(convo.phone)}
-                  </span>
-                  <span style={{ fontSize: '12px', color: '#667781' }}>
-                    {formatTime(convo.lastMessageAt)}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
-                  <span style={{
-                    fontSize: '13px', color: '#667781',
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  }}>
-                    {convo.lastDirection === 'outbound' && <StatusIcon status="read" size={14} />} {convo.lastMessage}
-                  </span>
-                  {convo.unreadCount > 0 && (
-                    <span style={{
-                      background: '#25d366', color: '#fff', borderRadius: '50%',
-                      width: 20, height: 20, fontSize: '11px', fontWeight: 700,
-                      display: 'grid', placeItems: 'center',
-                    }}>
-                      {convo.unreadCount}
-                    </span>
-                  )}
-                </div>
-              </div>
+          {filteredConversations.length === 0 ? (
+            <div style={{ padding: '24px 16px', textAlign: 'center', color: '#94a3b8', fontSize: '14px' }}>
+              No conversations found.
             </div>
-          ))}
+          ) : (
+            filteredConversations.map(convo => (
+              <div
+                key={convo.id}
+                onClick={() => setSelectedLeadId(convo.id)}
+                className={`sidebar-item ${selectedLeadId === convo.id ? 'active' : ''}`}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '12px 16px', cursor: 'pointer',
+                  borderBottom: '1px solid #f1f5f9',
+                }}
+              >
+                <div style={{
+                  width: 48, height: 48, borderRadius: '50%',
+                  background: '#dfe5e7', display: 'flex',
+                  alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                }}>
+                  <span style={{ fontWeight: 500, color: '#54656f', fontSize: '1.1rem' }}>
+                    {(convo.contactName || convo.phone || 'C').charAt(0).toUpperCase()}
+                  </span>
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontWeight: 500, fontSize: '15px', color: '#111b21' }}>
+                      {convo.contactName || formatPhone(convo.phone)}
+                    </span>
+                    <span style={{ fontSize: '12px', color: '#667781' }}>
+                      {formatTime(convo.lastMessageAt)}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
+                    <span style={{
+                      fontSize: '13px', color: '#667781',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {convo.lastDirection === 'outbound' && <StatusIcon status="read" size={14} />} {convo.lastMessage}
+                    </span>
+                    {convo.unreadCount > 0 && (
+                      <span style={{
+                        background: '#25d366', color: '#fff', borderRadius: '50%',
+                        width: 20, height: 20, fontSize: '11px', fontWeight: 700,
+                        display: 'grid', placeItems: 'center',
+                      }}>
+                        {convo.unreadCount}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
       {/* Chat Area (Right) */}
       <div className="whatsapp-chat-area">
-        {selectedPhone ? (
+        {selectedLeadId ? (
           <>
             {/* Header */}
             <div className="whatsapp-header">
@@ -339,30 +283,37 @@ export default function InboxPage() {
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
                   <span style={{ fontWeight: 500, color: '#54656f' }}>
-                    {(selectedConvo?.contactName || selectedPhone).charAt(0).toUpperCase()}
+                    {(selectedConvo?.contactName || selectedConvo?.phone || 'C').charAt(0).toUpperCase()}
                   </span>
                 </div>
                 <div>
-                  <div style={{ fontWeight: 500, fontSize: '15px', color: '#0f172a' }}>{selectedConvo?.contactName || formatPhone(selectedPhone)}</div>
-                  <div style={{ fontSize: '12px', color: '#667781' }}>{formatPhone(selectedPhone)}</div>
+                  <div style={{ fontWeight: 500, fontSize: '15px', color: '#0f172a' }}>{selectedConvo?.contactName || formatPhone(selectedConvo?.phone)}</div>
+                  <div style={{ fontSize: '12px', color: '#667781' }}>{formatPhone(selectedConvo?.phone)}</div>
                 </div>
               </div>
             </div>
 
             {/* Message Stream */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '20px 5%', display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {messages.map((msg) => {
-                const isOutbound = msg.direction === 'outbound';
-                return (
-                  <div key={msg.id} className={`message-bubble ${isOutbound ? 'bubble-outbound' : 'bubble-inbound'}`}>
-                    <div style={{ color: '#0f172a' }}>{msg.text}</div>
-                    <div className="message-time">
-                      {formatMessageTime(msg.timestamp)}
-                      {isOutbound && <StatusIcon status={msg.status} size={15} />}
+              {messages.length === 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, color: '#94a3b8', fontSize: '14px' }}>
+                  <MessageCircle size={48} strokeWidth={1.5} style={{ opacity: 0.3, marginBottom: 12 }} />
+                  <p>No messages in this chat. Send a message to start.</p>
+                </div>
+              ) : (
+                messages.map((msg) => {
+                  const isOutbound = msg.direction === 'outbound' || msg.sender === 'counselor';
+                  return (
+                    <div key={msg.id} className={`message-bubble ${isOutbound ? 'bubble-outbound' : 'bubble-inbound'}`}>
+                      <div style={{ color: '#0f172a' }}>{msg.text}</div>
+                      <div className="message-time">
+                        {msg.time || formatMessageTime(msg.timestamp)}
+                        {isOutbound && <StatusIcon status={msg.status || 'read'} size={15} />}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
               <div ref={messagesEndRef} />
             </div>
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart3, Trash2, Eye, Plus, Copy } from 'lucide-react';
-import { mockDb } from './mockData';
+import { whatsappDb } from './whatsappDb';
 
 const BRAND_BLUE = '#2563eb';
 
@@ -14,7 +14,7 @@ export default function CampaignsList({ setSubView, navigateToReport, setReusedC
 
   const loadCampaigns = () => {
     try {
-      const camps = mockDb.getCampaigns();
+      const camps = whatsappDb.getCampaigns();
       setCampaigns(camps);
     } catch (error) {
       console.error('Failed to load campaigns:', error);
@@ -27,13 +27,13 @@ export default function CampaignsList({ setSubView, navigateToReport, setReusedC
     if (!confirm('Delete this campaign and all its data?')) return;
     try {
       const updated = campaigns.filter(c => c.id !== id);
-      mockDb.saveCampaigns(updated);
+      whatsappDb.saveCampaigns(updated);
       setCampaigns(updated);
 
       // Clean up recipients also
-      const recipients = mockDb.getRecipients();
+      const recipients = whatsappDb.getRecipients();
       delete recipients[id];
-      mockDb.saveRecipients(recipients);
+      whatsappDb.saveRecipients(recipients);
     } catch (error) {
       alert('Failed to delete campaign');
     }

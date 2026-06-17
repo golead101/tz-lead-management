@@ -3,7 +3,7 @@ import {
   FileText, RefreshCw, ExternalLink, Plus, X, Trash2, AlertCircle,
   CheckCircle, Image, Video, FileIcon, Phone, Globe, Copy, MessageSquare, Upload, Loader
 } from 'lucide-react';
-import { mockDb } from './mockData';
+import { whatsappDb } from './whatsappDb';
 
 const BRAND_BLUE = '#2563eb';
 
@@ -73,7 +73,7 @@ export default function TemplatesPage() {
   const loadTemplates = () => {
     setLoading(true);
     try {
-      const data = mockDb.getTemplates();
+      const data = whatsappDb.getTemplates();
       setTemplates(data);
     } catch (error) {
       console.error(error);
@@ -125,9 +125,9 @@ export default function TemplatesPage() {
         ].filter(Boolean)
       };
 
-      const currentTemplates = mockDb.getTemplates();
+      const currentTemplates = whatsappDb.getTemplates();
       const updated = [...currentTemplates, newTemplate];
-      mockDb.saveTemplates(updated);
+      whatsappDb.saveTemplates(updated);
 
       setTemplates(updated);
       setShowCreator(false);
@@ -142,9 +142,9 @@ export default function TemplatesPage() {
     setDeleting(name);
 
     setTimeout(() => {
-      const current = mockDb.getTemplates();
+      const current = whatsappDb.getTemplates();
       const updated = current.filter(t => t.name !== name);
-      mockDb.saveTemplates(updated);
+      whatsappDb.saveTemplates(updated);
       setTemplates(updated);
       setDeleting(null);
       setToast({ type: 'success', message: `Template deleted.` });
