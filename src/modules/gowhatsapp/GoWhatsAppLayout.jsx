@@ -6,7 +6,6 @@ import {
   Users,
   FileText,
   Settings,
-  LogOut,
   ArrowLeft,
   Inbox,
   TrendingUp,
@@ -27,7 +26,7 @@ const navItems = [
 ];
 
 const GoWhatsAppLayout = ({ children, subView, setSubView }) => {
-  const { activeUser, logout, setActiveView } = useCRM();
+  const { activeUser, setActiveView } = useCRM();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const displayName = activeUser || 'User';
@@ -35,10 +34,6 @@ const GoWhatsAppLayout = ({ children, subView, setSubView }) => {
   const handleNavClick = (view) => {
     setSubView(view);
     setMobileOpen(false);
-  };
-
-  const handleLogout = async () => {
-    await logout();
   };
 
   const handleBackToDashboard = () => {
@@ -118,15 +113,6 @@ const GoWhatsAppLayout = ({ children, subView, setSubView }) => {
               <div className="sidebar__profile-name" style={{ color: '#ffffff' }}>{displayName}</div>
             </div>
           </div>
-          <button
-            type="button"
-            className="button ghost"
-            onClick={handleLogout}
-            style={{ width: '100%', justifyContent: 'flex-start', gap: 10, display: 'flex', alignItems: 'center', borderRadius: '12px' }}
-          >
-            <LogOut size={18} />
-            Sign Out
-          </button>
         </footer>
       </aside>
 
