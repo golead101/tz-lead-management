@@ -22,28 +22,6 @@ export default function Analytics() {
     !['Converted', 'Closed', 'Not Interested'].includes(l.stage)
   ).length;
 
-  // 2. Funnel stage calculations
-  const getStageCount = (stageName) => visibleLeads.filter(l => l.stage === stageName).length;
-  
-  const funnelStages = [
-    { name: 'New Lead', count: getStageCount('New Lead') },
-    { name: 'Contacted', count: getStageCount('Contacted') },
-    { name: 'Interested', count: getStageCount('Interested') },
-    { name: 'Demo Scheduled', count: getStageCount('Demo Scheduled') },
-    { name: 'Demo Attended', count: getStageCount('Demo Attended') },
-    { name: 'Converted', count: getStageCount('Converted') }
-  ];
-
-  const maxFunnelCount = Math.max(...funnelStages.map(s => s.count), 1);
-
-  // 4. Source acquisition statistics
-  const sourcesList = ['Meta Ads', 'Google Search', 'Website Form', 'WhatsApp Inbound', 'Walk-in', 'Student Referral'];
-  const sourceStats = sourcesList.map(source => {
-    const count = visibleLeads.filter(l => l.source === source).length;
-    const pct = totalLeads > 0 ? (count / totalLeads) * 100 : 0;
-    return { name: source, count, pct };
-  }).sort((a, b) => b.count - a.count);
-
   // 5. Counselor comparative rankings
   const counselorsList = counselors ? counselors.map(c => c.name) : ['Maha', 'Irfan'];
   const counselorPerformance = counselorsList.map(name => {
@@ -53,6 +31,39 @@ export default function Analytics() {
     const rate = counselorLeads.length > 0 ? Math.round((converted / counselorLeads.length) * 100) : 0;
     return { name, converted, active, rate, total: counselorLeads.length };
   }).sort((a, b) => b.rate - a.rate); // Sort by conversion rate for high-end leaderboard!
+
+  // Telecaller performance ranking
+  const telecallerUsers = counselors
+    ? counselors.filter(c => c.role === 'Telecaller' || c.role === 'Manager')
+    : [];
+
+  const telecallerPerformance = telecallerUsers.map(tc => {
+    const name = tc.name || tc.email || 'Unknown';
+    // Leads assigned to this telecaller
+    const assignedLeads = leads.filter(l => l.telecaller === name || l.assignedTelecaller === name);
+    // Leads they contacted = assigned leads where stage is not 'New Lead'
+    const leadsContacted = assignedLeads.filter(l => l.stage && l.stage !== 'New Lead').length;
+    // Count call timeline entries across ALL leads made by this user
+    const callsMade = leads.reduce((total, lead) => {
+      const callEntries = (lead.timeline || []).filter(t =>
+        (t.type === 'call' || t.type === 'Call') &&
+        (t.user === name || t.counselor === name || t.telecaller === name)
+      );
+      return total + callEntries.length;
+    }, 0);
+    // Conversions = assigned leads that are Converted or Enrolled
+    const conversions = assignedLeads.filter(l =>
+      l.stage === 'Converted' || l.stage === 'Enrolled'
+    ).length;
+    const convRate = assignedLeads.length > 0
+      ? Math.round((conversions / assignedLeads.length) * 100)
+      : 0;
+    return { name, callsMade, leadsContacted: leadsContacted || assignedLeads.length, conversions, convRate, total: assignedLeads.length };
+  }).sort((a, b) => b.convRate - a.convRate || b.conversions - a.conversions);
+
+  const rankMedal = (i) => i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : null;
+  const rankLabel = (i) => i === 0 ? 'Top Performer' : i === 1 ? 'Second Place' : i === 2 ? 'Third Place' : null;
+  const rankLabelColor = (i) => i === 0 ? '#fbbf24' : i === 1 ? '#9ca3af' : '#d97706';
 
   return (
     <div className="fade-in">
@@ -88,43 +99,86 @@ export default function Analytics() {
       </div>
 
       {/* ==================================================================
-          CHARTS ROW 1: PIPELINE FUNNEL & TEMPERATURE DONUT
+          CHARTS ROW 1: TELECALLER RANKING & COUNSELOR RANKING
           ================================================================== */}
       <div className="analytics-grid">
-        {/* Funnel Stage Card */}
-        <div className="chart-card">
-          <h3 className="panel-title" style={{ marginBottom: '6px' }}>Conversion Funnel Stages</h3>
-          <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '16px' }}>
-            Measures visual conversion rates across intake stages.
-          </p>
+        {/* Telecaller Performance Ranking */}
+        {activeRole !== 'Counselor' ? (
+          <div className="chart-card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+              <div>
+                <h3 className="panel-title" style={{ marginBottom: '4px' }}>Telecaller Performance Ranking</h3>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                  Displays rankings based on interactions and outbound conversion rates.
+                </p>
+              </div>
+              <span style={{ fontSize: '20px' }}>📞</span>
+            </div>
 
-          <div className="funnel-container">
-            {funnelStages.map((stage, idx) => {
-              const percentage = ((stage.count / maxFunnelCount) * 100).toFixed(0);
-              return (
-                <div key={stage.name} className="funnel-stage-row">
-                  <div className="funnel-stage-label">{stage.name}</div>
-                  <div className="funnel-stage-bar-outer">
-                    <div 
-                      className="funnel-stage-bar-inner" 
-                      style={{ 
-                        width: `${percentage}%`,
-                        background: 'linear-gradient(to right, var(--primary), #f43f5e)',
-                        opacity: 1 - (idx * 0.12) // soft visual decay
-                      }}
-                    />
-                  </div>
-                  <div className="funnel-stage-value">
-                    {stage.count} <span style={{ fontSize: '9px', color: 'var(--text-muted)', fontWeight: '500' }}>({totalLeads > 0 ? ((stage.count / totalLeads) * 100).toFixed(0) : 0}%)</span>
-                  </div>
-                </div>
-              );
-            })}
+            {telecallerPerformance.length === 0 ? (
+              <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '30px 0', fontSize: '13px' }}>
+                No telecallers assigned yet. Add telecallers in Settings.
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid #f1f5f9', fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase' }}>
+                      <th style={{ textAlign: 'left', padding: '8px 6px', fontWeight: 600 }}>Rank</th>
+                      <th style={{ textAlign: 'left', padding: '8px 6px', fontWeight: 600 }}>Telecaller Name</th>
+                      <th style={{ textAlign: 'center', padding: '8px 6px', fontWeight: 600 }}>Calls</th>
+                      <th style={{ textAlign: 'center', padding: '8px 6px', fontWeight: 600 }}>Leads Contacted</th>
+                      <th style={{ textAlign: 'center', padding: '8px 6px', fontWeight: 600 }}>Conversions</th>
+                      <th style={{ textAlign: 'right', padding: '8px 6px', fontWeight: 600 }}>Conversion Rate</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {telecallerPerformance.map((tc, i) => (
+                      <tr key={tc.name} style={{ borderBottom: '1px solid #f8fafc', transition: 'background 0.15s' }}
+                        onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                      >
+                        <td style={{ padding: '12px 6px', fontWeight: 700, color: rankLabelColor(i), fontSize: '15px' }}>
+                          {rankMedal(i) || <span style={{ color: '#94a3b8', fontWeight: 600 }}>{i + 1}</span>}
+                        </td>
+                        <td style={{ padding: '12px 6px' }}>
+                          <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '13px' }}>{tc.name}</div>
+                          {rankLabel(i) && (
+                            <div style={{
+                              display: 'inline-block', marginTop: 3, fontSize: '10px', fontWeight: 700,
+                              padding: '1px 7px', borderRadius: 20,
+                              background: i === 0 ? '#fef3c7' : i === 1 ? '#f1f5f9' : '#fff7ed',
+                              color: rankLabelColor(i)
+                            }}>
+                              {rankLabel(i)}
+                            </div>
+                          )}
+                        </td>
+                        <td style={{ textAlign: 'center', padding: '12px 6px', color: '#64748b', fontWeight: 600 }}>{tc.callsMade}</td>
+                        <td style={{ textAlign: 'center', padding: '12px 6px', color: '#64748b', fontWeight: 600 }}>{tc.leadsContacted}</td>
+                        <td style={{ textAlign: 'center', padding: '12px 6px', color: '#10b981', fontWeight: 700, fontSize: '14px' }}>{tc.conversions}</td>
+                        <td style={{ textAlign: 'right', padding: '12px 6px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
+                            <div style={{ width: 60, height: 5, background: '#f1f5f9', borderRadius: 3, overflow: 'hidden' }}>
+                              <div style={{ height: '100%', width: `${tc.convRate}%`, background: tc.convRate > 50 ? '#10b981' : tc.convRate > 20 ? '#3b82f6' : '#e2e8f0', borderRadius: 3 }} />
+                            </div>
+                            <span style={{ fontWeight: 800, color: tc.convRate > 0 ? '#3b82f6' : '#94a3b8', minWidth: 36, textAlign: 'right' }}>{tc.convRate}%</span>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-        </div>
-
-
-
+        ) : (
+          <div className="chart-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', textAlign: 'center', padding: '30px' }}>
+            <svg viewBox="0 0 24 24" width="48" height="48" stroke="currentColor" strokeWidth="1.5" fill="none" style={{ color: 'var(--primary)', marginBottom: '8px' }}><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+            <h4 style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '4px' }}>Access Restricted</h4>
+            <p style={{ fontSize: '11.5px', maxWidth: '280px', lineHeight: '1.5' }}>Telecaller performance rankings are restricted to Administrators.</p>
+          </div>
+        )}
 
         {/* Counselor Comparative rankings leaderboard */}
         {activeRole !== 'Counselor' ? (
