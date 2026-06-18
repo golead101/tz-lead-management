@@ -13,7 +13,14 @@ import ChatbotSettingsPage from './ChatbotSettingsPage';
 import GoWhatsAppLayout from './GoWhatsAppLayout';
 
 const GoWhatsApp = () => {
-  const [subView, setSubView] = useState('dashboard');
+  // Persist subView to sessionStorage so page refresh stays on same tab
+  const [subView, setSubViewRaw] = useState(
+    () => sessionStorage.getItem('gowha_subview') || 'dashboard'
+  );
+  const setSubView = (view) => {
+    sessionStorage.setItem('gowha_subview', view);
+    setSubViewRaw(view);
+  };
   const [selectedCampaignId, setSelectedCampaignId] = useState(null);
   const [reusedCampaign, setReusedCampaign] = useState(null);
 

@@ -113,46 +113,36 @@ service cloud.firestore {
 
     // ─────────────────────────────────────────────
     // /whatsapp_campaigns collection
-    //  Admin      → full CRUD
-    //  Counselor  → read only (view campaign results)
-    //  Telecaller → read only
+    //  Admin/Telecaller/Counselor → full CRUD
+    //  (all staff manage campaigns)
     // ─────────────────────────────────────────────
     match /whatsapp_campaigns/{campaignId} {
-      allow read:  if isStaff();
-      allow write: if isAdmin();
+      allow read, write: if isStaff();
     }
 
     // ─────────────────────────────────────────────
     // /whatsapp_contact_lists collection
-    //  Admin      → full CRUD
-    //  Counselor  → read only (to pick a list when sending)
-    //  Telecaller → read only
+    //  Admin/Telecaller/Counselor → full CRUD
+    //  (all staff create and delete contact lists)
     // ─────────────────────────────────────────────
     match /whatsapp_contact_lists/{listId} {
-      allow read:  if isStaff();
-      allow write: if isAdmin();
+      allow read, write: if isStaff();
     }
 
     // ─────────────────────────────────────────────
     // /whatsapp_contacts collection
-    //  Admin      → full CRUD
-    //  Counselor  → read only
-    //  Telecaller → read only
+    //  Admin/Telecaller/Counselor → full CRUD
     // ─────────────────────────────────────────────
     match /whatsapp_contacts/{docId} {
-      allow read:  if isStaff();
-      allow write: if isAdmin();
+      allow read, write: if isStaff();
     }
 
     // ─────────────────────────────────────────────
     // /whatsapp_recipients collection
-    //  Admin      → full CRUD
-    //  Counselor  → read only (view who received campaign messages)
-    //  Telecaller → read only
+    //  Admin/Telecaller/Counselor → full CRUD
     // ─────────────────────────────────────────────
     match /whatsapp_recipients/{docId} {
-      allow read:  if isStaff();
-      allow write: if isAdmin();
+      allow read, write: if isStaff();
     }
 
     // ─────────────────────────────────────────────

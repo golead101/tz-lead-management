@@ -3,7 +3,7 @@ import {
   Users, Upload, Trash2, FileSpreadsheet, Eye, Edit3, Plus, Save, X, Check, Download, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { whatsappDb } from './whatsappDb';
+import { whatsappDb, deleteContactListById } from './whatsappDb';
 import { useCRM } from '../../context/CRMContext';
 
 const BRAND_BLUE = '#2563eb';
@@ -181,19 +181,25 @@ export default function ContactsPage() {
     }, 800);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (!confirm('Delete this contact list?')) return;
     try {
-      const currentLists = whatsappDb.getContactLists();
-      const updated = currentLists.filter(l => l.id !== id);
-      whatsappDb.saveContactLists(updated);
-      setLists(updated);
-
-      const allContacts = whatsappDb.getContacts();
-      delete allContacts[id];
-      whatsappDb.saveContacts(allContacts);
+      // Optimistically remove from UI immediately (keep crmList)
+      const crmList = {
+        id: 'crm-leads-all',
+        name: 'Active CRM Leads (Live)',
+        contactCount: leads.length,
+        columns: ['name', 'phone', 'course', 'stage', 'counselor'],
+        createdAt: new Date().toISOString(),
+        isLive: true
+      };
+      setLists(prev => [crmList, ...prev.filter(l => l.id !== id && l.id !== 'crm-leads-all')]);
+      // Delete from Firestore + localStorage directly (no race condition)
+      await deleteContactListById(id);
     } catch (error) {
+      console.error('Failed to delete list:', error);
       alert('Failed to delete list');
+      loadLists(); // reload on error
     }
   };
 

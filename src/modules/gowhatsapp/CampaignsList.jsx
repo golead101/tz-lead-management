@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart3, Trash2, Eye, Plus, Copy } from 'lucide-react';
-import { whatsappDb } from './whatsappDb';
+import { whatsappDb, deleteCampaignById } from './whatsappDb';
 
 const BRAND_BLUE = '#2563eb';
 
@@ -23,19 +23,17 @@ export default function CampaignsList({ setSubView, navigateToReport, setReusedC
     }
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (!confirm('Delete this campaign and all its data?')) return;
     try {
-      const updated = campaigns.filter(c => c.id !== id);
-      whatsappDb.saveCampaigns(updated);
-      setCampaigns(updated);
-
-      // Clean up recipients also
-      const recipients = whatsappDb.getRecipients();
-      delete recipients[id];
-      whatsappDb.saveRecipients(recipients);
+      // Optimistically remove from UI immediately
+      setCampaigns(prev => prev.filter(c => c.id !== id));
+      // Delete from Firestore + localStorage directly (no race condition)
+      await deleteCampaignById(id);
     } catch (error) {
+      console.error('Failed to delete campaign:', error);
       alert('Failed to delete campaign');
+      loadCampaigns(); // reload on error
     }
   };
 

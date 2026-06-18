@@ -141,88 +141,31 @@ export function initWhatsappDb() {
     onSnapshot(doc(db, 'settings', 'whatsapp_chatbot'), (snapshot) => {
       if (snapshot.exists()) {
         localStorage.setItem('gowha_chatbot', JSON.stringify(snapshot.data()));
-      } else {
-        const initial = JSON.parse(localStorage.getItem('gowha_chatbot') || '{}');
-        setDoc(doc(db, 'settings', 'whatsapp_chatbot'), initial).catch(console.error);
       }
     });
 
-    // Listen to Templates
+    // Listen to Templates — sync from Firestore only (no re-seeding on empty)
     onSnapshot(collection(db, 'whatsapp_templates'), (snapshot) => {
       if (!snapshot.empty) {
         const templates = snapshot.docs.map(doc => doc.data());
-        
-        // Auto-upgrade welcome_brochure in Firestore to have exactly 2 variables
-        const welcomeBrochure = templates.find(t => t.name === 'welcome_brochure');
-        if (welcomeBrochure) {
-          const bodyComp = welcomeBrochure.components?.find(c => c.type === 'BODY');
-          if (bodyComp && (!bodyComp.text.includes('{{2}}') || bodyComp.text.includes('{{3}}'))) {
-            const updatedBrochure = {
-              ...welcomeBrochure,
-              components: welcomeBrochure.components.map(c => 
-                c.type === 'BODY' 
-                  ? { ...c, text: 'Hi {{1}}! Thanks for enrolling in the {{2}} course. Here is the program overview brochure. Let us know if you have any questions.' }
-                  : c
-              )
-            };
-            setDoc(doc(db, 'whatsapp_templates', 'welcome_brochure'), updatedBrochure).catch(console.error);
-          }
-        }
-
-        // Auto-upgrade fee_reminder in Firestore to have exactly 3 variables
-        const feeReminder = templates.find(t => t.name === 'fee_reminder');
-        if (feeReminder) {
-          const bodyComp = feeReminder.components?.find(c => c.type === 'BODY');
-          if (bodyComp && bodyComp.text.includes('{{4}}')) {
-            const updatedFee = {
-              ...feeReminder,
-              components: feeReminder.components.map(c => 
-                c.type === 'BODY' 
-                  ? { ...c, text: 'Hi {{1}}, this is a friendly reminder that your payment of {{2}} for the {{3}} course is due.' }
-                  : c
-              )
-            };
-            setDoc(doc(db, 'whatsapp_templates', 'fee_reminder'), updatedFee).catch(console.error);
-          }
-        }
-
         localStorage.setItem('gowha_templates', JSON.stringify(templates));
-      } else {
-        const initial = JSON.parse(localStorage.getItem('gowha_templates') || '[]');
-        initial.forEach(tpl => {
-          setDoc(doc(db, 'whatsapp_templates', tpl.name), tpl).catch(console.error);
-        });
       }
     });
 
-    // Listen to Contact Lists
+    // Listen to Contact Lists — sync from Firestore only (no re-seeding on empty)
     onSnapshot(collection(db, 'whatsapp_contact_lists'), (snapshot) => {
-      if (!snapshot.empty) {
-        const lists = snapshot.docs
-          .filter(d => !STALE_LIST_IDS.includes(d.id)) // skip stale IDs only
-          .map(d => d.data());
-        localStorage.setItem('gowha_contact_lists', JSON.stringify(lists));
-      } else {
-        const initial = JSON.parse(localStorage.getItem('gowha_contact_lists') || '[]');
-        initial.forEach(list => {
-          setDoc(doc(db, 'whatsapp_contact_lists', list.id), list).catch(console.error);
-        });
-      }
+      const lists = snapshot.docs
+        .filter(d => !STALE_LIST_IDS.includes(d.id))
+        .map(d => d.data());
+      localStorage.setItem('gowha_contact_lists', JSON.stringify(lists));
     });
 
-    // Listen to Campaigns
+    // Listen to Campaigns — sync from Firestore only (no re-seeding on empty)
     onSnapshot(collection(db, 'whatsapp_campaigns'), (snapshot) => {
-      if (!snapshot.empty) {
-        const campaigns = snapshot.docs
-          .filter(d => !STALE_CAMPAIGN_IDS.includes(d.id)) // skip stale IDs only
-          .map(d => d.data());
-        localStorage.setItem('gowha_campaigns', JSON.stringify(campaigns));
-      } else {
-        const initial = JSON.parse(localStorage.getItem('gowha_campaigns') || '[]');
-        initial.forEach(camp => {
-          setDoc(doc(db, 'whatsapp_campaigns', camp.id), camp).catch(console.error);
-        });
-      }
+      const campaigns = snapshot.docs
+        .filter(d => !STALE_CAMPAIGN_IDS.includes(d.id))
+        .map(d => d.data());
+      localStorage.setItem('gowha_campaigns', JSON.stringify(campaigns));
     });
 
     // Listen to Contacts
@@ -251,7 +194,55 @@ export function initWhatsappDb() {
   }
 }
 
-// Database Getters & Setters
+// ─── Direct delete helpers (bypass saveCampaigns/saveContactLists race condition) ───
+export async function deleteCampaignById(id) {
+  // Remove from localStorage immediately
+  try {
+    const camps = JSON.parse(localStorage.getItem('gowha_campaigns') || '[]');
+    localStorage.setItem('gowha_campaigns', JSON.stringify(camps.filter(c => c.id !== id)));
+  } catch (e) { /* ignore */ }
+  // Remove recipients from localStorage
+  try {
+    const recipients = JSON.parse(localStorage.getItem('gowha_recipients') || '{}');
+    delete recipients[id];
+    localStorage.setItem('gowha_recipients', JSON.stringify(recipients));
+  } catch (e) { /* ignore */ }
+  // Delete from Firestore — throw on failure so caller sees the error
+  try {
+    await deleteDoc(doc(db, 'whatsapp_campaigns', id));
+    await deleteDoc(doc(db, 'whatsapp_recipients', id)).catch(() => {}); // recipients doc may not exist
+    console.log('[whatsappDb] Campaign deleted from Firestore:', id);
+  } catch (err) {
+    console.error('[whatsappDb] Firestore deleteCampaign FAILED:', err.code, err.message);
+    alert('Delete failed: ' + (err.message || err.code || 'Unknown error') + '\n\nCheck console for details.');
+    throw err;
+  }
+}
+
+export async function deleteContactListById(id) {
+  // Remove from localStorage immediately
+  try {
+    const lists = JSON.parse(localStorage.getItem('gowha_contact_lists') || '[]');
+    localStorage.setItem('gowha_contact_lists', JSON.stringify(lists.filter(l => l.id !== id)));
+  } catch (e) { /* ignore */ }
+  // Remove contacts from localStorage
+  try {
+    const contacts = JSON.parse(localStorage.getItem('gowha_contacts') || '{}');
+    delete contacts[id];
+    localStorage.setItem('gowha_contacts', JSON.stringify(contacts));
+  } catch (e) { /* ignore */ }
+  // Delete from Firestore — throw on failure so caller sees the error
+  try {
+    await deleteDoc(doc(db, 'whatsapp_contact_lists', id));
+    await deleteDoc(doc(db, 'whatsapp_contacts', id)).catch(() => {}); // contacts doc may not exist
+    console.log('[whatsappDb] Contact list deleted from Firestore:', id);
+  } catch (err) {
+    console.error('[whatsappDb] Firestore deleteContactList FAILED:', err.code, err.message);
+    alert('Delete failed: ' + (err.message || err.code || 'Unknown error') + '\n\nCheck console for details.');
+    throw err;
+  }
+}
+
 export const whatsappDb = {
   getCampaigns: () => {
     initWhatsappDb();
