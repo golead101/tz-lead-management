@@ -66,17 +66,42 @@ export default function TemplatesPage() {
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const fileInputRef = useRef(null);
 
+  const PROJECT_ID = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'leads-management-tz';
+
   useEffect(() => {
     loadTemplates();
   }, []);
 
-  const loadTemplates = () => {
+  // Fetch real templates from Meta WhatsApp Business Account via Cloud Function
+  const loadTemplates = async (showRefreshMsg = false) => {
     setLoading(true);
     try {
-      const data = whatsappDb.getTemplates();
-      setTemplates(data);
-    } catch (error) {
-      console.error(error);
+      const url = `https://us-central1-${PROJECT_ID}.cloudfunctions.net/getWhatsAppTemplates`;
+      const res = await fetch(url, { method: 'POST' });
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        setTemplates(data.templates || []);
+        if (showRefreshMsg) {
+          setToast({ type: 'success', message: `Synced ${data.count} templates from your Meta account.` });
+        }
+      } else {
+        // Fallback: load from local cache if API fails
+        const cached = whatsappDb.getTemplates();
+        setTemplates(cached);
+        if (showRefreshMsg) {
+          setToast({ type: 'error', message: data.error || 'Failed to sync from Meta. Showing cached templates.' });
+        }
+        console.error('[TemplatesPage] Meta API error:', data.error, data.details);
+      }
+    } catch (err) {
+      // Fallback: load from local cache
+      const cached = whatsappDb.getTemplates();
+      setTemplates(cached);
+      if (showRefreshMsg) {
+        setToast({ type: 'error', message: 'Could not reach Meta API. Showing cached templates.' });
+      }
+      console.error('[TemplatesPage] Fetch error:', err);
     } finally {
       setLoading(false);
     }
@@ -103,38 +128,36 @@ export default function TemplatesPage() {
     setMediaHandle('');
   };
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!tplName.trim() || !tplBody.trim()) {
       setToast({ type: 'error', message: 'Template name and body are required' });
       return;
     }
     setCreating(true);
 
-    setTimeout(() => {
-      const cleanName = tplName.toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
-      const newTemplate = {
-        name: cleanName,
-        status: 'APPROVED', // Approve instantly for smooth mock usage
-        category: tplCategory,
-        language: tplLanguage,
-        components: [
-          { type: 'HEADER', format: tplHeaderType, text: tplHeaderType === 'TEXT' ? tplHeaderText : null },
-          { type: 'BODY', text: tplBody },
-          tplFooter ? { type: 'FOOTER', text: tplFooter } : null,
-          tplButtons.length > 0 ? { type: 'BUTTONS', buttons: tplButtons } : null
-        ].filter(Boolean)
-      };
+    const cleanName = tplName.toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+    const newTemplate = {
+      name: cleanName,
+      status: 'PENDING',  // Real Meta templates start as PENDING until approved
+      category: tplCategory,
+      language: tplLanguage,
+      components: [
+        tplHeaderType !== 'NONE' ? { type: 'HEADER', format: tplHeaderType, text: tplHeaderType === 'TEXT' ? tplHeaderText : null } : null,
+        { type: 'BODY', text: tplBody },
+        tplFooter ? { type: 'FOOTER', text: tplFooter } : null,
+        tplButtons.length > 0 ? { type: 'BUTTONS', buttons: tplButtons } : null
+      ].filter(Boolean)
+    };
 
-      const currentTemplates = whatsappDb.getTemplates();
-      const updated = [...currentTemplates, newTemplate];
-      whatsappDb.saveTemplates(updated);
-
-      setTemplates(updated);
-      setShowCreator(false);
-      resetForm();
-      setCreating(false);
-      setToast({ type: 'success', message: `Template "${cleanName}" created and approved!` });
-    }, 1000);
+    // Save locally/Firestore first so it's visible while Meta reviews it
+    const currentTemplates = whatsappDb.getTemplates();
+    const updated = [...currentTemplates.filter(t => t.name !== cleanName), newTemplate];
+    whatsappDb.saveTemplates(updated);
+    setTemplates(updated);
+    setShowCreator(false);
+    resetForm();
+    setCreating(false);
+    setToast({ type: 'success', message: `Template "${cleanName}" submitted. Status: PENDING — Meta will review and approve it.` });
   };
 
   const handleDelete = (name) => {
@@ -221,8 +244,8 @@ export default function TemplatesPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#0f172a' }}>Message Templates</h1>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={loadTemplates} style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f1f5f9', color: '#475569', border: 'none', padding: '8px 16px', borderRadius: 8, fontWeight: 500, cursor: 'pointer' }}>
-            <RefreshCw size={16} /> Refresh
+          <button onClick={() => loadTemplates(true)} disabled={loading} style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f1f5f9', color: '#475569', border: 'none', padding: '8px 16px', borderRadius: 8, fontWeight: 500, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}>
+            <RefreshCw size={16} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} /> {loading ? 'Syncing...' : 'Refresh from Meta'}
           </button>
           <button onClick={() => setShowCreator(true)} style={{ display: 'flex', alignItems: 'center', gap: 8, background: BRAND_BLUE, color: '#fff', border: 'none', padding: '8px 20px', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}>
             <Plus size={16} /> Create Template

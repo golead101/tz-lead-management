@@ -2,52 +2,15 @@
 import { db } from '../../firebase';
 import { doc, setDoc, deleteDoc, onSnapshot, collection, getDocs } from 'firebase/firestore';
 
-const SEED_CAMPAIGNS = [];
+// ─── Old mock document IDs from the original mockData.js that must be cleaned up ───
+// These are safe to delete permanently — real campaigns use camp-{timestamp} IDs,
+// real contact lists use list-{timestamp} IDs. These old IDs can never re-appear.
+const STALE_CAMPAIGN_IDS = ['camp-001', 'camp-002', 'camp-003', 'camp-1', 'camp-2', 'camp-3'];
+const STALE_LIST_IDS     = ['list-001', 'list-002', 'list-1', 'list-2'];
 
-const SEED_TEMPLATES = [
-  {
-    name: 'welcome_brochure',
-    status: 'APPROVED',
-    category: 'MARKETING',
-    language: 'en_US',
-    components: [
-      { type: 'HEADER', format: 'DOCUMENT' },
-      { type: 'BODY', text: 'Hi {{1}}! Thanks for enrolling in the {{2}} course. Here is the program overview brochure. Let us know if you have any questions.' },
-      { type: 'FOOTER', text: 'TechZone Academy' },
-      {
-        type: 'BUTTONS',
-        buttons: [
-          { type: 'QUICK_REPLY', text: 'Contact Counselor' }
-        ]
-      }
-    ]
-  },
-  {
-    name: 'fee_reminder',
-    status: 'APPROVED',
-    category: 'UTILITY',
-    language: 'en_US',
-    components: [
-      { type: 'HEADER', format: 'TEXT', text: 'Payment Reminder' },
-      { type: 'BODY', text: 'Hi {{1}}, this is a friendly reminder that your payment of {{2}} for the {{3}} course is due.' },
-      {
-        type: 'BUTTONS',
-        buttons: [
-          { type: 'URL', text: 'Pay Fees Online', url: 'https://techzone.academy/pay' }
-        ]
-      }
-    ]
-  },
-  {
-    name: 'lead_followup_',
-    status: 'APPROVED',
-    category: 'UTILITY',
-    language: 'en',
-    components: [
-      { type: 'BODY', text: 'Hello {{1}}, Thank you for your interest in {{2}} at Ambrits Training Hub. Our counselor will assist you shortly to discuss the course details. If you have any urgent queries, feel free to call. Regards, Ambrits Training Hub' }
-    ]
-  }
-];
+// Templates are fetched from the real Meta WhatsApp Business API
+// via the getWhatsAppTemplates Cloud Function — no local seeds needed.
+const SEED_TEMPLATES = [];
 
 const SEED_CONTACT_LISTS = [];
 
@@ -56,30 +19,64 @@ const SEED_CONTACTS = {};
 const SEED_RECIPIENTS = {};
 
 const SEED_CHATBOT = {
-  welcomeTemplate: 'welcome_brochure',
-  coursesText: 'We offer the following programs:\n1. Full-Stack Web Development (6 Months)\n2. Data Science & AI (8 Months)\n3. Cloud & DevOps Engineering (5 Months)\n4. Cyber Security (6 Months)\n5. UI/UX Product Design (4 Months)\n\nReply with the course number to get fee details!',
-  feeDetails: 'Our program fee structures are:\n- Web Development: ₹75,000\n- Data Science & AI: ₹95,000\n- Cloud & DevOps: ₹80,000\n- Cyber Security: ₹85,000\n- UI/UX Design: ₹60,000\n\nScholarships and monthly installment plans (EMIs starting at ₹5,000/month) are available. Let us know if you want to speak to a counselor.',
+  welcomeTemplate: '',
+  coursesText: '',
+  feeDetails: '',
   counselorPhone: '',
-  brochureUrl: 'https://firebasestorage.googleapis.com/v0/b/leads-management-tz/o/brochures%2Ftechzone-brochure.pdf?alt=media'
+  brochureUrl: ''
 };
 
-const SEED_API_STATUS = {
-  ok: true,
-  configured: true,
-  businessAccountId: '564738291029384',
-  phoneNumbers: [
-    { id: 'phone-1', display_phone_number: '+91 98765 43210', quality_rating: 'GREEN', messaging_limit_tier: 'TIER_10K', status: 'CONNECTED', verifiedName: 'TechZone Academy' }
-  ]
-};
+// API status is always fetched live from Meta — no hardcoded defaults
+const SEED_API_STATUS = {};
 
 const SEED_CONVERSATIONS = [];
 
 const SEED_MESSAGES = {};
 
 let listenersInitialized = false;
+let staleDataPurged = false;
+
+// One-time cleanup: delete stale mock documents from Firestore by their old IDs.
+// Safe for production — real campaigns/lists use timestamp-based IDs (camp-1750123456789)
+// so these hardcoded old IDs (camp-001, list-001) can never belong to real data.
+function purgeStaleDataFromFirestore() {
+  if (staleDataPurged) return;
+  staleDataPurged = true;
+
+  // Delete by exact old IDs from Firestore
+  STALE_CAMPAIGN_IDS.forEach(id => {
+    deleteDoc(doc(db, 'whatsapp_campaigns', id)).catch(() => {});
+    deleteDoc(doc(db, 'whatsapp_recipients', id)).catch(() => {});
+  });
+  STALE_LIST_IDS.forEach(id => {
+    deleteDoc(doc(db, 'whatsapp_contact_lists', id)).catch(() => {});
+    deleteDoc(doc(db, 'whatsapp_contacts', id)).catch(() => {});
+  });
+
+  // Clean same stale IDs from localStorage
+  try {
+    const camps = JSON.parse(localStorage.getItem('gowha_campaigns') || '[]');
+    const clean = camps.filter(c => !STALE_CAMPAIGN_IDS.includes(c.id));
+    if (clean.length !== camps.length) localStorage.setItem('gowha_campaigns', JSON.stringify(clean));
+  } catch (e) { console.error(e); }
+
+  try {
+    const lists = JSON.parse(localStorage.getItem('gowha_contact_lists') || '[]');
+    const clean = lists.filter(l => !STALE_LIST_IDS.includes(l.id));
+    if (clean.length !== lists.length) {
+      localStorage.setItem('gowha_contact_lists', JSON.stringify(clean));
+      const contacts = JSON.parse(localStorage.getItem('gowha_contacts') || '{}');
+      STALE_LIST_IDS.forEach(id => delete contacts[id]);
+      localStorage.setItem('gowha_contacts', JSON.stringify(contacts));
+    }
+  } catch (e) { console.error(e); }
+}
 
 // Database Init
 export function initWhatsappDb() {
+  // Purge stale old mock IDs from Firestore (safe — never affects real data)
+  purgeStaleDataFromFirestore();
+
   if (!localStorage.getItem('gowha_campaigns')) {
     localStorage.setItem('gowha_campaigns', JSON.stringify(SEED_CAMPAIGNS));
   }
@@ -199,7 +196,9 @@ export function initWhatsappDb() {
     // Listen to Contact Lists
     onSnapshot(collection(db, 'whatsapp_contact_lists'), (snapshot) => {
       if (!snapshot.empty) {
-        const lists = snapshot.docs.map(doc => doc.data());
+        const lists = snapshot.docs
+          .filter(d => !STALE_LIST_IDS.includes(d.id)) // skip stale IDs only
+          .map(d => d.data());
         localStorage.setItem('gowha_contact_lists', JSON.stringify(lists));
       } else {
         const initial = JSON.parse(localStorage.getItem('gowha_contact_lists') || '[]');
@@ -212,7 +211,9 @@ export function initWhatsappDb() {
     // Listen to Campaigns
     onSnapshot(collection(db, 'whatsapp_campaigns'), (snapshot) => {
       if (!snapshot.empty) {
-        const campaigns = snapshot.docs.map(doc => doc.data());
+        const campaigns = snapshot.docs
+          .filter(d => !STALE_CAMPAIGN_IDS.includes(d.id)) // skip stale IDs only
+          .map(d => d.data());
         localStorage.setItem('gowha_campaigns', JSON.stringify(campaigns));
       } else {
         const initial = JSON.parse(localStorage.getItem('gowha_campaigns') || '[]');

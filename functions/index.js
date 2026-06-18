@@ -1196,3 +1196,78 @@ exports.whatsappWebhook = functions.https.onRequest((req, res) => {
   return res.status(405).send('Method Not Allowed');
 });
 
+/**
+ * getWhatsAppTemplates
+ * Fetches all message templates from the connected Meta WhatsApp Business Account
+ * and caches them in Firestore (whatsapp_templates collection).
+ */
+exports.getWhatsAppTemplates = functions.https.onRequest((req, res) => {
+  return cors(req, res, async () => {
+    if (req.method !== 'GET' && req.method !== 'POST') {
+      return res.status(405).json({ error: 'Method not allowed' });
+    }
+
+    try {
+      // Load WhatsApp credentials from Firestore settings
+      const creds = await getDecryptedWhatsAppCredentials();
+
+      if (!creds.accessToken || !creds.businessAccountId) {
+        return res.status(400).json({
+          success: false,
+          error: 'WhatsApp Business Account ID and Access Token are not configured in settings.'
+        });
+      }
+
+      const apiVersion = creds.apiVersion || 'v20.0';
+      const url = `https://graph.facebook.com/${apiVersion}/${creds.businessAccountId}/message_templates`;
+
+      const response = await axios.get(url, {
+        params: {
+          access_token: creds.accessToken.trim(),
+          limit: 100,
+          fields: 'name,status,category,language,components,rejected_reason'
+        }
+      });
+
+      const metaTemplates = response.data?.data || [];
+      console.log(`[getWhatsAppTemplates] Fetched ${metaTemplates.length} templates from Meta.`);
+
+      // Normalize to our internal schema and cache in Firestore
+      const batch = db.batch();
+      // Clear old cached templates first
+      const existing = await db.collection('whatsapp_templates').get();
+      existing.docs.forEach(doc => batch.delete(doc.ref));
+
+      const normalized = metaTemplates.map(t => ({
+        name: t.name,
+        status: t.status,
+        category: t.category,
+        language: t.language,
+        components: t.components || [],
+        rejectedReason: t.rejected_reason || null
+      }));
+
+      normalized.forEach(tpl => {
+        const ref = db.collection('whatsapp_templates').doc(tpl.name);
+        batch.set(ref, tpl);
+      });
+
+      await batch.commit();
+
+      return res.status(200).json({
+        success: true,
+        count: normalized.length,
+        templates: normalized
+      });
+
+    } catch (err) {
+      const errorMsg = err.response ? JSON.stringify(err.response.data) : err.message;
+      console.error('[getWhatsAppTemplates] Error:', errorMsg);
+      return res.status(400).json({
+        success: false,
+        error: 'Failed to fetch templates from Meta.',
+        details: errorMsg
+      });
+    }
+  });
+});
