@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useCRM } from '../context/CRMContext';
+import { db } from '../firebase';
+import { collection, onSnapshot } from 'firebase/firestore';
 
 export default function Dashboard() {
   const { leads, activeUser, activeRole } = useCRM();
@@ -7,6 +9,17 @@ export default function Dashboard() {
   const [hoveredPoint, setHoveredPoint] = useState(null);
   const [timeRange, setTimeRange] = useState('7days'); // '7days', '1month', '1year'
   const [walkinExpanded, setWalkinExpanded] = useState(true);
+
+  // phoneCallLeads count from Firestore (each doc = 1 unique phone lead called)
+  const [phoneCallLeadsCount, setPhoneCallLeadsCount] = useState(0);
+  useEffect(() => {
+    const unsub = onSnapshot(
+      collection(db, 'phoneCallLeads'),
+      snap => setPhoneCallLeadsCount(snap.size),
+      e => console.error('[Dashboard] phoneCallLeads listen failed:', e)
+    );
+    return () => unsub();
+  }, []);
 
   // Date Picker States
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
@@ -507,7 +520,7 @@ export default function Dashboard() {
             </div>
             <div className="db-source-details">
               <span className="db-source-label">Call</span>
-              <span className="db-source-value">{activeStats.callLeads.toLocaleString()}</span>
+              <span className="db-source-value">{(activeStats.callLeads + phoneCallLeadsCount).toLocaleString()}</span>
             </div>
           </div>
         </div>

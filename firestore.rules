@@ -203,5 +203,27 @@ service cloud.firestore {
       allow read, update, delete: if isStaff();
     }
 
+    // ─────────────────────────────────────────────
+    // /phoneCallLeads collection (synced from dialer app)
+    //  Admin/Telecaller → read (dashboard + performance ranking)
+    //  Counselor        → read
+    //  Write            → Admin only (external dialer sync)
+    // ─────────────────────────────────────────────
+    match /phoneCallLeads/{docId} {
+      allow read: if isStaff();
+      allow write: if isAdmin();
+    }
+
+    // ─────────────────────────────────────────────
+    // /phoneCallActivities collection (synced from dialer app)
+    //  Admin/Telecaller → read (analytics performance)
+    //  Counselor        → read
+    //  Write            → Admin only (external dialer sync)
+    // ─────────────────────────────────────────────
+    match /phoneCallActivities/{docId} {
+      allow read: if isStaff();
+      allow write: if isAdmin();
+    }
+
   }
 }
