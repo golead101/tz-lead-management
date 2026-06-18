@@ -1271,3 +1271,133 @@ exports.getWhatsAppTemplates = functions.https.onRequest((req, res) => {
     }
   });
 });
+
+/**
+ * createWhatsAppTemplate
+ * Submits a new message template to Meta WhatsApp Business API for review/approval.
+ */
+exports.createWhatsAppTemplate = functions.https.onRequest((req, res) => {
+  return cors(req, res, async () => {
+    if (req.method !== 'POST') {
+      return res.status(405).json({ error: 'Method not allowed' });
+    }
+
+    try {
+      const { name, category, language, components } = req.body;
+
+      if (!name || !category || !language || !components) {
+        return res.status(400).json({
+          success: false,
+          error: 'name, category, language, and components are required.'
+        });
+      }
+
+      const creds = await getDecryptedWhatsAppCredentials();
+      if (!creds.accessToken || !creds.businessAccountId) {
+        return res.status(400).json({
+          success: false,
+          error: 'WhatsApp credentials are not configured in settings.'
+        });
+      }
+
+      const apiVersion = creds.apiVersion || 'v20.0';
+      const url = `https://graph.facebook.com/${apiVersion}/${creds.businessAccountId}/message_templates`;
+
+      const payload = { name, category, language, components };
+      console.log('[createWhatsAppTemplate] Submitting to Meta:', JSON.stringify(payload));
+
+      const response = await axios.post(url, payload, {
+        headers: {
+          'Authorization': `Bearer ${creds.accessToken.trim()}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const created = response.data;
+      console.log('[createWhatsAppTemplate] Meta response:', JSON.stringify(created));
+
+      // Cache in Firestore with PENDING status
+      const templateDoc = {
+        name,
+        status: created.status || 'PENDING',
+        category,
+        language,
+        components,
+        metaId: created.id || null,
+        rejectedReason: null
+      };
+      await db.collection('whatsapp_templates').doc(name).set(templateDoc);
+
+      return res.status(200).json({
+        success: true,
+        template: templateDoc,
+        metaResponse: created
+      });
+
+    } catch (err) {
+      const errorMsg = err.response ? JSON.stringify(err.response.data) : err.message;
+      console.error('[createWhatsAppTemplate] Error:', errorMsg);
+      return res.status(400).json({
+        success: false,
+        error: 'Failed to create template on Meta.',
+        details: errorMsg
+      });
+    }
+  });
+});
+
+/**
+ * deleteWhatsAppTemplate
+ * Permanently deletes a template from Meta WhatsApp Business API by name.
+ */
+exports.deleteWhatsAppTemplate = functions.https.onRequest((req, res) => {
+  return cors(req, res, async () => {
+    if (req.method !== 'POST' && req.method !== 'DELETE') {
+      return res.status(405).json({ error: 'Method not allowed' });
+    }
+
+    try {
+      const { name } = req.body;
+
+      if (!name) {
+        return res.status(400).json({ success: false, error: 'Template name is required.' });
+      }
+
+      const creds = await getDecryptedWhatsAppCredentials();
+      if (!creds.accessToken || !creds.businessAccountId) {
+        return res.status(400).json({
+          success: false,
+          error: 'WhatsApp credentials are not configured in settings.'
+        });
+      }
+
+      const apiVersion = creds.apiVersion || 'v20.0';
+      const url = `https://graph.facebook.com/${apiVersion}/${creds.businessAccountId}/message_templates`;
+
+      console.log('[deleteWhatsAppTemplate] Deleting from Meta:', name);
+
+      await axios.delete(url, {
+        headers: {
+          'Authorization': `Bearer ${creds.accessToken.trim()}`,
+          'Content-Type': 'application/json'
+        },
+        params: { name }
+      });
+
+      // Remove from Firestore cache too
+      await db.collection('whatsapp_templates').doc(name).delete().catch(() => {});
+
+      console.log('[deleteWhatsAppTemplate] Successfully deleted:', name);
+      return res.status(200).json({ success: true, message: `Template "${name}" deleted from Meta.` });
+
+    } catch (err) {
+      const errorMsg = err.response ? JSON.stringify(err.response.data) : err.message;
+      console.error('[deleteWhatsAppTemplate] Error:', errorMsg);
+      return res.status(400).json({
+        success: false,
+        error: 'Failed to delete template from Meta.',
+        details: errorMsg
+      });
+    }
+  });
+});

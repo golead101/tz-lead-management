@@ -136,42 +136,73 @@ export default function TemplatesPage() {
     setCreating(true);
 
     const cleanName = tplName.toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
-    const newTemplate = {
-      name: cleanName,
-      status: 'PENDING',  // Real Meta templates start as PENDING until approved
-      category: tplCategory,
-      language: tplLanguage,
-      components: [
-        tplHeaderType !== 'NONE' ? { type: 'HEADER', format: tplHeaderType, text: tplHeaderType === 'TEXT' ? tplHeaderText : null } : null,
-        { type: 'BODY', text: tplBody },
-        tplFooter ? { type: 'FOOTER', text: tplFooter } : null,
-        tplButtons.length > 0 ? { type: 'BUTTONS', buttons: tplButtons } : null
-      ].filter(Boolean)
-    };
 
-    // Save locally/Firestore first so it's visible while Meta reviews it
-    const currentTemplates = whatsappDb.getTemplates();
-    const updated = [...currentTemplates.filter(t => t.name !== cleanName), newTemplate];
-    whatsappDb.saveTemplates(updated);
-    setTemplates(updated);
-    setShowCreator(false);
-    resetForm();
-    setCreating(false);
-    setToast({ type: 'success', message: `Template "${cleanName}" submitted. Status: PENDING — Meta will review and approve it.` });
+    const components = [
+      tplHeaderType !== 'NONE' ? { type: 'HEADER', format: tplHeaderType, ...(tplHeaderType === 'TEXT' ? { text: tplHeaderText } : {}) } : null,
+      { type: 'BODY', text: tplBody },
+      tplFooter ? { type: 'FOOTER', text: tplFooter } : null,
+      tplButtons.length > 0 ? { type: 'BUTTONS', buttons: tplButtons } : null
+    ].filter(Boolean);
+
+    try {
+      const url = `https://us-central1-${PROJECT_ID}.cloudfunctions.net/createWhatsAppTemplate`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: cleanName,
+          category: tplCategory,
+          language: tplLanguage,
+          components
+        })
+      });
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        setShowCreator(false);
+        resetForm();
+        setToast({ type: 'success', message: `Template "${cleanName}" submitted to Meta for approval. Status: PENDING.` });
+        // Refresh from Meta to show real status
+        await loadTemplates();
+      } else {
+        setToast({ type: 'error', message: data.error || 'Failed to submit template to Meta.' });
+        console.error('[handleCreate] Meta error:', data.details);
+      }
+    } catch (err) {
+      setToast({ type: 'error', message: 'Could not reach Meta API. Check your connection.' });
+      console.error('[handleCreate] Error:', err);
+    } finally {
+      setCreating(false);
+    }
   };
 
-  const handleDelete = (name) => {
-    if (!confirm(`Delete template "${name}"?`)) return;
+  const handleDelete = async (name) => {
+    if (!confirm(`Delete template "${name}" from Meta? This cannot be undone.`)) return;
     setDeleting(name);
 
-    setTimeout(() => {
-      const current = whatsappDb.getTemplates();
-      const updated = current.filter(t => t.name !== name);
-      whatsappDb.saveTemplates(updated);
-      setTemplates(updated);
+    try {
+      const url = `https://us-central1-${PROJECT_ID}.cloudfunctions.net/deleteWhatsAppTemplate`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      });
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        setToast({ type: 'success', message: `Template "${name}" deleted from Meta.` });
+        // Refresh to reflect Meta's actual state
+        await loadTemplates();
+      } else {
+        setToast({ type: 'error', message: data.error || 'Failed to delete from Meta.' });
+        console.error('[handleDelete] Meta error:', data.details);
+      }
+    } catch (err) {
+      setToast({ type: 'error', message: 'Could not reach Meta API.' });
+      console.error('[handleDelete] Error:', err);
+    } finally {
       setDeleting(null);
-      setToast({ type: 'success', message: `Template deleted.` });
-    }, 500);
+    }
   };
 
   const resetForm = () => {
