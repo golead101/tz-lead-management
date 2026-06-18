@@ -8,6 +8,8 @@ import { doc, setDoc, deleteDoc, onSnapshot, collection, getDocs } from 'firebas
 const STALE_CAMPAIGN_IDS = ['camp-001', 'camp-002', 'camp-003', 'camp-1', 'camp-2', 'camp-3'];
 const STALE_LIST_IDS     = ['list-001', 'list-002', 'list-1', 'list-2'];
 
+const SEED_CAMPAIGNS = [];
+
 // Templates are fetched from the real Meta WhatsApp Business API
 // via the getWhatsAppTemplates Cloud Function — no local seeds needed.
 const SEED_TEMPLATES = [];

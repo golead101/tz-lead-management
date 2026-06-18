@@ -14,6 +14,7 @@ const CATEGORIES = [
 ];
 
 const LANGUAGES = [
+  { value: 'en', label: 'English' },
   { value: 'en_US', label: 'English (US)' },
   { value: 'en_GB', label: 'English (UK)' },
   { value: 'hi', label: 'Hindi' },
@@ -53,7 +54,7 @@ export default function TemplatesPage() {
   // Form State
   const [tplName, setTplName] = useState('');
   const [tplCategory, setTplCategory] = useState('MARKETING');
-  const [tplLanguage, setTplLanguage] = useState('en_US');
+  const [tplLanguage, setTplLanguage] = useState('en');
   const [tplHeaderType, setTplHeaderType] = useState('NONE');
   const [tplHeaderText, setTplHeaderText] = useState('');
   const [tplBody, setTplBody] = useState('');
@@ -137,9 +138,21 @@ export default function TemplatesPage() {
 
     const cleanName = tplName.toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
 
+    // Detect variables {{1}}, {{2}}, etc. in body and build example values
+    const varMatches = [...tplBody.matchAll(/\{\{(\d+)\}\}/g)];
+    const maxVar = varMatches.length > 0 ? Math.max(...varMatches.map(m => parseInt(m[1]))) : 0;
+    const bodyExamples = [];
+    for (let i = 1; i <= maxVar; i++) {
+      bodyExamples.push(tplVariableExamples[i] || `value${i}`);
+    }
+
     const components = [
       tplHeaderType !== 'NONE' ? { type: 'HEADER', format: tplHeaderType, ...(tplHeaderType === 'TEXT' ? { text: tplHeaderText } : {}) } : null,
-      { type: 'BODY', text: tplBody },
+      {
+        type: 'BODY',
+        text: tplBody,
+        ...(bodyExamples.length > 0 ? { example: { body_text: [bodyExamples] } } : {})
+      },
       tplFooter ? { type: 'FOOTER', text: tplFooter } : null,
       tplButtons.length > 0 ? { type: 'BUTTONS', buttons: tplButtons } : null
     ].filter(Boolean);
@@ -208,7 +221,7 @@ export default function TemplatesPage() {
   const resetForm = () => {
     setTplName('');
     setTplCategory('MARKETING');
-    setTplLanguage('en_US');
+    setTplLanguage('en');
     setTplHeaderType('NONE');
     setTplHeaderText('');
     setTplBody('');
@@ -416,6 +429,35 @@ export default function TemplatesPage() {
                   </div>
                   <textarea value={tplBody} onChange={e => setTplBody(e.target.value)} placeholder="Enter body text..." rows={5} style={inputStyle} />
                 </div>
+
+                {/* Variable Examples — required by Meta for templates with {{variables}} */}
+                {(() => {
+                  const varMatches = [...tplBody.matchAll(/\{\{(\d+)\}\}/g)];
+                  const maxVar = varMatches.length > 0 ? Math.max(...varMatches.map(m => parseInt(m[1]))) : 0;
+                  if (maxVar === 0) return null;
+                  return (
+                    <div style={{ marginBottom: 16, padding: 12, background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8 }}>
+                      <label style={{ display: 'block', fontWeight: 600, fontSize: '0.82rem', marginBottom: 8, color: '#92400e' }}>
+                        ⚡ Variable Examples (required by Meta)
+                      </label>
+                      <p style={{ fontSize: '0.78rem', color: '#78350f', marginBottom: 10 }}>
+                        Meta requires sample values for each variable to approve your template.
+                      </p>
+                      {Array.from({ length: maxVar }, (_, i) => i + 1).map(i => (
+                        <div key={i} style={{ marginBottom: 8 }}>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#475569', marginBottom: 4 }}>{'{{' + i + '}} example value *'}</label>
+                          <input
+                            type="text"
+                            value={tplVariableExamples[i] || ''}
+                            onChange={e => setTplVariableExamples(prev => ({ ...prev, [i]: e.target.value }))}
+                            placeholder={`e.g. ${i === 1 ? 'John' : i === 2 ? '5000' : 'Data Science'}`}
+                            style={inputStyle}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
 
                 <div style={{ marginBottom: 16 }}>
                   <label style={{ display: 'block', fontWeight: 600, fontSize: '0.85rem', marginBottom: 6, color: '#0f172a' }}>Footer (optional)</label>

@@ -1238,14 +1238,26 @@ exports.getWhatsAppTemplates = functions.https.onRequest((req, res) => {
       const existing = await db.collection('whatsapp_templates').get();
       existing.docs.forEach(doc => batch.delete(doc.ref));
 
-      const normalized = metaTemplates.map(t => ({
-        name: t.name,
-        status: t.status,
-        category: t.category,
-        language: t.language,
-        components: t.components || [],
-        rejectedReason: t.rejected_reason || null
-      }));
+      const normalized = metaTemplates.map(t => {
+        // Strip example field from each component — Firestore does not support
+        // arrays-of-arrays (e.g. example.body_text: [["a","b"]]) and will throw
+        // "Property array contains an invalid nested entity"
+        const safeComponents = (t.components || []).map(c => {
+          if (c.example) {
+            const { example, ...rest } = c;
+            return rest;
+          }
+          return c;
+        });
+        return {
+          name: t.name,
+          status: t.status,
+          category: t.category,
+          language: t.language,
+          components: safeComponents,
+          rejectedReason: t.rejected_reason || null
+        };
+      });
 
       normalized.forEach(tpl => {
         const ref = db.collection('whatsapp_templates').doc(tpl.name);
@@ -1316,13 +1328,23 @@ exports.createWhatsAppTemplate = functions.https.onRequest((req, res) => {
       const created = response.data;
       console.log('[createWhatsAppTemplate] Meta response:', JSON.stringify(created));
 
+      // Strip example field before saving to Firestore
+      // Firestore does NOT support arrays-of-arrays (e.g. body_text: [["a","b"]])
+      const componentsForFirestore = components.map(c => {
+        if (c.example) {
+          const { example, ...rest } = c;
+          return rest;
+        }
+        return c;
+      });
+
       // Cache in Firestore with PENDING status
       const templateDoc = {
         name,
         status: created.status || 'PENDING',
         category,
         language,
-        components,
+        components: componentsForFirestore,
         metaId: created.id || null,
         rejectedReason: null
       };

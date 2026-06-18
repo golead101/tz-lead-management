@@ -9,6 +9,8 @@ import {
 } from 'lucide-react';
 import { whatsappDb } from './whatsappDb';
 import { useCRM } from '../../context/CRMContext';
+import { db } from '../../firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 const BRAND_BLUE = '#2563eb';
 const C = {
@@ -75,7 +77,7 @@ export default function GoWhatsAppDashboard({ setSubView, navigateToReport }) {
     loadData();
   }, [period, leads]);
 
-  const loadData = () => {
+  const loadData = async () => {
     setLoading(true);
     try {
       const camps = whatsappDb.getCampaigns();
@@ -105,18 +107,30 @@ export default function GoWhatsAppDashboard({ setSubView, navigateToReport }) {
             const isIncoming = m.sender === 'lead' || m.direction === 'inbound';
             if (!isIncoming) return false;
             const msgTime = getMsgTimestampLocal(m);
-            return msgTime >= campaignTime - 5000; // 5s buffer
+            return msgTime >= campaignTime - 5000;
           });
         }).length;
 
-        return {
-          ...c,
-          replied: repliedCount
-        };
+        return { ...c, replied: repliedCount };
       });
 
       setCampaigns(updatedCamps);
-      setApiStatus(whatsappDb.getApiStatus());
+
+      // Check real WhatsApp credentials from Firestore settings
+      try {
+        const settingsSnap = await getDoc(doc(db, 'settings', 'integrations'));
+        if (settingsSnap.exists()) {
+          const wa = settingsSnap.data()?.whatsapp || {};
+          const isConfigured = !!(wa.accessToken && wa.phoneNumberId);
+          setApiStatus({ ok: isConfigured, configured: isConfigured });
+        } else {
+          setApiStatus({ ok: false, configured: false });
+        }
+      } catch (e) {
+        // If Firestore check fails, don't show the error banner
+        setApiStatus({ ok: true, configured: true });
+      }
+
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
     } finally {
