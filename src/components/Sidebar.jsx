@@ -205,7 +205,7 @@ export default function Sidebar() {
           if ((activeRole === 'Manager' || activeRole === 'Telecaller') && (item.id === 'settings' || item.id === 'reports' || item.id === 'integrations')) {
             return null;
           }
-          if (activeRole === 'Telecaller' && (item.id === 'automation' || item.id === 'gowhatsapp')) {
+          if (activeRole === 'Telecaller' && (item.id === 'automation' || item.id === 'gowhatsapp' || item.id === 'history')) {
             return null;
           }
           // Admin has all tabs access, no exclusions

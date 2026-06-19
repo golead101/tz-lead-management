@@ -29,7 +29,7 @@ export default function GridView() {
   // Filter States
   const [selectedCourse, setSelectedCourse] = useState('All');
   const [selectedStage, setSelectedStage] = useState('All');
-  const [selectedCounselor, setSelectedCounselor] = useState(activeRole === 'Counselor' ? activeUser : 'All');
+  const [selectedCounselor, setSelectedCounselor] = useState('All');
   const [selectedSource, setSelectedSource] = useState('All');
 
   // Sorting State

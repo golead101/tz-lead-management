@@ -70,9 +70,16 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
     setLocalSubSources(prev => Array.from(new Set([...computed, ...prev])));
   }, [leads]);
 
+  const activeCouns = counselors.filter(c => c.status === 'Active' && c.role !== 'Admin' && c.name.toLowerCase() !== 'admin');
+  const getInitialCounselor = () => {
+    if (lead) return lead.counselor;
+    if (activeRole === 'Counselor') return activeUser;
+    return activeCouns[0]?.name || activeUser;
+  };
+
   const [formSubSource, setFormSubSource] = useState(lead ? (lead.subSource || 'Walk-in') : 'Walk-in');
   const [customSubSource, setCustomSubSource] = useState('');
-  const [formCounselor, setFormCounselor] = useState(lead ? lead.counselor : activeUser);
+  const [formCounselor, setFormCounselor] = useState(getInitialCounselor());
   const [formStage, setFormStage] = useState(lead ? lead.stage : 'New Lead');
 
   // Custom Fields form data
@@ -162,12 +169,12 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
       setFormSource('Walk-in');
       setFormSubSource('Walk-in');
       setCustomSubSource('');
-      setFormCounselor(activeUser);
+      setFormCounselor(activeRole === 'Counselor' ? activeUser : (counselors.filter(c => c.status === 'Active' && c.role !== 'Admin' && c.name.toLowerCase() !== 'admin')[0]?.name || activeUser));
       setFormStage('New Lead');
       setFormCustomFields({});
       setIsEditMode(true);
     }
-  }, [selectedLeadId, leads]);
+  }, [selectedLeadId, leads, courses, counselors, activeRole, activeUser]);
 
   // Form Submission
   const handleFormSubmit = (e) => {

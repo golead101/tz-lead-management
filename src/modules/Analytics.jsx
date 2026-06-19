@@ -90,8 +90,15 @@ export default function Analytics() {
 
   const telecallerPerformance = telecallerUsers.map(tc => {
     const name = tc.name || tc.email || 'Unknown';
-    // Leads assigned to this telecaller
-    const assignedLeads = leads.filter(l => l.telecaller === name || l.assignedTelecaller === name);
+    // Leads assigned to or called by this telecaller
+    const assignedLeads = leads.filter(l => 
+      l.telecaller === name || 
+      l.assignedTelecaller === name ||
+      (l.timeline || []).some(t => 
+        (t.type === 'call' || t.type === 'Call') && 
+        (t.user === name || t.telecaller === name)
+      )
+    );
     // Conversions = assigned leads that are Converted or Enrolled
     const conversions = assignedLeads.filter(l =>
       l.stage === 'Converted' || l.stage === 'Enrolled'
