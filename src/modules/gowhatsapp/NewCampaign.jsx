@@ -135,7 +135,7 @@ export default function NewCampaign({ setSubView }) {
 
     const bodyText = tmpl.components?.find(c => c.type === 'BODY')?.text || '';
     const detectedMapping = autoDetectTemplateVariables(selectedTemplate, bodyText, columns);
-    
+
     setVariableMapping(prev => ({
       ...detectedMapping,
       // preserve manually mapped fields if they are still present in current columns
@@ -208,11 +208,11 @@ export default function NewCampaign({ setSubView }) {
   const handleUploadToServer = () => {
     if (uploadedContacts.length === 0) return;
     setUploading(true);
-    
+
     setTimeout(() => {
       const newListId = `list-${Date.now()}`;
       const newListName = uploadName || 'Uploaded Contacts';
-      
+
       const newLists = [
         ...existingLists,
         {
@@ -364,14 +364,12 @@ export default function NewCampaign({ setSubView }) {
 
       targetContacts.forEach((contact, idx) => {
         let phone = getContactPhone(contact);
-        const cleanPhone = phone ? phone.replace(/\D/g, '') : '';
-        const isValid = cleanPhone.length >= 9 && cleanPhone.length <= 15;
-
-        if (!isValid) {
+        if (!phone) {
           failedCount++;
           return;
         }
         sentCount++;
+        const cleanPhone = phone.replace(/\D/g, '');
         let existingLead = leads.find(l => l.phone.replace(/\D/g, '') === cleanPhone);
         const messageToDeliver = getMessageForContact(contact);
 
@@ -409,23 +407,21 @@ export default function NewCampaign({ setSubView }) {
 
       const campaignsList = whatsappDb.getCampaigns();
       whatsappDb.saveCampaigns([newCamp, ...campaignsList]);
-      
+
       // Save recipient list details for report
       const allRecipients = whatsappDb.getRecipients();
       allRecipients[newCamp.id] = targetContacts.map((c, i) => {
         let phone = getContactPhone(c);
-        const cleanPhone = phone ? phone.replace(/\D/g, '') : '';
-        const isValid = cleanPhone.length >= 9 && cleanPhone.length <= 15;
         const msg = getMessageForContact(c);
-        const isFailed = !isValid;
+        const isFailed = !phone;
         return {
           id: `r-${newCamp.id}-${i}`,
-          name: c.name || `Recipient ${i+1}`,
+          name: c.name || `Recipient ${i + 1}`,
           phone: phone || 'N/A',
           status: isFailed ? 'failed' : i % 3 === 0 ? 'delivered' : 'read',
-          error: isFailed ? (phone ? 'Invalid phone number format' : 'Missing phone number') : null,
-          errorCode: isFailed ? '131030' : '131026',
-          messageId: isFailed ? null : `msg-${Date.now()}-${i}`,
+          error: isFailed ? 'Missing phone number' : null,
+          errorCode: isFailed ? '131026' : null,
+          messageId: `msg-${Date.now()}-${i}`,
           deliveredAt: isFailed ? null : Date.now(),
           readAt: isFailed || i % 3 === 0 ? null : Date.now() + 100,
           replied: false
@@ -831,7 +827,7 @@ export default function NewCampaign({ setSubView }) {
                             {`{{${v}}}`}
                           </span>
                           <span style={{ color: '#94a3b8', fontWeight: 500 }}>→</span>
-                          
+
                           <div style={{ display: 'inline-flex', background: '#e2e8f0', borderRadius: 20, padding: 2 }}>
                             <button
                               onClick={() => setVariableMode(prev => ({ ...prev, [v]: 'column' }))}
@@ -923,6 +919,7 @@ export default function NewCampaign({ setSubView }) {
               onClick={() => setStep(1)}
               style={{
                 padding: '10px 24px',
+
                 borderRadius: 24,
                 background: '#fff',
                 color: '#1e293b',
@@ -1001,5 +998,7 @@ export default function NewCampaign({ setSubView }) {
         </div>
       )}
     </div>
+
   );
 }
+
