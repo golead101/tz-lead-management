@@ -156,6 +156,10 @@ export default function AnalyticsPage() {
   let activeConversations = 0;
   let totalUnread = 0;
 
+  let totalResponseTimeMs = 0;
+  let responseCount = 0;
+  let realButtonClicks = 0;
+
   const getMsgTimestamp = (msg) => {
     if (msg.timestamp) {
       return typeof msg.timestamp === 'object' && msg.timestamp._seconds
@@ -171,9 +175,14 @@ export default function AnalyticsPage() {
     if (msgs.length > 0) {
       activeConversations++;
     }
+
+    let lastOutboundTime = null;
+
     msgs.forEach(m => {
+      const ts = getMsgTimestamp(m);
       if (m.sender === 'counselor' || m.direction === 'outbound') {
         totalSent++;
+        lastOutboundTime = ts;
         if (m.status === 'failed') {
           totalFailed++;
         } else if (m.status === 'read') {
@@ -184,6 +193,17 @@ export default function AnalyticsPage() {
         }
       } else if (m.sender === 'lead' || m.direction === 'inbound') {
         totalInbound++;
+        
+        if (m.type === 'interactive' || m.type === 'button' || m.isButtonReply || (m.text && m.text.includes('[interactive'))) {
+          realButtonClicks++;
+        }
+
+        if (lastOutboundTime && ts > lastOutboundTime) {
+          totalResponseTimeMs += (ts - lastOutboundTime);
+          responseCount++;
+          lastOutboundTime = null; // reset
+        }
+
         if (!m.read) {
           totalUnread++;
         }
@@ -209,8 +229,8 @@ export default function AnalyticsPage() {
   const readRate = totalDelivered > 0 ? pct(totalRead, totalDelivered) : 0;
   const failureRate = totalSent > 0 ? pct(totalFailed, totalSent) : 0;
 
-  const buttonClicks = Math.round(totalRead * 0.25); // estimate
-  const avgResponseTime = totalInbound > 0 ? 5 : 0; // minutes
+  const buttonClicks = realButtonClicks > 0 ? realButtonClicks : 0;
+  const avgResponseTime = responseCount > 0 ? Math.round(totalResponseTimeMs / responseCount / 60000) : 0; // minutes
 
   // Delivery funnel
   const funnel = {
@@ -331,22 +351,23 @@ export default function AnalyticsPage() {
     .sort((a, b) => (b.sent + b.replied) - (a.sent + a.replied))
     .slice(0, 5);
 
-  // Meta Insights mock data
+  // Meta Insights data (Real-time estimated)
+  const last7Days = dailyVolume.slice(-7);
   const metaInsights = [
     {
       title: 'Messages Sent (Meta API)',
-      values: Array.from({ length: 7 }).map((_, i) => ({ value: 120 + i * 15, end_time: `2026-06-1${i}T00:00:00` })),
-      description: 'Total number of messages successfully delivered from business API.',
+      values: last7Days.map(d => ({ value: d.outbound, end_time: d.date })),
+      description: 'Total number of outbound messages processed.',
     },
     {
       title: 'Messages Received (Meta API)',
-      values: Array.from({ length: 7 }).map((_, i) => ({ value: 30 + i * 8, end_time: `2026-06-1${i}T00:00:00` })),
+      values: last7Days.map(d => ({ value: d.inbound, end_time: d.date })),
       description: 'Incoming user messages processed by webhook handlers.',
     },
     {
-      title: 'Messaging Cost (Simulated)',
-      values: Array.from({ length: 7 }).map((_, i) => ({ value: Math.round(5 + i * 1.5), end_time: `2026-06-1${i}T00:00:00` })),
-      description: 'Meta utility/marketing category-based conversations cost ($).',
+      title: 'Messaging Cost (Estimated)',
+      values: last7Days.map(d => ({ value: Number((d.outbound * 0.015).toFixed(2)), end_time: d.date })),
+      description: 'Estimated standard conversation pricing ($0.015 per outbound).',
     }
   ];
 
@@ -503,7 +524,7 @@ export default function AnalyticsPage() {
 
       {/* Meta Insights Panel */}
       {showMeta && (
-        <Section title="Meta Cloud Insights" subtitle="Simulated Meta business account API health stats">
+        <Section title="Meta Cloud Insights" subtitle="Real-time estimated Meta business account API health stats">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
             {metaInsights.map((insight, idx) => {
               const totalValue = insight.values.reduce((sum, v) => sum + v.value, 0);

@@ -170,12 +170,7 @@ export default function Topbar() {
                       <span className="cmd-shortcut">G + A</span>
                     </div>
                   )}
-                  {activeRole !== 'Telecaller' && (
-                    <div className="cmd-item" onClick={() => { setActiveView('whatsapp'); setCmdOpen(false); }}>
-                      <span>💬 Go to WhatsApp Chat Console</span>
-                      <span className="cmd-shortcut">G + W</span>
-                    </div>
-                  )}
+
                   {activeRole === 'Admin' && (
                     <div className="cmd-item" onClick={() => { setActiveView('settings'); setCmdOpen(false); }}>
                       <span>⚙️ Go to System Configurations</span>

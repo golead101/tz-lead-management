@@ -66,8 +66,8 @@ export default function LiveFormEmbed() {
     data.customFields = {};
 
     try {
-      // Store in the specific 'i-frame' collection as requested
-      await addDoc(collection(db, 'i-frame'), data);
+      // Store in the standard 'leads' collection so it shows up in CRM
+      await addDoc(collection(db, 'leads'), data);
       setIsSuccess(true);
     } catch (err) {
       console.error('Error submitting form: ', err);

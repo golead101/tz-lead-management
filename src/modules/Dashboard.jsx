@@ -115,11 +115,14 @@ export default function Dashboard() {
   const liveStats = (() => {
     const activeLeads = filteredLeads;
     const total = activeLeads.length || 1;
-    const metaCount = activeLeads.filter(l => l.source === 'Meta Ads' || l.source === 'Meta').length;
-    const googleCount = activeLeads.filter(l => l.source === 'Google Search' || l.source === 'Google Ads' || l.source === 'Google').length;
-    const whatsappCount = activeLeads.filter(l => l.source === 'WhatsApp Inbound' || l.source === 'WhatsApp').length;
-    const websiteCount = activeLeads.filter(l => l.source === 'Website Form' || l.source === 'Website').length;
-    const callCount = activeLeads.filter(l => l.source === 'Call' || l.source === 'Inbound Call' || l.source === 'Outbound Call' || l.source === 'Phone').length;
+    const metaCount = activeLeads.filter(l => (l.source || '').toLowerCase().includes('meta')).length;
+    const googleCount = activeLeads.filter(l => (l.source || '').toLowerCase().includes('google')).length;
+    const whatsappCount = activeLeads.filter(l => (l.source || '').toLowerCase().includes('whatsapp')).length;
+    const websiteCount = activeLeads.filter(l => (l.source || '').toLowerCase().includes('website')).length;
+    const callCount = activeLeads.filter(l => {
+      const srcLower = (l.source || '').toLowerCase();
+      return srcLower.includes('call') || srcLower.includes('phone');
+    }).length;
     const walkinCount = activeLeads.filter(l => {
       const srcLower = (l.source || '').toLowerCase();
       return srcLower.includes('walk-in') || srcLower.includes('walkin');

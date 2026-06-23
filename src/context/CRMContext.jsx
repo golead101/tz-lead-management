@@ -294,6 +294,7 @@ export const CRMProvider = ({ children }) => {
 
     let active = true;
     let leadsUnsub = null;
+    let iframeUnsub = null;
     let coursesUnsub = null;
     let stagesUnsub = null;
     let customFieldsUnsub = null;
@@ -302,6 +303,15 @@ export const CRMProvider = ({ children }) => {
     let integrationsUnsub = null;
 
     try {
+      let mainLeads = [];
+      let iframeLeads = [];
+
+      const updateLeads = () => {
+        const combined = [...mainLeads, ...iframeLeads];
+        combined.sort((a, b) => new Date(b.createdDate) - new Date(a.createdDate));
+        setLeads(combined);
+      };
+
       // 1. Leads
       leadsUnsub = onSnapshot(collection(db, 'leads'), (snapshot) => {
         if (!active) return;
@@ -315,7 +325,7 @@ export const CRMProvider = ({ children }) => {
             .then(() => console.log("Firestore leads successfully seeded."))
             .catch(err => console.error("Firestore leads seeding failed:", err));
         } else {
-          const leadsData = snapshot.docs.map(doc => {
+          mainLeads = snapshot.docs.map(doc => {
             const data = doc.data();
             return {
               email: '',
@@ -327,16 +337,42 @@ export const CRMProvider = ({ children }) => {
               lastContacted: data.createdDate || new Date().toISOString(),
               timeline: [],
               customFields: {},
+              id: doc.id,
               ...data
             };
           });
-          leadsData.sort((a, b) => new Date(b.createdDate) - new Date(a.createdDate));
-          setLeads(leadsData);
+          updateLeads();
           setIsFirebaseEnabled(true);
         }
       }, (err) => {
         console.error("Firestore leads subscription error:", err);
         setIsFirebaseEnabled(false);
+      });
+
+      // 1b. i-frame Leads
+      iframeUnsub = onSnapshot(collection(db, 'i-frame'), (snapshot) => {
+        if (!active) return;
+        if (!snapshot.empty) {
+          iframeLeads = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+              email: '',
+              course: '',
+              education: '',
+              source: 'Website Embedded Form',
+              stage: 'New Lead',
+              counselor: 'Unassigned',
+              lastContacted: data.createdDate || new Date().toISOString(),
+              timeline: [],
+              customFields: {},
+              id: doc.id,
+              ...data
+            };
+          });
+          updateLeads();
+        }
+      }, (err) => {
+        console.error("Firestore iframe subscription error:", err);
       });
 
       // 2. Courses
@@ -491,6 +527,7 @@ export const CRMProvider = ({ children }) => {
     return () => {
       active = false;
       if (leadsUnsub) leadsUnsub();
+      if (iframeUnsub) iframeUnsub();
       if (coursesUnsub) coursesUnsub();
       if (stagesUnsub) stagesUnsub();
       if (customFieldsUnsub) customFieldsUnsub();
