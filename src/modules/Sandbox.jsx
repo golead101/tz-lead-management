@@ -8,7 +8,7 @@ export default function Sandbox() {
 
   // Initial field definitions
   const initialFields = [
-    { id: 'f_name', name: 'name', type: 'text', label: 'Student Name', placeholder: 'e.g. Rohan', required: true },
+    { id: 'f_name', name: 'name', type: 'teloxt', label: 'Student Name', placeholder: 'e.g. Rohan', required: true },
     { id: 'f_email', name: 'email', type: 'email', label: 'Email ID', placeholder: 'rohan@gmail.com', required: true },
     { id: 'f_phone', name: 'phone', type: 'tel', label: 'Contact Number', placeholder: '+91 96543 21098', required: true },
     { id: 'f_course', name: 'course', type: 'select', label: 'Program of Interest', options: courses.map(c => c.name), required: false }
@@ -121,7 +121,8 @@ export default function Sandbox() {
 
   // Generate embed code connecting to Firestore
   const generateEmbedCode = () => {
-    return `\n<iframe src="https://tz-lead-management.web.app/live-form" width="100%" height="600" frameborder="0" style="border: none;"></iframe>`;
+    const baseUrl = window.location.origin;
+    return `\n<iframe src="${baseUrl}/live-form" width="100%" height="600" frameborder="0" style="border: none;"></iframe>`;
   };
 
   return (
