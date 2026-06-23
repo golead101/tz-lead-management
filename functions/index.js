@@ -44,16 +44,18 @@ async function getDecryptedCredentials() {
  */
 async function getAccessToken(clientId, clientSecret, refreshToken) {
   try {
+    console.log(`[Google Ads Validation] Initiating OAuth token exchange for clientId: ${clientId ? 'Exists' : 'Missing'}`);
     const response = await axios.post('https://oauth2.googleapis.com/token', {
       client_id: clientId,
       client_secret: clientSecret,
       refresh_token: refreshToken,
       grant_type: 'refresh_token'
     });
+    console.log('[Google Ads Validation] OAuth token exchange successful.');
     return response.data.access_token;
   } catch (err) {
     const errorDetails = err.response ? JSON.stringify(err.response.data) : err.message;
-    console.error('Failed to get Google OAuth access token:', errorDetails);
+    console.error('[Google Ads Validation] Failed to get Google OAuth access token:', errorDetails);
     throw new Error(`Google OAuth authentication failed: ${errorDetails}`);
   }
 }
@@ -90,6 +92,8 @@ exports.googleAdsValidate = functions.https.onRequest((req, res) => {
       clientSecret = cryptoHelper.decrypt(clientSecret);
       refreshToken = cryptoHelper.decrypt(refreshToken);
 
+      console.log(`[Google Ads Validation] Credential check - customerId: ${customerId ? customerId : 'Missing'}, managerCustomerId: ${managerCustomerId ? managerCustomerId : 'Not Provided'}, clientId: ${clientId ? 'Exists' : 'Missing'}, clientSecret: ${clientSecret ? 'Exists' : 'Missing'}, refreshToken: ${refreshToken ? 'Exists' : 'Missing'}, developerToken: ${developerToken ? 'Exists' : 'Missing'}`);
+
       if (!customerId || !developerToken || !clientId || !clientSecret || !refreshToken) {
         return res.status(400).json({ error: 'All configuration credentials are required.' });
       }
@@ -97,9 +101,11 @@ exports.googleAdsValidate = functions.https.onRequest((req, res) => {
       const cleanCustomerId = customerId.replace(/-/g, '').trim();
 
       // 1. Authenticate with Google OAuth
+      console.log('[Google Ads Validation] Step 1: Authenticating with Google OAuth...');
       const accessToken = await getAccessToken(clientId, clientSecret, refreshToken);
 
       // 2. Query Google Ads API (fetch single campaign to test token and access status)
+      console.log('[Google Ads Validation] Step 2: Initializing Google Ads API Request...');
       const query = 'SELECT campaign.id, campaign.name FROM campaign LIMIT 1';
 
       const headers = {
@@ -112,8 +118,11 @@ exports.googleAdsValidate = functions.https.onRequest((req, res) => {
         const cleanManagerCustomerId = managerCustomerId.replace(/-/g, '').trim();
         if (cleanManagerCustomerId) {
           headers['login-customer-id'] = cleanManagerCustomerId;
+          console.log(`[Google Ads Validation] Using Login Customer ID (Manager): ${cleanManagerCustomerId}`);
         }
       }
+      console.log(`[Google Ads Validation] Using Operating Customer ID: ${cleanCustomerId}`);
+
 
       const response = await axios.post(
         `https://googleads.googleapis.com/v24/customers/${cleanCustomerId}/googleAds:search`,
