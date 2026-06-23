@@ -26,6 +26,8 @@ export default function ConfigSettings() {
   // Customizer States
   const [instName, setInstName] = useState(branding.instituteName);
   const [logoUrl, setLogoUrl] = useState(branding.logoUrl || '');
+  const [brandTextSize, setBrandTextSize] = useState(branding.brandTextSize || 19);
+  const [brandLogoSize, setBrandLogoSize] = useState(branding.brandLogoSize || 32);
 
   // New Course State
   const [courseName, setCourseName] = useState('');
@@ -72,18 +74,94 @@ export default function ConfigSettings() {
       sidebarBg: branding.sidebarBg || '#0A1E44',
       sidebarText: branding.sidebarText || '#ffffff',
       sidebarActiveBg: branding.sidebarActiveBg || '#2F6BFF',
-      sidebarHoverBg: branding.sidebarHoverBg || '#173B7A'
+      sidebarHoverBg: branding.sidebarHoverBg || '#173B7A',
+      brandTextSize: parseInt(brandTextSize),
+      brandLogoSize: parseInt(brandLogoSize)
     });
   };
 
   const handleResetToDefault = () => {
     setInstName('TechZone Academy');
     setLogoUrl('');
+    setBrandTextSize(19);
+    setBrandLogoSize(32);
   };
 
   const handleCancelChanges = () => {
     setInstName(branding.instituteName);
     setLogoUrl(branding.logoUrl || '');
+    setBrandTextSize(branding.brandTextSize || 19);
+    setBrandLogoSize(branding.brandLogoSize || 32);
+  };
+
+  const cropTransparentPixels = (base64Str, callback) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.drawImage(img, 0, 0);
+
+      try {
+        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imgData.data;
+
+        let minX = canvas.width;
+        let minY = canvas.height;
+        let maxX = 0;
+        let maxY = 0;
+        let found = false;
+
+        for (let y = 0; y < canvas.height; y++) {
+          for (let x = 0; x < canvas.width; x++) {
+            const alpha = data[(y * canvas.width + x) * 4 + 3];
+            if (alpha > 5) { // Threshold for transparency detection
+              if (x < minX) minX = x;
+              if (y < minY) minY = y;
+              if (x > maxX) maxX = x;
+              if (y > maxY) maxY = y;
+              found = true;
+            }
+          }
+        }
+
+        if (!found) {
+          callback(base64Str);
+          return;
+        }
+
+        // Add 2px safety padding around content bounding box
+        const padding = 2;
+        minX = Math.max(0, minX - padding);
+        minY = Math.max(0, minY - padding);
+        maxX = Math.min(canvas.width - 1, maxX + padding);
+        maxY = Math.min(canvas.height - 1, maxY + padding);
+
+        const cropWidth = maxX - minX + 1;
+        const cropHeight = maxY - minY + 1;
+
+        const cropCanvas = document.createElement('canvas');
+        cropCanvas.width = cropWidth;
+        cropCanvas.height = cropHeight;
+        const cropCtx = cropCanvas.getContext('2d');
+
+        cropCtx.drawImage(
+          img,
+          minX, minY, cropWidth, cropHeight,
+          0, 0, cropWidth, cropHeight
+        );
+
+        callback(cropCanvas.toDataURL());
+      } catch (e) {
+        console.error("Canvas pixel cropping failed: ", e);
+        callback(base64Str);
+      }
+    };
+    img.onerror = () => {
+      callback(base64Str);
+    };
+    img.src = base64Str;
   };
 
   const handleLogoUpload = (e) => {
@@ -95,7 +173,9 @@ export default function ConfigSettings() {
       }
       const reader = new FileReader();
       reader.onloadend = () => {
-        setLogoUrl(reader.result);
+        cropTransparentPixels(reader.result, (croppedBase64) => {
+          setLogoUrl(croppedBase64);
+        });
       };
       reader.readAsDataURL(file);
     }
@@ -103,7 +183,9 @@ export default function ConfigSettings() {
 
   const hasChanges = 
     instName !== branding.instituteName ||
-    logoUrl !== (branding.logoUrl || '');
+    logoUrl !== (branding.logoUrl || '') ||
+    brandTextSize !== (branding.brandTextSize || 19) ||
+    brandLogoSize !== (branding.brandLogoSize || 32);
 
   const handleAddCourse = (e) => {
     e.preventDefault();
@@ -269,12 +351,13 @@ export default function ConfigSettings() {
                       </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <div style={{ width: '110px', height: '32px', borderRadius: '6px', background: branding.sidebarBg || '#0A1E44', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: '4px', border: '1px solid rgba(0,0,0,0.08)' }}>
-                        {logoUrl ? (
-                          <img src={logoUrl} alt="Logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
-                        ) : (
-                          <span style={{ fontSize: '9px', fontWeight: '700', color: branding.sidebarText || '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{instName}</span>
+                      <div style={{ minWidth: '150px', height: '40px', borderRadius: '6px', background: branding.sidebarBg || '#0A1E44', display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', padding: '6px 12px', border: '1px solid rgba(0,0,0,0.08)' }}>
+                        {logoUrl && (
+                          <img src={logoUrl} alt="Logo" style={{ maxHeight: '28px', maxWidth: '40px', objectFit: 'contain' }} />
                         )}
+                        <span style={{ fontSize: '11px', fontWeight: '700', color: branding.sidebarText || '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {instName}
+                        </span>
                       </div>
                       <button 
                         type="button" 
@@ -296,6 +379,57 @@ export default function ConfigSettings() {
                         accept="image/*" 
                         onChange={handleLogoUpload} 
                       />
+                    </div>
+                  </div>
+
+                  {/* Row 3: Name Text Size */}
+                  <div className="branding-item-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div className="branding-item-icon-box" style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb' }}>
+                        <span style={{ fontWeight: '750', fontSize: '13px' }}>A A</span>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#1e293b' }}>Institute Name Text Size</span>
+                        <span style={{ fontSize: '11px', color: '#64748b' }}>Resize the branding text in the sidebar.</span>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <input 
+                        type="range" 
+                        min="12" 
+                        max="28" 
+                        value={brandTextSize} 
+                        onChange={(e) => setBrandTextSize(parseInt(e.target.value))}
+                        style={{ width: '130px', cursor: 'pointer' }}
+                      />
+                      <span style={{ fontSize: '12px', fontWeight: '700', color: '#1e293b', width: '35px', textAlign: 'right' }}>{brandTextSize}px</span>
+                    </div>
+                  </div>
+
+                  {/* Row 4: Logo Image Size */}
+                  <div className="branding-item-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid rgba(0,0,0,0.05)', opacity: logoUrl ? 1 : 0.4, pointerEvents: logoUrl ? 'auto' : 'none', transition: 'opacity 0.2s ease' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div className="branding-item-icon-box" style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb' }}>
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <path d="M4 14h6v6H4zm10-10h6v6h-6zm0 10h6v6h-6zM4 4h6v6H4z"/>
+                        </svg>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#1e293b' }}>Logo Image Size</span>
+                        <span style={{ fontSize: '11px', color: '#64748b' }}>Resize the uploaded logo image.</span>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <input 
+                        type="range" 
+                        min="20" 
+                        max="120" 
+                        value={brandLogoSize} 
+                        onChange={(e) => setBrandLogoSize(parseInt(e.target.value))}
+                        disabled={!logoUrl}
+                        style={{ width: '130px', cursor: logoUrl ? 'pointer' : 'not-allowed' }}
+                      />
+                      <span style={{ fontSize: '12px', fontWeight: '700', color: '#1e293b', width: '35px', textAlign: 'right' }}>{brandLogoSize}px</span>
                     </div>
                   </div>
 
@@ -372,16 +506,23 @@ export default function ConfigSettings() {
                   
                   {/* Brand Preview */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingBottom: '16px', borderBottom: `1px solid ${(branding.sidebarHoverBg || '#173B7A')}33` }}>
-                    {logoUrl ? (
-                      <img src={logoUrl} alt="Logo" style={{ maxHeight: '24px', maxWidth: '80px', objectFit: 'contain' }} />
-                    ) : (
-                      <>
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke={branding.sidebarActiveBg || '#2F6BFF'} strokeWidth="2.5">
-                          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                        </svg>
-                        <span style={{ fontSize: '11px', fontWeight: '800', color: branding.sidebarText || '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{instName}</span>
-                      </>
+                    {logoUrl && (
+                      <img src={logoUrl} alt="Logo" style={{ maxHeight: `${brandLogoSize * 0.7}px`, maxWidth: `${brandLogoSize * 0.9}px`, objectFit: 'contain' }} />
                     )}
+                    {instName === 'LeadCRM' && !logoUrl && (
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke={branding.sidebarActiveBg || '#2F6BFF'} strokeWidth="2.5">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                      </svg>
+                    )}
+                    <span style={{ fontSize: `${brandTextSize * 0.6}px`, fontWeight: '800', color: branding.sidebarText || '#ffffff', whiteSpace: 'normal', lineHeight: '1.2' }}>
+                      {instName === 'TechZone Academy' ? (
+                        <>TechZone <span style={{ color: branding.sidebarActiveBg || '#2F6BFF', display: 'block' }}>Academy</span></>
+                      ) : instName === 'LeadCRM' ? (
+                        <>Lead<span style={{ color: branding.sidebarActiveBg || '#2F6BFF', display: 'block' }}>CRM</span></>
+                      ) : (
+                        instName
+                      )}
+                    </span>
                   </div>
 
                   {/* Navigation list */}

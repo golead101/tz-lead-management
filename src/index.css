@@ -196,14 +196,14 @@ a {
 
 .brand-logo-img {
   max-width: 140px;
-  max-height: 40px;
+  max-height: var(--brand-logo-size, 32px);
   object-fit: contain;
 }
 
 .brand-name {
   font-family: var(--font-heading);
   font-weight: 800;
-  font-size: 19px;
+  font-size: var(--brand-text-size, 19px);
   color: var(--sidebar-text, #ffffff);
   letter-spacing: -0.3px;
   transition: color var(--transition-normal);

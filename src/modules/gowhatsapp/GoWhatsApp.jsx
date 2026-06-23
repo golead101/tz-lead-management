@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useCRM } from '../../context/CRMContext';
 import './gowhatsapp.css';
 import GoWhatsAppDashboard from './GoWhatsAppDashboard';
 import NewCampaign from './NewCampaign';
@@ -13,14 +14,9 @@ import ChatbotSettingsPage from './ChatbotSettingsPage';
 import GoWhatsAppLayout from './GoWhatsAppLayout';
 
 const GoWhatsApp = () => {
-  // Persist subView to sessionStorage so page refresh stays on same tab
-  const [subView, setSubViewRaw] = useState(
-    () => sessionStorage.getItem('gowha_subview') || 'dashboard'
-  );
-  const setSubView = (view) => {
-    sessionStorage.setItem('gowha_subview', view);
-    setSubViewRaw(view);
-  };
+  const { whatsappSubView, setWhatsappSubView } = useCRM();
+  const subView = whatsappSubView;
+  const setSubView = setWhatsappSubView;
   const [selectedCampaignId, setSelectedCampaignId] = useState(null);
   const [reusedCampaign, setReusedCampaign] = useState(null);
 
