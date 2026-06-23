@@ -327,7 +327,6 @@ export default function ConfigSettings() {
                       <input 
                         type="text" 
                         className="form-control" 
-                        required 
                         style={{ width: '220px', padding: '8px 12px', fontSize: '12.5px', borderRadius: '8px', border: '1px solid #cbd5e1' }}
                         value={instName}
                         onChange={(e) => setInstName(e.target.value)}
