@@ -270,6 +270,15 @@ export const CRMProvider = ({ children }) => {
     return local ? JSON.parse(local) : 'dashboard';
   });
 
+  const [whatsappSubView, setWhatsappSubView] = useState(() => {
+    return sessionStorage.getItem('gowha_subview') || 'dashboard';
+  });
+
+  const changeWhatsappSubView = (view) => {
+    sessionStorage.setItem('gowha_subview', view);
+    setWhatsappSubView(view);
+  };
+
   const [selectedLeadId, setSelectedLeadId] = useState(() => {
     const local = localStorage.getItem('crm_selected_lead_id');
     return local ? JSON.parse(local) : null;
@@ -602,6 +611,8 @@ export const CRMProvider = ({ children }) => {
     root.style.setProperty('--sidebar-font', brand.sidebarFont || 'Inter');
     root.style.setProperty('--sidebar-radius', `${brand.sidebarRadius !== undefined ? brand.sidebarRadius : 8}px`);
     root.style.setProperty('--sidebar-width', brand.sidebarWidth === 'compact' ? '80px' : brand.sidebarWidth === 'wide' ? '280px' : '250px');
+    root.style.setProperty('--brand-text-size', `${brand.brandTextSize !== undefined ? brand.brandTextSize : 19}px`);
+    root.style.setProperty('--brand-logo-size', `${brand.brandLogoSize !== undefined ? brand.brandLogoSize : 32}px`);
 
     // Dynamically apply sidebar color scheme variables globally to align the entire CRM workspace!
     const activeColor = brand.sidebarActiveBg || '#2F6BFF';
@@ -1661,6 +1672,8 @@ export const CRMProvider = ({ children }) => {
       isFirebaseEnabled,
       notifications,
       activeView,
+      whatsappSubView,
+      setWhatsappSubView: changeWhatsappSubView,
       selectedLeadId,
       searchQuery,
       showDetailModal,

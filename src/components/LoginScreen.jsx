@@ -43,7 +43,7 @@ export default function LoginScreen() {
                 </svg>
                 <h1 className="brand-name" style={{ fontSize: '19px', fontWeight: '800', margin: 0, color: 'var(--sidebar-text, #ffffff)', display: 'flex', alignItems: 'center' }}>
                   {branding.instituteName === 'TechZone Academy' ? (
-                    <>TechZone<span style={{ color: 'var(--sidebar-active-bg, #2F6BFF)' }}>Academy</span></>
+                    <>TechZone <span style={{ color: 'var(--sidebar-active-bg, #2F6BFF)' }}>Academy</span></>
                   ) : branding.instituteName === 'LeadCRM' ? (
                     <>Lead<span style={{ color: 'var(--sidebar-active-bg, #2F6BFF)' }}>CRM</span></>
                   ) : (

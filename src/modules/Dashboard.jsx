@@ -500,10 +500,13 @@ export default function Dashboard() {
         <div className="db-source-card">
           <div className="db-source-top">
             <div className="db-source-icon-wrap web">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" />
-                <line x1="2" y1="12" x2="22" y2="12" />
-                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="16" rx="3" />
+                <path d="M3 10h18" />
+                <circle cx="6" cy="7" r="1.2" fill="currentColor" />
+                <circle cx="9" cy="7" r="1.2" fill="currentColor" />
+                <circle cx="12" cy="7" r="1.2" fill="currentColor" />
+                <path d="M14 14l3 3m1-4l4 1.5-2 1 2 2-1.5 1.5-2-2-1 2z" fill="currentColor" />
               </svg>
             </div>
             <div className="db-source-details">
@@ -517,8 +520,10 @@ export default function Dashboard() {
         <div className="db-source-card">
           <div className="db-source-top">
             <div className="db-source-icon-wrap call">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                <path d="M14.05 2a9 9 0 0 1 8 8" strokeDasharray="3 3" />
+                <path d="M17.05 5a5 5 0 0 1 4 4" />
               </svg>
             </div>
             <div className="db-source-details">
@@ -532,11 +537,10 @@ export default function Dashboard() {
         <div className="db-source-card">
           <div className="db-source-top">
             <div className="db-source-icon-wrap walkin" style={{ color: '#db2777' }}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '28px', height: '28px' }}>
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                <circle cx="9" cy="7" r="4" />
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '28px', height: '28px' }}>
+                <path d="M10 21V4a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v17" />
+                <circle cx="5" cy="7" r="2.5" />
+                <path d="M2 13h3.5l1.5 3.5 2.5-4.5M5 13v4.5l-2.5 3.5" />
               </svg>
             </div>
             <div className="db-source-details">
@@ -809,11 +813,10 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="db-bottom-icon-wrap new">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-              <circle cx="8.5" cy="7" r="4" />
-              <line x1="20" y1="8" x2="20" y2="14" />
-              <line x1="23" y1="11" x2="17" y2="11" />
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <polygon points="19 2 20.5 5.5 24 6 21 8.5 22 12 19 10 16 12 17 8.5 14 6 17.5 5.5" fill="currentColor" />
             </svg>
           </div>
         </div>
@@ -828,8 +831,11 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="db-bottom-icon-wrap contacted">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+              <circle cx="8.5" cy="12" r="1" fill="currentColor" />
+              <circle cx="12" cy="12" r="1" fill="currentColor" />
+              <circle cx="15.5" cy="12" r="1" fill="currentColor" />
             </svg>
           </div>
         </div>
@@ -844,8 +850,10 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="db-bottom-icon-wrap followups">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+              <path d="M12 2a10 10 0 0 1 8 4" strokeWidth="3" />
             </svg>
           </div>
         </div>
@@ -860,12 +868,15 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="db-bottom-icon-wrap converted">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
               <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
               <path d="M4 22h16" />
               <path d="M10 14.66V17c0 .55-.45 1-1 1H4v2h16v-2h-5c-.55 0-1-.45-1-1v-2.34" />
-              <path d="M12 2a7 7 0 0 0-7 7c0 2.62 1.34 4.5 3 5.34a8.26 8.26 0 0 0 8 0c1.66-.84 3-2.72 3-5.34a7 7 0 0 0-7-7z" />
+              <path d="M12 2a7 7 0 0 0-7 7c0 2.62 1.34 4.5 3 5.34a8.26 8.26 0 0 0 8 0c1.66-.84 3-2.72 3-5.34a7 7 0 0 0-7-7z" fill="currentColor" opacity="0.15" />
+              <line x1="12" y1="2" x2="12" y2="4" strokeWidth="2.5" />
+              <line x1="5.5" y1="5.5" x2="7.5" y2="7.5" strokeWidth="2.5" />
+              <line x1="18.5" y1="5.5" x2="16.5" y2="7.5" strokeWidth="2.5" />
             </svg>
           </div>
         </div>
