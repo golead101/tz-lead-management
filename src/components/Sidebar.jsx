@@ -167,41 +167,63 @@ export default function Sidebar() {
   const renderLogo = () => {
     // Shield icon decoration for TechZone Academy or LeadCRM
     const showShield = branding.instituteName === 'LeadCRM';
+    const hasName = !!branding.instituteName?.trim();
 
     return (
-      <div className="brand-logo" style={{ display: 'flex', alignItems: 'center' }}>
+      <div className="brand-logo" style={{ 
+        display: 'flex', 
+        alignItems: 'center',
+        justifyContent: hasName ? 'flex-start' : 'center',
+        width: hasName ? 'auto' : '100%',
+        gap: hasName ? '8px' : '0'
+      }}>
         {branding.logoUrl && (
-          <img src={branding.logoUrl} alt={branding.instituteName} className="brand-logo-img" style={{ marginRight: '8px' }} />
+          <img src={branding.logoUrl} alt={branding.instituteName || ''} className="brand-logo-img" style={{ marginRight: hasName ? '8px' : '0px' }} />
         )}
         {!branding.logoUrl && showShield && (
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ color: 'var(--sidebar-active-bg, #2F6BFF)', marginRight: '4px' }}>
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ color: 'var(--sidebar-active-bg, #2F6BFF)', marginRight: hasName ? '4px' : '0px' }}>
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
           </svg>
         )}
-        <h1 className="brand-name">
-          {branding.instituteName === 'TechZone Academy' ? (
-            <>TechZone <span>Academy</span></>
-          ) : branding.instituteName === 'LeadCRM' ? (
-            <>Lead<span>CRM</span></>
-          ) : (
-            branding.instituteName
-          )}
-        </h1>
+        {hasName && (
+          <h1 className="brand-name">
+            {branding.instituteName === 'TechZone Academy' ? (
+              <>TechZone <span>Academy</span></>
+            ) : branding.instituteName === 'LeadCRM' ? (
+              <>Lead<span>CRM</span></>
+            ) : (
+              branding.instituteName
+            )}
+          </h1>
+        )}
       </div>
     );
   };
 
   const isCompact = isCollapsed || branding.sidebarWidth === 'compact';
+  const hasName = !!branding.instituteName?.trim();
 
   return (
     <aside className={`sidebar ${isCompact ? 'compact-mode' : ''}`}>
       {/* Brand Profile section */}
-      <div className="brand-section" style={{ justifyContent: isCompact ? 'center' : 'space-between', padding: isCompact ? '24px 0' : '24px 20px' }}>
+      <div className="brand-section" style={{ 
+        justifyContent: isCompact ? 'center' : (hasName ? 'space-between' : 'center'), 
+        padding: isCompact ? '24px 0' : '24px 20px',
+        position: 'relative'
+      }}>
         {!isCompact && renderLogo()}
         <div
           className="brand-hamburger"
           onClick={() => setIsCollapsed(prev => !prev)}
-          style={{ cursor: 'pointer', margin: isCompact ? '0 auto' : '0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          style={{ 
+            cursor: 'pointer', 
+            margin: isCompact ? '0 auto' : '0', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            position: (!isCompact && !hasName) ? 'absolute' : 'static',
+            right: (!isCompact && !hasName) ? '20px' : 'auto'
+          }}
           title={isCompact ? "Expand Sidebar" : "Collapse Sidebar"}
         >
           {isCompact ? (

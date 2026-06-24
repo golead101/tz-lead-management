@@ -500,13 +500,24 @@ export default function Dashboard() {
         <div className="db-source-card">
           <div className="db-source-top">
             <div className="db-source-icon-wrap web">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="4" width="18" height="16" rx="3" />
-                <path d="M3 10h18" />
-                <circle cx="6" cy="7" r="1.2" fill="currentColor" />
-                <circle cx="9" cy="7" r="1.2" fill="currentColor" />
-                <circle cx="12" cy="7" r="1.2" fill="currentColor" />
-                <path d="M14 14l3 3m1-4l4 1.5-2 1 2 2-1.5 1.5-2-2-1 2z" fill="currentColor" />
+              <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '36px', height: '36px' }}>
+                <defs>
+                  <linearGradient id="globeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#29b6f6" />
+                    <stop offset="100%" stopColor="#0288d1" />
+                  </linearGradient>
+                </defs>
+                <circle cx="50" cy="50" r="40" fill="url(#globeGrad)" />
+                <line x1="10" y1="50" x2="90" y2="50" stroke="#ffffff" strokeWidth="3" />
+                <path d="M15.5 30C25 35 75 35 84.5 30" stroke="#ffffff" strokeWidth="3" />
+                <path d="M15.5 70C25 65 75 65 84.5 70" stroke="#ffffff" strokeWidth="3" />
+                <line x1="50" y1="10" x2="50" y2="90" stroke="#ffffff" strokeWidth="3" />
+                <path d="M50 10C30 30 30 70 50 90" stroke="#ffffff" strokeWidth="3" />
+                <path d="M50 10C70 30 70 70 50 90" stroke="#ffffff" strokeWidth="3" />
+                <circle cx="50" cy="50" r="40" stroke="#ffffff" strokeWidth="3" />
+                <rect x="20" y="38" width="60" height="24" rx="6" fill="#ffffff" />
+                <text x="50" y="55" fill="url(#globeGrad)" fontSize="13" fontWeight="900" fontFamily="system-ui, -apple-system, sans-serif" textAnchor="middle" letterSpacing="0.5">WWW</text>
+                <path d="M55 62 L78 71 L69 75 L81 90 L73 94 L62 79 L53 84 Z" fill="url(#globeGrad)" stroke="#ffffff" strokeWidth="3.5" strokeLinejoin="round" />
               </svg>
             </div>
             <div className="db-source-details">
@@ -520,10 +531,17 @@ export default function Dashboard() {
         <div className="db-source-card">
           <div className="db-source-top">
             <div className="db-source-icon-wrap call">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-                <path d="M14.05 2a9 9 0 0 1 8 8" strokeDasharray="3 3" />
-                <path d="M17.05 5a5 5 0 0 1 4 4" />
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '30px', height: '30px' }}>
+                <defs>
+                  <linearGradient id="callGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#22d3ee" />
+                    <stop offset="100%" stopColor="#0891b2" />
+                  </linearGradient>
+                </defs>
+                <path d="M5 4H7.5C8.2 4 8.8 4.5 8.9 5.2L9.7 8.5C9.8 9.1 9.5 9.7 9 10L7.5 11C8.5 13 10.5 15 12.5 16L13.5 14.5C13.8 14 14.4 13.7 15 13.8L18.3 14.6C19 14.7 19.5 15.3 19.5 16V18.5C19.5 19.3 18.8 20 18 20C10.3 20 4 13.7 4 5.9C4 5.1 4.7 4.4 5.5 4.4H5Z" fill="url(#callGrad)" />
+                <path d="M13 3C15.65 3 18.2 4.05 20.07 5.93C21.95 7.8 23 10.35 23 13" stroke="url(#callGrad)" strokeWidth="2" strokeLinecap="round" />
+                <path d="M14 6C15.86 6 17.64 6.74 18.95 8.05C20.26 9.36 21 11.14 21 13" stroke="url(#callGrad)" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="1 1" />
+                <path d="M15 9C16.06 9 17.08 9.42 17.83 10.17C18.58 10.92 19 11.94 19 13" stroke="url(#callGrad)" strokeWidth="1.5" strokeLinecap="round" />
               </svg>
             </div>
             <div className="db-source-details">
@@ -536,11 +554,25 @@ export default function Dashboard() {
         {/* Walk-in Leads Card */}
         <div className="db-source-card">
           <div className="db-source-top">
-            <div className="db-source-icon-wrap walkin" style={{ color: '#db2777' }}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '28px', height: '28px' }}>
-                <path d="M10 21V4a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v17" />
-                <circle cx="5" cy="7" r="2.5" />
-                <path d="M2 13h3.5l1.5 3.5 2.5-4.5M5 13v4.5l-2.5 3.5" />
+            <div className="db-source-icon-wrap walkin">
+              <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '36px', height: '36px' }}>
+                <defs>
+                  <linearGradient id="walkGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#db2777" />
+                    <stop offset="100%" stopColor="#f43f5e" />
+                  </linearGradient>
+                </defs>
+                {/* Bottom ground shadow */}
+                <ellipse cx="50" cy="91" rx="32" ry="7" fill="#000000" opacity="0.12" />
+                {/* Map Pin body */}
+                <path d="M 50 86 C 44 80 16 56 16 38 C 16 19.2 31.2 4 50 4 C 68.8 4 84 19.2 84 38 C 84 56 56 80 50 86 Z" fill="url(#walkGrad)" stroke="#ffffff" strokeWidth="2" strokeLinejoin="round" />
+                {/* Walking man silhouette */}
+                <circle cx="52.5" cy="21" r="5" fill="#ffffff" />
+                <path d="M52.5 26 L52 44" stroke="#ffffff" strokeWidth="6.5" strokeLinecap="round" />
+                <path d="M52.5 29 L58.5 31.5 L64.5 35" stroke="#ffffff" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M52.5 29 L45 30.5 L42.5 37" stroke="#ffffff" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M52 44 L57.5 50.5 L62 57" stroke="#ffffff" strokeWidth="6.5" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M52 44 L47 50.5 L42.5 57" stroke="#ffffff" strokeWidth="6.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </div>
             <div className="db-source-details">
@@ -813,10 +845,22 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="db-bottom-icon-wrap new">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-              <circle cx="9" cy="7" r="4" />
-              <polygon points="19 2 20.5 5.5 24 6 21 8.5 22 12 19 10 16 12 17 8.5 14 6 17.5 5.5" fill="currentColor" />
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '28px', height: '28px' }}>
+              <defs>
+                <linearGradient id="newLeadsGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#3b82f6" />
+                  <stop offset="100%" stopColor="#60a5fa" />
+                </linearGradient>
+                <linearGradient id="starGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#fbbf24" />
+                  <stop offset="100%" stopColor="#f59e0b" />
+                </linearGradient>
+              </defs>
+              <circle cx="7" cy="8" r="3.2" fill="url(#newLeadsGrad)" opacity="0.4" />
+              <path d="M2 17.5C2 15 4 13.5 7 13.5C8.2 13.5 9.5 13.9 10.3 14.6" stroke="url(#newLeadsGrad)" strokeWidth="1.5" strokeLinecap="round" opacity="0.4" />
+              <circle cx="13" cy="9" r="4.5" fill="url(#newLeadsGrad)" />
+              <path d="M6 21C6 17.5 9 15.5 13 15.5C15.2 15.5 17.5 16.3 18.8 17.8" stroke="url(#newLeadsGrad)" strokeWidth="2.5" strokeLinecap="round" />
+              <path d="M19 2L19.9 4.4L22.5 4.6L20.5 6.2L21.2 8.8L19 7.4L16.8 8.8L17.5 6.2L15.5 4.6L18.1 4.4L19 2Z" fill="url(#starGrad)" />
             </svg>
           </div>
         </div>
@@ -831,11 +875,18 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="db-bottom-icon-wrap contacted">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
-              <circle cx="8.5" cy="12" r="1" fill="currentColor" />
-              <circle cx="12" cy="12" r="1" fill="currentColor" />
-              <circle cx="15.5" cy="12" r="1" fill="currentColor" />
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '28px', height: '28px' }}>
+              <defs>
+                <linearGradient id="contactedGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#10b981" />
+                  <stop offset="100%" stopColor="#059669" />
+                </linearGradient>
+              </defs>
+              <path d="M19.5 13.5C19.5 17 15.5 17.5 13 17.5L8.5 21V17.5C4.5 17.5 2.5 15 2.5 11.5C2.5 7.5 6.5 4.5 11 4.5C15.5 4.5 19.5 7.5 19.5 11.5V13.5Z" fill="url(#contactedGrad)" />
+              <path d="M13 9.5H19C21 9.5 22.5 10.8 22.5 12.5C22.5 14.2 21 15.5 19 15.5H17.5V18L15 15.5" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              <circle cx="8" cy="11.5" r="1.2" fill="#ffffff" />
+              <circle cx="11" cy="11.5" r="1.2" fill="#ffffff" />
+              <circle cx="14" cy="11.5" r="1.2" fill="#ffffff" />
             </svg>
           </div>
         </div>
@@ -850,10 +901,21 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="db-bottom-icon-wrap followups">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <polyline points="12 6 12 12 16 14" />
-              <path d="M12 2a10 10 0 0 1 8 4" strokeWidth="3" />
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '28px', height: '28px' }}>
+              <defs>
+                <linearGradient id="followGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#f97316" />
+                  <stop offset="100%" stopColor="#ea580c" />
+                </linearGradient>
+                <linearGradient id="arrowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#f87171" />
+                  <stop offset="100%" stopColor="#ef4444" />
+                </linearGradient>
+              </defs>
+              <circle cx="12" cy="12" r="9.5" stroke="url(#followGrad)" strokeWidth="2.2" />
+              <path d="M12 6.5V12.5L16 14.5" stroke="url(#followGrad)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M12 2C15.5 2 18.5 3.5 20.5 6L21.5 3" stroke="url(#arrowGrad)" strokeWidth="2" strokeLinecap="round" />
+              <circle cx="12" cy="12" r="2" fill="url(#followGrad)" />
             </svg>
           </div>
         </div>
@@ -868,15 +930,20 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="db-bottom-icon-wrap converted">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
-              <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
-              <path d="M4 22h16" />
-              <path d="M10 14.66V17c0 .55-.45 1-1 1H4v2h16v-2h-5c-.55 0-1-.45-1-1v-2.34" />
-              <path d="M12 2a7 7 0 0 0-7 7c0 2.62 1.34 4.5 3 5.34a8.26 8.26 0 0 0 8 0c1.66-.84 3-2.72 3-5.34a7 7 0 0 0-7-7z" fill="currentColor" opacity="0.15" />
-              <line x1="12" y1="2" x2="12" y2="4" strokeWidth="2.5" />
-              <line x1="5.5" y1="5.5" x2="7.5" y2="7.5" strokeWidth="2.5" />
-              <line x1="18.5" y1="5.5" x2="16.5" y2="7.5" strokeWidth="2.5" />
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '28px', height: '28px' }}>
+              <defs>
+                <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#fbbf24" />
+                  <stop offset="100%" stopColor="#d97706" />
+                </linearGradient>
+              </defs>
+              <path d="M6 4H18V11C18 13.8 15.8 16 13 16H11C8.2 16 6 13.8 6 11V4Z" fill="url(#goldGrad)" />
+              <path d="M6 6H4C2.9 6 2 6.9 2 8V9C2 10.1 2.9 11 4 11H6" stroke="url(#goldGrad)" strokeWidth="1.5" strokeLinecap="round" />
+              <path d="M18 6H20C21.1 6 22 6.9 22 8V9C22 10.1 21.1 11 20 11H18" stroke="url(#goldGrad)" strokeWidth="1.5" strokeLinecap="round" />
+              <path d="M9 19.5H15M12 16V19.5M7 21H17" stroke="url(#goldGrad)" strokeWidth="2" strokeLinecap="round" />
+              <path d="M9.5 9.5L11 11L14.5 7.5" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M4 2.5L4.5 3.5L5.5 3.8L4.7 4.5L5 5.5L4 5L3 5.5L3.3 4.5L2.5 3.8L3.5 3.5L4 2.5Z" fill="url(#goldGrad)" />
+              <path d="M20 2L20.3 2.8L21.1 3L20.5 3.6L20.7 4.4L20 4L19.3 4.4L19.5 3.6L18.9 3L19.7 2.8L20 2Z" fill="url(#goldGrad)" />
             </svg>
           </div>
         </div>
