@@ -58,24 +58,33 @@ function MainAppContent() {
 
   const runLicenseVerification = async () => {
     setCheckingLicense(true);
-    let localLicense = localStorage.getItem('crm_license_file');
 
-    // Tauri AppData Check: If in Tauri and not in localStorage, load from AppData/com.tz.leadmanagement/
-    if (!localLicense && window.__TAURI__) {
+    // Tauri AppData Check: If in Tauri, delegate verification entirely to Rust
+    if (window.__TAURI__) {
       try {
-        const fetched = await window.__TAURI__.core.invoke('read_license_file');
-        if (fetched) {
-          JSON.parse(fetched);
-          localLicense = fetched;
-          // Sync it to localStorage for immediate caching
-          localStorage.setItem('crm_license_file', fetched);
+        const result = await window.__TAURI__.core.invoke('verify_license', { currentProjectId });
+        if (result.success) {
+          // Clock integrity check using frontend leads list
+          const clockResult = await checkClockIntegrity(isLoggedIn ? leads : []);
+          if (!clockResult.success) {
+            setLicenseStatus('rollback');
+          } else {
+            setLicenseStatus('valid');
+          }
+        } else {
+          setLicenseStatus(result.reason);
         }
       } catch (e) {
-        console.log("No Tauri AppData license found. Bypassing.");
+        console.error("Tauri license verification error:", e);
+        setLicenseStatus('tampered');
+      } finally {
+        setCheckingLicense(false);
       }
+      return;
     }
 
-    // Fallback: If still empty, try to fetch the pre-packaged license
+    // Web Browser Fallback (only for browser-based dev preview context)
+    let localLicense = localStorage.getItem('crm_license_file');
     if (!localLicense) {
       try {
         const response = await fetch('/license.dat');
@@ -86,7 +95,7 @@ function MainAppContent() {
           localLicense = fetchedLicense;
         }
       } catch (e) {
-        console.log("No pre-packaged license found. Bypassing fallback.");
+        console.log("No browser fallback license found.");
       }
     }
 

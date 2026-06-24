@@ -59,6 +59,8 @@ async function runGenerator() {
     const durationInput = await askQuestion(rl, "Trial Duration (Days)", env.LICENSING_TRIAL_DURATION_DAYS || '15');
     durationDays = parseInt(durationInput, 10);
   }
+
+  const machineId = await askQuestion(rl, "Lock to Workstation Machine ID (leave blank to skip hardware lock)", "");
   
   const firebaseProjectId = env.VITE_FIREBASE_PROJECT_ID || 'leads-management-tz';
   
@@ -80,6 +82,10 @@ async function runGenerator() {
     expires: expiryDate,
     firebaseProjectId: firebaseProjectId
   };
+
+  if (machineId && machineId.trim()) {
+    licenseData.machineId = machineId.trim();
+  }
 
   const privateKeyPath = path.join(__dirname, 'private_key.pem');
   if (!fs.existsSync(privateKeyPath)) {

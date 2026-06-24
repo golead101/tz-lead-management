@@ -46,7 +46,17 @@ export default function ActivationScreen({ status, currentProjectId, onLicenseAc
         // Verification call
         const checkResult = await verifySoftwareLicense(parsed, currentProjectId);
         if (checkResult.success) {
-          localStorage.setItem('crm_license_file', text);
+          if (window.__TAURI__) {
+            try {
+              await window.__TAURI__.core.invoke('write_license_file', { contents: text });
+            } catch (err) {
+              setErrorMsg("Failed to write license file to disk: " + err.message);
+              setIsProcessing(false);
+              return;
+            }
+          } else {
+            localStorage.setItem('crm_license_file', text);
+          }
           onLicenseActivated();
         } else {
           const reasons = {
@@ -70,9 +80,28 @@ export default function ActivationScreen({ status, currentProjectId, onLicenseAc
     reader.readAsText(file);
   };
 
+  const [localMachineId, setLocalMachineId] = React.useState('Fetching...');
+
+  React.useEffect(() => {
+    if (window.__TAURI__) {
+      window.__TAURI__.core.invoke('get_machine_id')
+        .then(id => setLocalMachineId(id))
+        .catch(err => setLocalMachineId('N/A (Error querying ID)'));
+    } else {
+      setLocalMachineId('N/A (Browser Mode)');
+    }
+  }, []);
+
   // Status-specific copy
   const getStatusDetails = () => {
     switch (status) {
+      case 'hardware_mismatch':
+        return {
+          title: "Hardware Lock Active",
+          desc: "This license file is locked to a different workstation. Please register a valid license matching this computer's Machine ID.",
+          color: "var(--color-followup)",
+          badge: "Hardware Mismatch"
+        };
       case 'expired':
         return {
           title: "Evaluation Period Expired",
@@ -150,7 +179,7 @@ export default function ActivationScreen({ status, currentProjectId, onLicenseAc
           color: info.color,
           display: 'flex',
           alignItems: 'center',
-          justifycontent: 'center',
+          justifyContent: 'center',
           margin: '0 auto',
           fontSize: '24px',
           fontWeight: 'bold',
@@ -195,17 +224,37 @@ export default function ActivationScreen({ status, currentProjectId, onLicenseAc
 
         {/* Dynamic Firebase Project Info */}
         <div style={{
-          fontSize: '11px',
-          background: 'rgba(0,0,0,0.02)',
-          border: '1px solid var(--border-color)',
-          borderRadius: 'var(--radius-sm)',
-          padding: '8px 12px',
-          color: 'var(--text-secondary)',
           display: 'flex',
-          justifyContent: 'space-between'
+          flexDirection: 'column',
+          gap: '8px'
         }}>
-          <span>Database Lock (Project ID):</span>
-          <strong style={{ color: 'var(--text-primary)' }}>{currentProjectId}</strong>
+          <div style={{
+            fontSize: '11px',
+            background: 'rgba(0,0,0,0.02)',
+            border: '1px solid var(--border-color)',
+            borderRadius: 'var(--radius-sm)',
+            padding: '8px 12px',
+            color: 'var(--text-secondary)',
+            display: 'flex',
+            justifyContent: 'space-between'
+          }}>
+            <span>Database Lock (Project ID):</span>
+            <strong style={{ color: 'var(--text-primary)' }}>{currentProjectId}</strong>
+          </div>
+
+          <div style={{
+            fontSize: '11px',
+            background: 'rgba(0,0,0,0.02)',
+            border: '1px solid var(--border-color)',
+            borderRadius: 'var(--radius-sm)',
+            padding: '8px 12px',
+            color: 'var(--text-secondary)',
+            display: 'flex',
+            justifyContent: 'space-between'
+          }}>
+            <span>Workstation Machine ID:</span>
+            <strong style={{ color: 'var(--text-primary)', fontFamily: 'monospace', fontSize: '10px' }}>{localMachineId}</strong>
+          </div>
         </div>
 
         {/* Drag and Drop Zone */}
