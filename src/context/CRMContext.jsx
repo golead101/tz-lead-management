@@ -1210,8 +1210,8 @@ export const CRMProvider = ({ children }) => {
   };
 
   // Sending custom WhatsApp logs & triggering bot automated simulated reply
-  const sendWhatsAppMsg = (leadId, messageText) => {
-    if (!messageText.trim()) return;
+  const sendWhatsAppMsg = async (leadId, messageText, templateData = null) => {
+    if (!messageText.trim() && !templateData) return false;
 
     // If real WhatsApp integration is active and enabled, make the HTTP call to Firebase Cloud Function
     if (integrations.whatsapp.enabled) {
@@ -1226,33 +1226,37 @@ export const CRMProvider = ({ children }) => {
         const digitsOnly = rawPhone.replace(/\D/g, '');
         const normalizedPhone = digitsOnly ? `+${digitsOnly}` : rawPhone;
 
-        fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            leadId: leadId,
-            recipientPhone: normalizedPhone,
-            messageText: messageText,
-            counselorName: activeUser
-          })
-        })
-        .then(async (res) => {
+        try {
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              leadId: leadId,
+              recipientPhone: normalizedPhone,
+              messageText: messageText,
+              counselorName: activeUser,
+              templateData: templateData
+            })
+          });
+
           const data = await res.json();
           if (res.ok && data.success) {
             showToastMsg('WhatsApp message delivered in real-time!', 'success');
+            return true;
           } else {
             console.error('WhatsApp API failed:', data.error || data.details);
             showToastMsg(data.error || 'Failed to deliver WhatsApp message via API.', 'error');
+            return false;
           }
-        })
-        .catch((err) => {
+        } catch (err) {
           console.error('Error dispatching WhatsApp to Cloud Function:', err);
           showToastMsg('Could not reach WhatsApp gateway function.', 'error');
-        });
+          return false;
+        }
       }
-      return;
+      return false;
     }
 
     const outgoingMsg = {
@@ -1299,6 +1303,8 @@ export const CRMProvider = ({ children }) => {
     setTimeout(() => {
       triggerSimulatedBotReply(leadId, updatedLead?.name || 'Student', messageText);
     }, 3000);
+
+    return true;
   };
 
   const triggerSimulatedBotReply = (leadId, studentName, outgoingText) => {
