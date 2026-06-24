@@ -1,0 +1,8 @@
+{
+  "customer": "TechZone Academy",
+  "email": "admin@academy.com",
+  "type": "trial",
+  "expires": "2026-07-09",
+  "firebaseProjectId": "leads-management-tz",
+  "signature": "KDU24msNpAi/3horAnIKlyJp6mZO6VHpmxgDvMU5GEmwWYbsG0HIkO7zyBBTTE0zvmUPYWd9eR7O7vzfmdkZEVHNYplc1qAVj8Mh68uCpHoDq/25y1H/QUoqsyF02q4L2Dc3m1kVfO4386gz4+KaCaoKPvYiOZq2tlGcLmn3EVzvywfKeDbRjscwsw2FO98Naq+uAkCcSg7qoN+9pw7wiCaNW9YJLhTwKoc4T6DGPUQ6DUF/xrrwL5V1kPA72MZGLWtm+0CA9zQf2jn3+0/GCctrXkH3Zzd5JUdlCG/lzJqW17rJ5oByoyq+W2izQcG+b7o5wL56lZHdvl6J5pdEGQ=="
+}

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { CRMProvider, useCRM } from './context/CRMContext';
 import Sidebar from './components/Sidebar';
 import LoginScreen from './components/LoginScreen';
+import { verifySoftwareLicense, checkClockIntegrity } from './utils/licenseChecker';
+import ActivationScreen from './components/ActivationScreen';
 
 // Page Modules
 import Dashboard from './modules/Dashboard';
@@ -45,9 +47,84 @@ function ShimmerLoader() {
 }
 
 function MainAppContent() {
-  const { activeView, isLoggedIn, activeRole, setActiveView } = useCRM();
+  const { activeView, isLoggedIn, activeRole, setActiveView, leads } = useCRM();
   const [isNavigating, setIsNavigating] = useState(false);
   const [navigatedView, setNavigatedView] = useState(activeView);
+
+  // Licensing Verification States
+  const [licenseStatus, setLicenseStatus] = useState('checking');
+  const [checkingLicense, setCheckingLicense] = useState(true);
+  const currentProjectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'leads-management-tz';
+
+  const runLicenseVerification = async () => {
+    setCheckingLicense(true);
+    let localLicense = localStorage.getItem('crm_license_file');
+
+    // Tauri AppData Check: If in Tauri and not in localStorage, load from AppData/com.tz.leadmanagement/
+    if (!localLicense && window.__TAURI__) {
+      try {
+        const fetched = await window.__TAURI__.core.invoke('read_license_file');
+        if (fetched) {
+          JSON.parse(fetched);
+          localLicense = fetched;
+          // Sync it to localStorage for immediate caching
+          localStorage.setItem('crm_license_file', fetched);
+        }
+      } catch (e) {
+        console.log("No Tauri AppData license found. Bypassing.");
+      }
+    }
+
+    // Fallback: If still empty, try to fetch the pre-packaged license
+    if (!localLicense) {
+      try {
+        const response = await fetch('/license.dat');
+        if (response.ok) {
+          const fetchedLicense = await response.text();
+          // Verify it is valid JSON
+          JSON.parse(fetchedLicense);
+          localLicense = fetchedLicense;
+        }
+      } catch (e) {
+        console.log("No pre-packaged license found. Bypassing fallback.");
+      }
+    }
+
+    if (!localLicense) {
+      setLicenseStatus('missing');
+      setCheckingLicense(false);
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(localLicense);
+      // 1. Signature & Expiry & Project ID verification
+      const verifyResult = await verifySoftwareLicense(parsed, currentProjectId);
+      if (!verifyResult.success) {
+        setLicenseStatus(verifyResult.reason);
+        setCheckingLicense(false);
+        return;
+      }
+
+      // 2. Clock Rollback validation
+      const clockResult = await checkClockIntegrity(isLoggedIn ? leads : []);
+      if (!clockResult.success) {
+        setLicenseStatus('rollback');
+        setCheckingLicense(false);
+        return;
+      }
+
+      setLicenseStatus('valid');
+    } catch (e) {
+      setLicenseStatus('tampered');
+    } finally {
+      setCheckingLicense(false);
+    }
+  };
+
+  useEffect(() => {
+    runLicenseVerification();
+  }, [isLoggedIn, leads?.length]);
 
   // Trigger quick shimmer loading state when swapping tabs or when role changes and view needs redirection
   useEffect(() => {
@@ -73,6 +150,20 @@ function MainAppContent() {
     }, 150);
     return () => clearTimeout(timer);
   }, [activeView, activeRole, setActiveView]);
+
+  if (checkingLicense) {
+    return <ShimmerLoader />;
+  }
+
+  if (licenseStatus !== 'valid') {
+    return (
+      <ActivationScreen 
+        status={licenseStatus} 
+        currentProjectId={currentProjectId} 
+        onLicenseActivated={runLicenseVerification} 
+      />
+    );
+  }
 
   if (!isLoggedIn) {
     return <LoginScreen />;
