@@ -416,6 +416,21 @@ export default function NewCampaign({ setSubView }) {
         });
       }
       const components = [];
+      const headerType = getTemplateHeaderType();
+      if (headerType && ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(headerType) && headerMediaUrl) {
+        components.push({
+          type: 'header',
+          parameters: [
+            {
+              type: headerType.toLowerCase(),
+              [headerType.toLowerCase()]: {
+                link: headerMediaUrl
+              }
+            }
+          ]
+        });
+      }
+
       if (parameters.length > 0) {
         components.push({
           type: 'body',
@@ -880,25 +895,21 @@ export default function NewCampaign({ setSubView }) {
                         This template requires a {getTemplateHeaderType().toLowerCase()} header *
                       </label>
                       <input
-                        ref={headerMediaInputRef}
-                        type="file"
-                        onChange={handleHeaderMediaUpload}
-                        style={{ display: 'none' }}
+                        type="text"
+                        placeholder={`Paste public ${getTemplateHeaderType().toLowerCase()} URL (https://...)`}
+                        value={headerMediaUrl}
+                        onChange={(e) => {
+                          setHeaderMediaUrl(e.target.value);
+                          setHeaderMediaFileName('Media Link Attached');
+                        }}
+                        style={{
+                          width: '100%', padding: '10px 14px', borderRadius: 8,
+                          border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.95rem', boxSizing: 'border-box'
+                        }}
                       />
-                      {headerMediaUrl ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, background: '#f0fdf4', borderRadius: 8, border: '1px solid #bbf7d0' }}>
-                          <CheckCircle size={18} color="#16a34a" />
-                          <div style={{ flex: 1, fontSize: '0.85rem', color: '#16a34a' }}>{headerMediaFileName} (Loaded)</div>
-                          <button onClick={() => setHeaderMediaUrl('')} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}>Remove</button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => headerMediaInputRef.current?.click()}
-                          style={{ width: '100%', padding: 20, border: '2px dashed #cbd5e1', borderRadius: 8, cursor: 'pointer', background: '#fafafa', color: '#64748b', fontSize: '0.85rem' }}
-                        >
-                          Click to upload sample media file
-                        </button>
-                      )}
+                      <div style={{ fontSize: '0.75rem', color: '#92400e', marginTop: 6 }}>
+                        Note: Meta API requires a public URL (e.g. Imgur, AWS) to deliver media.
+                      </div>
                     </div>
                   )}
 
