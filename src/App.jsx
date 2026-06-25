@@ -215,7 +215,7 @@ function MainAppContent() {
   return (
     <div className="app-container">
       {/* Visual Navigation Sidebar */}
-      {activeView !== 'gowhatsapp' && <Sidebar />}
+      <Sidebar />
 
       {/* Core main dashboard panel */}
       <div className="main-wrapper" style={activeView === 'gowhatsapp' ? { padding: 0 } : {}}>

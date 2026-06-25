@@ -31,6 +31,19 @@ function formatMessageTime(ts) {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
+function getDisplayTime(msg) {
+  if (msg.timestamp && msg.timestamp._seconds) {
+    return formatMessageTime(msg.timestamp);
+  }
+  if (msg.id) {
+    const match = msg.id.match(/\d+$/);
+    if (match) {
+      return formatMessageTime({ _seconds: Math.floor(parseInt(match[0], 10) / 1000) });
+    }
+  }
+  return msg.time || '';
+}
+
 function formatPhone(phone) {
   if (!phone) return '';
   // Strip ALL leading '+' signs first (handles ++91, +91, etc.)
@@ -307,7 +320,7 @@ export default function InboxPage() {
                     <div key={msg.id} className={`message-bubble ${isOutbound ? 'bubble-outbound' : 'bubble-inbound'}`}>
                       <div style={{ color: '#0f172a' }}>{msg.text}</div>
                       <div className="message-time">
-                        {msg.time || formatMessageTime(msg.timestamp)}
+                        {getDisplayTime(msg)}
                         {isOutbound && <StatusIcon status={msg.status || 'read'} size={15} />}
                       </div>
                     </div>

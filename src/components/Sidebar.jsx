@@ -1,5 +1,14 @@
 import React, { useState } from 'react';
 import { useCRM } from '../context/CRMContext';
+import {
+  LayoutDashboard,
+  Inbox,
+  Send,
+  TrendingUp,
+  Users,
+  FileText,
+  Bot
+} from 'lucide-react';
 
 export default function Sidebar() {
   const {
@@ -8,11 +17,27 @@ export default function Sidebar() {
     activeRole,
     activeUser,
     logout,
-    branding
+    branding,
+    whatsappSubView,
+    setWhatsappSubView
   } = useCRM();
 
   // Local collapsible state for left navigation sidebar
   const [isCollapsed, setIsCollapsed] = useState(false);
+
+  // Local state to track WhatsApp menu expansion in Sidebar
+  const [isWhatsAppExpanded, setIsWhatsAppExpanded] = useState(() => {
+    return activeView === 'gowhatsapp' || sessionStorage.getItem('gowha_expanded') === 'true';
+  });
+
+  const toggleWhatsAppExpand = () => {
+    const nextState = !isWhatsAppExpanded;
+    setIsWhatsAppExpanded(nextState);
+    sessionStorage.setItem('gowha_expanded', nextState ? 'true' : 'false');
+    if (activeView !== 'gowhatsapp') {
+      setActiveView('gowhatsapp');
+    }
+  };
 
   // Define navigation tabs to match the mockup screenshot exactly
   const menuItems = [
@@ -140,44 +165,65 @@ export default function Sidebar() {
 
   // Modern dynamic logo renderer
   const renderLogo = () => {
-    if (branding.logoUrl) {
-      return <img src={branding.logoUrl} alt={branding.instituteName} className="brand-logo-img" />;
-    }
-
     // Shield icon decoration for TechZone Academy or LeadCRM
-    const showShield = branding.instituteName === 'TechZone Academy' || branding.instituteName === 'LeadCRM';
+    const showShield = branding.instituteName === 'LeadCRM';
+    const hasName = !!branding.instituteName?.trim();
 
     return (
-      <div className="brand-logo">
-        {showShield && (
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ color: 'var(--sidebar-active-bg, #2F6BFF)', marginRight: '4px' }}>
+      <div className="brand-logo" style={{ 
+        display: 'flex', 
+        alignItems: 'center',
+        justifyContent: hasName ? 'flex-start' : 'center',
+        width: hasName ? 'auto' : '100%',
+        gap: hasName ? '8px' : '0'
+      }}>
+        {branding.logoUrl && (
+          <img src={branding.logoUrl} alt={branding.instituteName || ''} className="brand-logo-img" style={{ marginRight: hasName ? '8px' : '0px' }} />
+        )}
+        {!branding.logoUrl && showShield && (
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ color: 'var(--sidebar-active-bg, #2F6BFF)', marginRight: hasName ? '4px' : '0px' }}>
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
           </svg>
         )}
-        <h1 className="brand-name">
-          {branding.instituteName === 'TechZone Academy' ? (
-            <>TechZone<span>Academy</span></>
-          ) : branding.instituteName === 'LeadCRM' ? (
-            <>Lead<span>CRM</span></>
-          ) : (
-            branding.instituteName
-          )}
-        </h1>
+        {hasName && (
+          <h1 className="brand-name">
+            {branding.instituteName === 'TechZone Academy' ? (
+              <>TechZone <span>Academy</span></>
+            ) : branding.instituteName === 'LeadCRM' ? (
+              <>Lead<span>CRM</span></>
+            ) : (
+              branding.instituteName
+            )}
+          </h1>
+        )}
       </div>
     );
   };
 
   const isCompact = isCollapsed || branding.sidebarWidth === 'compact';
+  const hasName = !!branding.instituteName?.trim();
 
   return (
     <aside className={`sidebar ${isCompact ? 'compact-mode' : ''}`}>
       {/* Brand Profile section */}
-      <div className="brand-section" style={{ justifyContent: isCompact ? 'center' : 'space-between', padding: isCompact ? '24px 0' : '24px 20px' }}>
+      <div className="brand-section" style={{ 
+        justifyContent: isCompact ? 'center' : (hasName ? 'space-between' : 'center'), 
+        padding: isCompact ? '24px 0' : '24px 20px',
+        position: 'relative'
+      }}>
         {!isCompact && renderLogo()}
         <div
           className="brand-hamburger"
           onClick={() => setIsCollapsed(prev => !prev)}
-          style={{ cursor: 'pointer', margin: isCompact ? '0 auto' : '0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          style={{ 
+            cursor: 'pointer', 
+            margin: isCompact ? '0 auto' : '0', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            position: (!isCompact && !hasName) ? 'absolute' : 'static',
+            right: (!isCompact && !hasName) ? '20px' : 'auto'
+          }}
           title={isCompact ? "Expand Sidebar" : "Collapse Sidebar"}
         >
           {isCompact ? (
@@ -208,6 +254,86 @@ export default function Sidebar() {
           if (activeRole === 'Telecaller' && (item.id === 'automation' || item.id === 'gowhatsapp' || item.id === 'history')) {
             return null;
           }
+          if (item.id === 'gowhatsapp') {
+            const isActive = activeView === 'gowhatsapp';
+            return (
+              <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <button
+                  className={`nav-item ${isActive ? 'active' : ''}`}
+                  onClick={toggleWhatsAppExpand}
+                  title={item.label}
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    {item.icon}
+                    <span>{item.label}</span>
+                  </div>
+                  {!isCompact && (
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="14"
+                      height="14"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      style={{
+                        transition: 'transform 0.2s ease',
+                        transform: isWhatsAppExpanded ? 'rotate(0deg)' : 'rotate(-90deg)'
+                      }}
+                    >
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  )}
+                </button>
+
+                {isWhatsAppExpanded && !isCompact && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '14px', borderLeft: '1px dashed rgba(255, 255, 255, 0.15)', marginLeft: '24px', marginTop: '2px', marginBottom: '6px' }}>
+                    {[
+                      { subTarget: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+                      { subTarget: 'inbox', label: 'Inbox', icon: Inbox },
+                      { subTarget: 'new-campaign', label: 'New Campaign', icon: Send },
+                      { subTarget: 'campaigns', label: 'Campaigns', icon: TrendingUp },
+                      { subTarget: 'contacts', label: 'Contacts', icon: Users },
+                      { subTarget: 'templates', label: 'Templates', icon: FileText },
+                      { subTarget: 'chatbot', label: 'Chatbot', icon: Bot }
+                    ].map(sub => {
+                      const IconComponent = sub.icon;
+                      const isSubActive = activeView === 'gowhatsapp' && (whatsappSubView === sub.subTarget || (sub.subTarget === 'campaigns' && whatsappSubView === 'campaign-report'));
+                      return (
+                        <button
+                          key={sub.subTarget}
+                          className="nav-sub-item"
+                          onClick={() => {
+                            setWhatsappSubView(sub.subTarget);
+                            setActiveView('gowhatsapp');
+                          }}
+                          style={{
+                            padding: '6px 12px',
+                            fontSize: '12px',
+                            opacity: isSubActive ? 1 : 0.65,
+                            background: isSubActive ? 'var(--sidebar-active-bg, #2F6BFF)' : 'transparent',
+                            color: '#ffffff',
+                            fontWeight: isSubActive ? '700' : '500',
+                            borderRadius: '6px',
+                            textAlign: 'left',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                          }}
+                        >
+                          <IconComponent size={14} />
+                          {sub.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          }
+
           // Admin has all tabs access, no exclusions
           return (
             <button
@@ -224,22 +350,53 @@ export default function Sidebar() {
       </nav>
 
       {/* Bottom Profile details */}
-      <div className="user-profile-section">
-        <div className="user-avatar" style={{ border: '2px solid var(--sidebar-active-bg, #2F6BFF)' }}>
-          {getInitials(activeUser)}
-        </div>
-        <div className="user-details-wrapper">
-          <div className="user-details">
-            <span className="user-name">{activeUser}</span>
-            <span className="user-role-badge" style={{ color: 'var(--sidebar-active-bg, #2F6BFF)' }}>{activeRole}</span>
+      <div className="user-profile-section" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+          <div className="user-avatar" style={{ border: '2px solid var(--sidebar-active-bg, #2F6BFF)', flexShrink: 0 }}>
+            {getInitials(activeUser)}
           </div>
-          <button className="sidebar-logout-btn" onClick={logout}>
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5">
+          {!isCompact && (
+            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+              <span className="user-name" style={{ fontSize: '12.5px', fontWeight: '600', color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{activeUser}</span>
+              <span className="user-role-badge" style={{ color: 'var(--sidebar-active-bg, #2F6BFF)', fontSize: '9.5px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{activeRole}</span>
+            </div>
+          )}
+        </div>
+        {!isCompact && (
+          <button 
+            className="sidebar-logout-btn-always" 
+            onClick={logout}
+            title="Log Out"
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#ef4444';
+              e.currentTarget.style.color = '#ffffff';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)';
+              e.currentTarget.style.color = '#ef4444';
+            }}
+            style={{
+              background: 'rgba(239, 68, 68, 0.15)',
+              color: '#ef4444',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              borderRadius: '8px',
+              padding: '6px 10px',
+              fontSize: '11px',
+              fontWeight: '700',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>
             <span>Log Out</span>
           </button>
-        </div>
+        )}
       </div>
     </aside>
   );

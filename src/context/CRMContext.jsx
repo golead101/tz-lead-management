@@ -270,6 +270,15 @@ export const CRMProvider = ({ children }) => {
     return local ? JSON.parse(local) : 'dashboard';
   });
 
+  const [whatsappSubView, setWhatsappSubView] = useState(() => {
+    return sessionStorage.getItem('gowha_subview') || 'dashboard';
+  });
+
+  const changeWhatsappSubView = (view) => {
+    sessionStorage.setItem('gowha_subview', view);
+    setWhatsappSubView(view);
+  };
+
   const [selectedLeadId, setSelectedLeadId] = useState(() => {
     const local = localStorage.getItem('crm_selected_lead_id');
     return local ? JSON.parse(local) : null;
@@ -294,6 +303,7 @@ export const CRMProvider = ({ children }) => {
 
     let active = true;
     let leadsUnsub = null;
+    let iframeUnsub = null;
     let coursesUnsub = null;
     let stagesUnsub = null;
     let customFieldsUnsub = null;
@@ -302,6 +312,15 @@ export const CRMProvider = ({ children }) => {
     let integrationsUnsub = null;
 
     try {
+      let mainLeads = [];
+      let iframeLeads = [];
+
+      const updateLeads = () => {
+        const combined = [...mainLeads, ...iframeLeads];
+        combined.sort((a, b) => new Date(b.createdDate) - new Date(a.createdDate));
+        setLeads(combined);
+      };
+
       // 1. Leads
       leadsUnsub = onSnapshot(collection(db, 'leads'), (snapshot) => {
         if (!active) return;
@@ -315,7 +334,7 @@ export const CRMProvider = ({ children }) => {
             .then(() => console.log("Firestore leads successfully seeded."))
             .catch(err => console.error("Firestore leads seeding failed:", err));
         } else {
-          const leadsData = snapshot.docs.map(doc => {
+          mainLeads = snapshot.docs.map(doc => {
             const data = doc.data();
             return {
               email: '',
@@ -327,16 +346,42 @@ export const CRMProvider = ({ children }) => {
               lastContacted: data.createdDate || new Date().toISOString(),
               timeline: [],
               customFields: {},
+              id: doc.id,
               ...data
             };
           });
-          leadsData.sort((a, b) => new Date(b.createdDate) - new Date(a.createdDate));
-          setLeads(leadsData);
+          updateLeads();
           setIsFirebaseEnabled(true);
         }
       }, (err) => {
         console.error("Firestore leads subscription error:", err);
         setIsFirebaseEnabled(false);
+      });
+
+      // 1b. i-frame Leads
+      iframeUnsub = onSnapshot(collection(db, 'i-frame'), (snapshot) => {
+        if (!active) return;
+        if (!snapshot.empty) {
+          iframeLeads = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+              email: '',
+              course: '',
+              education: '',
+              source: 'Website Embedded Form',
+              stage: 'New Lead',
+              counselor: 'Unassigned',
+              lastContacted: data.createdDate || new Date().toISOString(),
+              timeline: [],
+              customFields: {},
+              id: doc.id,
+              ...data
+            };
+          });
+          updateLeads();
+        }
+      }, (err) => {
+        console.error("Firestore iframe subscription error:", err);
       });
 
       // 2. Courses
@@ -491,6 +536,7 @@ export const CRMProvider = ({ children }) => {
     return () => {
       active = false;
       if (leadsUnsub) leadsUnsub();
+      if (iframeUnsub) iframeUnsub();
       if (coursesUnsub) coursesUnsub();
       if (stagesUnsub) stagesUnsub();
       if (customFieldsUnsub) customFieldsUnsub();
@@ -565,6 +611,8 @@ export const CRMProvider = ({ children }) => {
     root.style.setProperty('--sidebar-font', brand.sidebarFont || 'Inter');
     root.style.setProperty('--sidebar-radius', `${brand.sidebarRadius !== undefined ? brand.sidebarRadius : 8}px`);
     root.style.setProperty('--sidebar-width', brand.sidebarWidth === 'compact' ? '80px' : brand.sidebarWidth === 'wide' ? '280px' : '250px');
+    root.style.setProperty('--brand-text-size', `${brand.brandTextSize !== undefined ? brand.brandTextSize : 19}px`);
+    root.style.setProperty('--brand-logo-size', `${brand.brandLogoSize !== undefined ? brand.brandLogoSize : 32}px`);
 
     // Dynamically apply sidebar color scheme variables globally to align the entire CRM workspace!
     const activeColor = brand.sidebarActiveBg || '#2F6BFF';
@@ -1162,8 +1210,8 @@ export const CRMProvider = ({ children }) => {
   };
 
   // Sending custom WhatsApp logs & triggering bot automated simulated reply
-  const sendWhatsAppMsg = (leadId, messageText) => {
-    if (!messageText.trim()) return;
+  const sendWhatsAppMsg = async (leadId, messageText, templateData = null) => {
+    if (!messageText.trim() && !templateData) return false;
 
     // If real WhatsApp integration is active and enabled, make the HTTP call to Firebase Cloud Function
     if (integrations.whatsapp.enabled) {
@@ -1178,33 +1226,37 @@ export const CRMProvider = ({ children }) => {
         const digitsOnly = rawPhone.replace(/\D/g, '');
         const normalizedPhone = digitsOnly ? `+${digitsOnly}` : rawPhone;
 
-        fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            leadId: leadId,
-            recipientPhone: normalizedPhone,
-            messageText: messageText,
-            counselorName: activeUser
-          })
-        })
-        .then(async (res) => {
+        try {
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              leadId: leadId,
+              recipientPhone: normalizedPhone,
+              messageText: messageText,
+              counselorName: activeUser,
+              templateData: templateData
+            })
+          });
+
           const data = await res.json();
           if (res.ok && data.success) {
             showToastMsg('WhatsApp message delivered in real-time!', 'success');
+            return true;
           } else {
             console.error('WhatsApp API failed:', data.error || data.details);
             showToastMsg(data.error || 'Failed to deliver WhatsApp message via API.', 'error');
+            return false;
           }
-        })
-        .catch((err) => {
+        } catch (err) {
           console.error('Error dispatching WhatsApp to Cloud Function:', err);
           showToastMsg('Could not reach WhatsApp gateway function.', 'error');
-        });
+          return false;
+        }
       }
-      return;
+      return false;
     }
 
     const outgoingMsg = {
@@ -1251,6 +1303,8 @@ export const CRMProvider = ({ children }) => {
     setTimeout(() => {
       triggerSimulatedBotReply(leadId, updatedLead?.name || 'Student', messageText);
     }, 3000);
+
+    return true;
   };
 
   const triggerSimulatedBotReply = (leadId, studentName, outgoingText) => {
@@ -1624,6 +1678,8 @@ export const CRMProvider = ({ children }) => {
       isFirebaseEnabled,
       notifications,
       activeView,
+      whatsappSubView,
+      setWhatsappSubView: changeWhatsappSubView,
       selectedLeadId,
       searchQuery,
       showDetailModal,

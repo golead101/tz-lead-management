@@ -32,6 +32,11 @@ export default function GridView() {
   const [selectedCounselor, setSelectedCounselor] = useState('All');
   const [selectedSource, setSelectedSource] = useState('All');
 
+  const [dateRangeFilter, setDateRangeFilter] = useState('All Time');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+  const [dateFilterOpen, setDateFilterOpen] = useState(false);
+
   // Sorting State
   const [sortBy, setSortBy] = useState('createdDate');
   const [sortOrder, setSortOrder] = useState('desc');
@@ -88,6 +93,31 @@ export default function GridView() {
         const isCall = srcLower.includes('call') || srcLower.includes('phone');
         const isWalkin = srcLower.includes('walk-in') || srcLower.includes('walkin');
         if (isMeta || isGoogle || isWhatsapp || isWebsite || isCall || isWalkin) return false;
+      }
+    }
+
+    if (dateRangeFilter !== 'All Time') {
+      const leadDate = new Date(lead.createdDate);
+      const today = new Date();
+      if (dateRangeFilter === 'Last 7 Days') {
+        const past = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+        if (leadDate < past) return false;
+      } else if (dateRangeFilter === 'Last 30 Days') {
+        const past = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+        if (leadDate < past) return false;
+      } else if (dateRangeFilter === 'This Month') {
+        if (leadDate.getMonth() !== today.getMonth() || leadDate.getFullYear() !== today.getFullYear()) return false;
+      } else if (dateRangeFilter === 'Custom Range') {
+        if (customStartDate) {
+          const start = new Date(customStartDate);
+          start.setHours(0,0,0,0);
+          if (leadDate < start) return false;
+        }
+        if (customEndDate) {
+          const end = new Date(customEndDate);
+          end.setHours(23,59,59,999);
+          if (leadDate > end) return false;
+        }
       }
     }
 
@@ -281,7 +311,7 @@ export default function GridView() {
   // Quick stats
   const totalAll = leads.filter(l => activeRole !== 'Counselor' || l.counselor === activeUser).length;
   const convertedCount = filteredLeads.filter(l => l.stage === 'Converted').length;
-  const activeFiltersCount = [selectedCourse, selectedStage, selectedCounselor, selectedSource].filter(f => f !== 'All').length;
+  const activeFiltersCount = [selectedCourse, selectedStage, selectedCounselor, selectedSource, dateRangeFilter].filter(f => f !== 'All' && f !== 'All Time').length;
 
   // Get relative time string
   const getRelativeTime = (dateStr) => {
@@ -308,6 +338,17 @@ export default function GridView() {
       pages.push(i);
     }
     return pages;
+  };
+
+  const getDisplayDateRange = () => {
+    if (dateRangeFilter === 'Custom Range' && customStartDate && customEndDate) {
+      const start = new Date(customStartDate);
+      const end = new Date(customEndDate);
+      const startStr = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const endStr = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      return `${startStr} - ${endStr}`;
+    }
+    return dateRangeFilter;
   };
 
   return (
@@ -354,7 +395,7 @@ export default function GridView() {
             <span style={{ color: 'var(--primary)', fontWeight: 600 }}>{activeFiltersCount} filter{activeFiltersCount > 1 ? 's' : ''} active</span>
             <button
               className="gv-clear-filters"
-              onClick={() => { setSelectedCourse('All'); setSelectedStage('All'); setSelectedCounselor('All'); setSelectedSource('All'); setCurrentPage(1); }}
+              onClick={() => { setSelectedCourse('All'); setSelectedStage('All'); setSelectedCounselor('All'); setSelectedSource('All'); setDateRangeFilter('All Time'); setCustomStartDate(''); setCustomEndDate(''); setCurrentPage(1); }}
             >Clear</button>
           </div>
         )}
@@ -435,6 +476,64 @@ export default function GridView() {
             <option value="call">Call</option>
             <option value="walkin">Walk-in</option>
           </select>
+        </div>
+
+        <div className="gv-filter-group" style={{ position: 'relative' }}>
+          <label className="gv-filter-label">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+            Date Range
+          </label>
+          <div
+            className="gv-filter-select"
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', background: 'var(--dark-surface-solid)', userSelect: 'none' }}
+            onClick={() => setDateFilterOpen(!dateFilterOpen)}
+          >
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{getDisplayDateRange()}</span>
+            {dateRangeFilter === 'Custom Range' && customStartDate && customEndDate ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginLeft: '8px', flexShrink: 0 }}><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginLeft: '8px', flexShrink: 0 }}><path d="M6 9l6 6 6-6"/></svg>
+            )}
+          </div>
+          
+          {dateFilterOpen && (
+            <div className="gv-popover" style={{ width: '240px', padding: '8px 0', zIndex: 100, top: 'calc(100% + 4px)', left: 0, boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                 {['All Time', 'Last 7 Days', 'Last 30 Days', 'This Month'].map(option => (
+                   <div 
+                     key={option}
+                     style={{ padding: '8px 16px', cursor: 'pointer', fontSize: '13px', background: dateRangeFilter === option ? 'rgba(37, 99, 235, 0.08)' : 'transparent', color: dateRangeFilter === option ? '#2563eb' : 'inherit', fontWeight: dateRangeFilter === option ? 600 : 400, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                     onClick={() => {setDateRangeFilter(option); setDateFilterOpen(false); setCurrentPage(1);}}
+                     onMouseEnter={(e) => { if (dateRangeFilter !== option) e.currentTarget.style.background = 'var(--dark-bg)' }}
+                     onMouseLeave={(e) => { if (dateRangeFilter !== option) e.currentTarget.style.background = 'transparent' }}
+                   >
+                     {option}
+                     {dateRangeFilter === option && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg>}
+                   </div>
+                 ))}
+                 
+                 <div 
+                   style={{ padding: '8px 16px', cursor: 'pointer', fontSize: '13px', background: dateRangeFilter === 'Custom Range' ? 'rgba(37, 99, 235, 0.08)' : 'transparent', color: dateRangeFilter === 'Custom Range' ? '#2563eb' : 'inherit', fontWeight: dateRangeFilter === 'Custom Range' ? 600 : 400, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                   onClick={() => setDateRangeFilter('Custom Range')}
+                   onMouseEnter={(e) => { if (dateRangeFilter !== 'Custom Range') e.currentTarget.style.background = 'var(--dark-bg)' }}
+                   onMouseLeave={(e) => { if (dateRangeFilter !== 'Custom Range') e.currentTarget.style.background = 'transparent' }}
+                 >
+                   Custom Range
+                   {dateRangeFilter === 'Custom Range' && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg>}
+                 </div>
+              </div>
+              
+              {dateRangeFilter === 'Custom Range' && (
+                <div style={{ padding: '12px 16px 4px 16px', marginTop: '4px', borderTop: '1px solid var(--border-color)' }}>
+                  <label className="form-label" style={{ fontSize: '10px', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px', display: 'block', letterSpacing: '0.5px' }}>Start Date</label>
+                  <input type="date" className="gv-filter-select" style={{ width: '100%', marginBottom: '12px', padding: '6px 10px', height: 'auto', fontSize: '13px' }} value={customStartDate} onChange={(e) => setCustomStartDate(e.target.value)} />
+                  <label className="form-label" style={{ fontSize: '10px', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px', display: 'block', letterSpacing: '0.5px' }}>End Date</label>
+                  <input type="date" className="gv-filter-select" style={{ width: '100%', marginBottom: '16px', padding: '6px 10px', height: 'auto', fontSize: '13px' }} value={customEndDate} onChange={(e) => setCustomEndDate(e.target.value)} />
+                  <button className="gv-btn-primary" style={{ width: '100%', justifyContent: 'center', height: '32px', fontSize: '13px' }} onClick={() => { setDateFilterOpen(false); setCurrentPage(1); }}>Apply Range</button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -622,16 +721,7 @@ export default function GridView() {
                           >
                             <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" strokeWidth="2" fill="none"/><circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" fill="none"/></svg>
                           </button>
-                          {activeRole !== 'Telecaller' && (
-                            <button
-                              className="gv-action-icon"
-                              title="WhatsApp Chat"
-                              onClick={() => { setSelectedLeadId(lead.id); setActiveView('whatsapp'); }}
-                              style={{ color: '#059669' }}
-                            >
-                              <svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" stroke="currentColor" strokeWidth="2" fill="none"/></svg>
-                            </button>
-                          )}
+
                         </div>
                       </td>
                     </tr>

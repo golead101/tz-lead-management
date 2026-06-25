@@ -960,9 +960,9 @@ exports.sendWhatsAppMessage = functions.https.onRequest((req, res) => {
     }
 
     try {
-      const { leadId, recipientPhone, messageText } = req.body;
-      if (!recipientPhone || !messageText) {
-        return res.status(400).json({ error: 'recipientPhone and messageText are required.' });
+      const { leadId, recipientPhone, messageText, templateData } = req.body;
+      if (!recipientPhone || (!messageText && !templateData)) {
+        return res.status(400).json({ error: 'recipientPhone and either messageText or templateData are required.' });
       }
 
       // 1. Load configuration
@@ -975,14 +975,12 @@ exports.sendWhatsAppMessage = functions.https.onRequest((req, res) => {
         return res.status(400).json({ error: 'WhatsApp integration credentials are not fully configured.' });
       }
 
-      // ⚙️ BULLETPROOF PHONE NUMBER CLEANING (Spaces aur symbols sab saaf)
+      // ⚙️ BULLETPROOF PHONE NUMBER CLEANING
       let cleanPhone = recipientPhone.replace(/[^0-9]/g, '').trim();
 
-      // Agar number sirf 10 digit ka hai toh aage 91 jodiye
       if (cleanPhone.length === 10) {
         cleanPhone = '91' + cleanPhone;
       }
-      // Agar kisi wajah se number ke aage 0091 lag gaya ho toh use clean karke strict 12 digits karein
       if (cleanPhone.startsWith('00')) {
         cleanPhone = cleanPhone.substring(2);
       }
@@ -994,18 +992,10 @@ exports.sendWhatsAppMessage = functions.https.onRequest((req, res) => {
         to: cleanPhone
       };
 
-      // Rules to automatically fire approved Meta Template layout
-      if (
-        messageText.includes("demo session has been scheduled") ||
-        messageText.includes("Welcome to the institute family") ||
-        messageText.toLowerCase().includes("welcome")
-      ) {
+      if (templateData) {
         payload.type = 'template';
-        payload.template = {
-          name: 'welcome_yuva',
-          language: { code: 'en_US' } // Strict locale configuration for Yuva profile
-        };
-        console.log(`[WhatsApp CF] Production trigger detected. Compiling payload via template.`);
+        payload.template = templateData;
+        console.log(`[WhatsApp CF] Dynamic template payload received. Template name: ${templateData.name}`);
       } else {
         // Normal conversation messaging layer
         payload.type = 'text';
