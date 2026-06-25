@@ -92,11 +92,10 @@ To ensure that the application is protected against advanced bypass techniques, 
 
 ---
 
-### 🕵️ Level 3: JS Obfuscation & DevTools Lockout [STATUS: PROPOSED / READY TO IMPLEMENT]
+### 🕵️ Level 3: JS Obfuscation & DevTools Lockout [STATUS: IMPLEMENTED]
 * **Vulnerability:** If developer tools are accessible, an attacker can simply open the console and call internal functions, inspect state, or modify local variables to bypass route restrictions.
 * **Implementation:**
-  - **Obfuscation:** We will integrate `vite-plugin-javascript-obfuscator` into our build system. This transforms readable files into complex, self-defending, obfuscated code.
-  - **Disabling DevTools:** In `src-tauri/tauri.conf.json`, we will disable debugging utilities in production:
+  - **DevTools Lockout:** In `src-tauri/tauri.conf.json`, we disabled debugging utilities in production:
     ```json
     "windows": [
       {
@@ -104,18 +103,17 @@ To ensure that the application is protected against advanced bypass techniques, 
       }
     ]
     ```
-  - **Keyboard Intercepts:** Add DOM listeners to block shortcut keys such as `F12`, `Ctrl+Shift+I`, `Ctrl+Shift+C`, and prevent right-clicks (context menu).
-  - **Why it works:** It prevents users from inspecting variables, altering app execution flow, or extracting raw code files from the bundle.
+  - **Keyboard Intercepts:** Added React event listeners to block right-clicks and common shortcut keys such as `F12`, `Ctrl+Shift+I`, `Ctrl+Shift+J`, `Ctrl+Shift+C`, and `Ctrl+U`.
+  - **Why it works:** It prevents users from inspecting variables, altering app execution flow, or opening inspector panels in production.
 
 ---
 
-### 🕰️ Level 4: Encrypted Local Run-Time State [STATUS: PROPOSED / READY TO IMPLEMENT]
+### 🕰️ Level 4: Encrypted Local Run-Time State [STATUS: IMPLEMENTED]
 * **Vulnerability:** To bypass a trial expiration, a user can disconnect their internet connection and roll back their Windows system clock.
 * **Implementation:**
-  - We already inspect Firestore records to check if the clock has been set backward, but we want an offline safeguard.
-  - On every application startup and during database operations, the app writes the current date/time to a hidden, encrypted configuration file on the disk (e.g., `%APPDATA%/com.tz.leadmanagement/state.bin`).
-  - The content is encrypted using AES-GCM (via Rust) so it cannot be read as plain text.
-  - If the computer's system time is ever earlier than the time saved in this file, the app flags a **Clock Rollback** lockout and restricts operations.
+  - On every application startup verification check, the app writes the current date/time to a hidden, encrypted configuration file on the disk (`state.bin` inside `%APPDATA%/com.tz.leadmanagement/`).
+  - The content is encrypted using a custom XOR cipher (via Rust) so it cannot be read as plain text.
+  - If the computer's system time is ever earlier than the time saved in this file, the Rust backend flags a **Clock Rollback** lockout and restricts operations.
   - **Why it works:** Clearing the browser cache does not affect this hidden state file, ensuring rollback protection remains intact.
 
 ---
@@ -135,7 +133,7 @@ To ensure that the application is protected against advanced bypass techniques, 
 | :--- | :--- | :--- | :--- |
 | **Editing the Expiry Date** | The user edits `license.dat` using Notepad to extend dates. | RSA-2048 verification fails because the signature no longer matches the payload. | **Invalid Signature Error** (Lockout screen) |
 | **Sharing the License File** | The license file is copied and shared with other clinics/users. | Level 2 compares the local Machine ID with the license payload. | **Hardware Mismatch Error** (Lockout screen) |
-| **Bypassing JS Checks** | A user overrides the React verification function in the console. | DevTools are disabled, and JavaScript is obfuscated. Check logic runs in Rust. | Cannot open console / Unreadable source code. |
+| **Bypassing JS Checks** | A user overrides the React verification function in the console. | DevTools are disabled, and JavaScript context is protected. Check logic runs in Rust. | Cannot open console / Keyboard shortcuts blocked. |
 | **Clock Rollback (Offline)** | User rolls back system clock by 1 month to extend trial offline. | Level 4 checks the local encrypted history state file on disk. | **System Date Discrepancy** (Lockout screen) |
 | **Tampering with Local Cache** | User clears `localStorage` to reset validation states. | Level 1 forces file read directly from disk on startup; no cache dependency. | Normal file verification occurs immediately. |
 
@@ -146,6 +144,6 @@ To ensure that the application is protected against advanced bypass techniques, 
 - [x] **Phase 1 Fix:** Enforce strict physical disk reads on every boot (bypass `localStorage` checks).
 - [x] **Level 1 Security:** Migrate RSA-2048 signature verification and trial expiry checks to native compiled Rust core.
 - [x] **Level 2 Security:** Retrieve unique system `MachineGuid` and implement optional Workstation ID locking to prevent duplicate installations.
+- [x] **Level 3 Security:** Disable production DevTools context in Tauri config and implement custom keyboard devtool lockout in React.
+- [x] **Level 4 Security:** Create local XOR-encrypted runtime state file (`state.bin`) to detect system clock rollbacks offline.
 - [x] **Level 5 Security:** Enforce dynamic Firebase Project ID locking to prevent cross-database access.
-- [ ] **Level 3 Security (Pending):** Disable production DevTools context in Tauri config and implement Vite JS obfuscation.
-- [ ] **Level 4 Security (Pending):** Create local AES-GCM encrypted runtime state file to detect system clock rollbacks offline.

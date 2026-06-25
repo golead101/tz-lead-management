@@ -72,6 +72,55 @@ fn utc_date_to_epoch(year: i32, month: i32, day: i32) -> u64 {
   (days * 86400 + 23 * 3600 + 59 * 60 + 59) as u64
 }
 
+const XOR_KEY: &[u8] = b"tz_lead_crm_security_key_32bytes";
+
+fn encrypt_decrypt_state(data: &[u8]) -> Vec<u8> {
+  let mut result = Vec::with_capacity(data.len());
+  for (i, &byte) in data.iter().enumerate() {
+    result.push(byte ^ XOR_KEY[i % XOR_KEY.len()]);
+  }
+  result
+}
+
+fn check_and_update_state_time(app_handle: &tauri::AppHandle, current_time: u64) -> Result<(), String> {
+  use tauri::Manager;
+  let mut path = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
+  std::fs::create_dir_all(&path).map_err(|e| e.to_string())?;
+  path.push("state.bin");
+
+  if path.exists() {
+    if let Ok(encrypted_bytes) = std::fs::read(&path) {
+      let decrypted_bytes = encrypt_decrypt_state(&encrypted_bytes);
+      if let Ok(decrypted_str) = String::from_utf8(decrypted_bytes) {
+        if let Ok(last_time) = decrypted_str.parse::<u64>() {
+          if current_time + 120 < last_time {
+            return Err("rollback".to_string());
+          }
+        }
+      }
+    }
+  }
+
+  let mut time_to_write = current_time;
+  if path.exists() {
+    if let Ok(encrypted_bytes) = std::fs::read(&path) {
+      let decrypted_bytes = encrypt_decrypt_state(&encrypted_bytes);
+      if let Ok(decrypted_str) = String::from_utf8(decrypted_bytes) {
+        if let Ok(last_time) = decrypted_str.parse::<u64>() {
+          if last_time > time_to_write {
+            time_to_write = last_time;
+          }
+        }
+      }
+    }
+  }
+
+  let time_str = time_to_write.to_string();
+  let encrypted_bytes = encrypt_decrypt_state(time_str.as_bytes());
+  std::fs::write(path, encrypted_bytes).map_err(|e| e.to_string())?;
+  Ok(())
+}
+
 fn get_local_machine_id() -> Option<String> {
   #[cfg(target_os = "windows")]
   {
@@ -249,6 +298,24 @@ fn verify_license(app_handle: tauri::AppHandle, current_project_id: String) -> R
         return Ok(LicenseVerificationResult {
           success: false,
           reason: "hardware_mismatch".to_string(),
+          customer: payload.customer,
+          email: payload.email,
+          license_type: payload.license_type,
+          expires: payload.expires,
+        });
+      }
+    }
+  }
+
+  // 6.7. Encrypted Clock Rollback Check
+  {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+    if let Err(e) = check_and_update_state_time(&app_handle, now) {
+      if e == "rollback" {
+        return Ok(LicenseVerificationResult {
+          success: false,
+          reason: "rollback".to_string(),
           customer: payload.customer,
           email: payload.email,
           license_type: payload.license_type,
