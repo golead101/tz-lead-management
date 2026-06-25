@@ -30,3 +30,8 @@ dist
 .env.local
 .env.test.local
 .env.production.local
+
+# Licensing and Signing Keys
+scripts/private_key.pem
+license.dat
+public/license.dat
