@@ -1202,7 +1202,7 @@ export const CRMProvider = ({ children }) => {
             showToastMsg('WhatsApp message delivered in real-time!', 'success');
             return true;
           } else {
-            console.error('WhatsApp API failed:', data.error || data.details);
+            console.error('WhatsApp API failed:', data.error, data.details, data);
             showToastMsg(data.error || 'Failed to deliver WhatsApp message via API.', 'error');
             return false;
           }

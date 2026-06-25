@@ -177,7 +177,7 @@ export default function NewCampaign({ setSubView }) {
   }, [selectedTemplate, columns, templates]);
 
   const loadExistingLists = () => {
-    const lists = whatsappDb.getContactLists();
+    const lists = whatsappDb.getContactLists().filter(l => l.id !== 'crm-leads-all');
     const crmList = {
       id: 'crm-leads-all',
       name: 'Active CRM Leads (Live)',
@@ -278,7 +278,20 @@ export default function NewCampaign({ setSubView }) {
 
   const getContactPhone = (contact) => {
     if (phoneColumn) return String(contact[phoneColumn] || '').trim();
-    return String(contact.phone || contact.Phone || contact.mobile || contact.Mobile || contact.number || contact.Number || '').trim();
+    
+    // Check standard hardcoded keys
+    const directMatch = contact.phone || contact.Phone || contact.mobile || contact.Mobile || contact.number || contact.Number;
+    if (directMatch) return String(directMatch).trim();
+    
+    // Search through all keys for a match
+    for (const key of Object.keys(contact)) {
+      const lowerKey = key.toLowerCase().replace(/[^a-z]/g, '');
+      if (lowerKey.includes('phone') || lowerKey.includes('mobile') || lowerKey.includes('contactnumber')) {
+        return String(contact[key] || '').trim();
+      }
+    }
+    
+    return '';
   };
 
   const insertVariable = (col) => {
@@ -453,7 +466,7 @@ export default function NewCampaign({ setSubView }) {
       }
       
       const cleanPhone = phone.replace(/\D/g, '');
-      let existingLead = leads.find(l => l.phone.replace(/\D/g, '') === cleanPhone);
+      let existingLead = leads.find(l => l.phone && l.phone.replace(/\D/g, '') === cleanPhone);
       const messageToDeliver = getMessageForContact(contact);
       const templateData = getTemplateDataForContact(contact);
 
