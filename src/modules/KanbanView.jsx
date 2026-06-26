@@ -33,9 +33,11 @@ export default function KanbanView() {
     // Stage Filter - only show leads in the currently selected stage
     if (lead.stage !== selectedStage) return false;
 
-    // Role-based security (Counselors only see assigned leads)
+    // Role-based security (Counselors only see assigned leads, plus global sources)
     if (activeRole === 'Counselor' && lead.counselor !== activeUser) {
-      return false;
+      const src = (lead.source || '').toLowerCase();
+      const isGlobal = src.includes('meta') || src.includes('google') || src.includes('website');
+      if (!isGlobal) return false;
     }
 
     // Dropdown filters

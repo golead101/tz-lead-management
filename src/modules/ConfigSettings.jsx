@@ -617,7 +617,7 @@ export default function ConfigSettings() {
             <div className="dashboard-panel">
               <h3 className="panel-title mb-4">Add Course Offering</h3>
               <form onSubmit={handleAddCourse}>
-                <div className="form-group two-col">
+                <div className="form-group">
                   <div>
                     <label className="form-label">Course Name</label>
                     <input 
@@ -627,17 +627,6 @@ export default function ConfigSettings() {
                       placeholder="e.g. Cyber Security"
                       value={courseName}
                       onChange={(e) => setCourseName(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="form-label">Course Code</label>
-                    <input 
-                      type="text" 
-                      className="form-control" 
-                      required 
-                      placeholder="e.g. CYBER"
-                      value={courseCode}
-                      onChange={(e) => setCourseCode(e.target.value)}
                     />
                   </div>
                 </div>
