@@ -45,7 +45,7 @@ export default function ContactsPage() {
   const loadLists = () => {
     try {
       const data = whatsappDb.getContactLists();
-      
+
       const crmList = {
         id: 'crm-leads-all',
         name: 'Active CRM Leads (Live)',
@@ -317,10 +317,10 @@ export default function ContactsPage() {
         updateLead(editingContactId, editValues);
         setViewContacts(prev => prev.map(c => c.id === editingContactId ? { ...c, ...editValues } : c));
       } else {
-        const updatedContacts = viewContacts.map(c => 
+        const updatedContacts = viewContacts.map(c =>
           c.id === editingContactId ? { ...c, ...editValues } : c
         );
-        
+
         const allContacts = whatsappDb.getContacts();
         allContacts[viewingList.id] = updatedContacts;
         whatsappDb.saveContacts(allContacts);
@@ -340,7 +340,7 @@ export default function ContactsPage() {
         setViewContacts(prev => prev.filter(c => c.id !== contactId));
       } else {
         const updatedContacts = viewContacts.filter(c => c.id !== contactId);
-        
+
         const allContacts = whatsappDb.getContacts();
         allContacts[viewingList.id] = updatedContacts;
         whatsappDb.saveContacts(allContacts);
@@ -493,7 +493,7 @@ export default function ContactsPage() {
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
         }}
-        onClick={() => setCreatingManual(false)}
+          onClick={() => setCreatingManual(false)}
         >
           <div
             onClick={(e) => e.stopPropagation()}
@@ -605,13 +605,13 @@ export default function ContactsPage() {
             </div>
 
             <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 16, marginTop: 'auto', display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-              <button 
-                onClick={() => setCreatingManual(false)} 
+              <button
+                onClick={() => setCreatingManual(false)}
                 style={{ background: '#f1f5f9', color: '#475569', border: 'none', padding: '10px 20px', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}
               >
                 Cancel
               </button>
-              <button 
+              <button
                 onClick={handleSaveManualList}
                 disabled={savingManual}
                 style={{ background: BRAND_BLUE, color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 8, fontWeight: 600, cursor: 'pointer', opacity: savingManual ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: 8 }}
@@ -629,7 +629,7 @@ export default function ContactsPage() {
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
         }}
-        onClick={() => { setViewingList(null); setEditingContactId(null); setAddingNew(false); }}
+          onClick={() => { setViewingList(null); setEditingContactId(null); setAddingNew(false); }}
         >
           <div
             onClick={(e) => e.stopPropagation()}
