@@ -457,11 +457,15 @@ export default function NewCampaign({ setSubView }) {
       };
     };
 
+    // Track individual success results
+    const deliveryResults = [];
+
     // Process sequentially or use Promise.all. Using sequential to avoid rate limits
     for (const contact of targetContacts) {
       let phone = getContactPhone(contact);
       if (!phone) {
         failedCount++;
+        deliveryResults.push(false);
         continue;
       }
       
@@ -483,11 +487,16 @@ export default function NewCampaign({ setSubView }) {
       }
 
       const success = await sendWhatsAppMsg(leadIdToUse, messageToDeliver, templateData);
+      
+      // Delay for 1 second between messages to prevent Google Cloud from rate-limiting the IP (which causes fake CORS errors)
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
       if (success) {
         sentCount++;
       } else {
         failedCount++;
       }
+      deliveryResults.push(success);
     }
 
     const newCamp = {
@@ -516,10 +525,7 @@ export default function NewCampaign({ setSubView }) {
     allRecipients[newCamp.id] = targetContacts.map((c, i) => {
       let phone = getContactPhone(c);
       const msg = getMessageForContact(c);
-      // Determine if this specific one failed (simplified logic)
-      // Since we don't map individual success array, we randomly assign fails to reach failedCount
-      // A more robust implementation would track success per contact
-      const isFailed = !phone || (i >= sentCount); 
+      const isFailed = !deliveryResults[i]; 
       return {
         id: `r-${newCamp.id}-${i}`,
         name: c.name || `Recipient ${i + 1}`,
