@@ -105,7 +105,7 @@ export default function Integrations() {
     };
 
     try {
-      const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'tz-lead-management';
+      const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'leads-management-tz';
       const functionUrl = `https://us-central1-${projectId}.cloudfunctions.net/googleAdsValidate`;
       const response = await fetch(functionUrl, {
         method: 'POST',
@@ -162,7 +162,7 @@ export default function Integrations() {
     setValidationResult(null);
 
     try {
-      const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'tz-lead-management';
+      const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'leads-management-tz';
       const functionUrl = `https://us-central1-${projectId}.cloudfunctions.net/metaValidate`;
       const response = await fetch(functionUrl, {
         method: 'POST',
@@ -209,7 +209,7 @@ export default function Integrations() {
   const forceGoogleAdsSync = async () => {
     setIsSyncing(true);
     try {
-      const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'tz-lead-management';
+      const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'leads-management-tz';
       const functionUrl = `https://us-central1-${projectId}.cloudfunctions.net/googleAdsSync`;
       const response = await fetch(functionUrl, {
         method: 'POST'
@@ -990,11 +990,11 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                           readOnly
                           className="form-control"
                           style={{ height: '28px', fontSize: '10px', padding: '0 8px', background: 'rgba(0,0,0,0.04)', flex: '1', border: '1px solid var(--border-color)' }}
-                          value={`https://us-central1-${import.meta.env.VITE_FIREBASE_PROJECT_ID || 'tz-lead-management'}.cloudfunctions.net/metaWebhook`}
+                          value={`https://us-central1-${import.meta.env.VITE_FIREBASE_PROJECT_ID || 'leads-management-tz'}.cloudfunctions.net/metaWebhook`}
                         />
                         <button
                           type="button"
-                          onClick={() => copyToClipboard(`https://us-central1-${import.meta.env.VITE_FIREBASE_PROJECT_ID || 'tz-lead-management'}.cloudfunctions.net/metaWebhook`, 'Meta Webhook URL')}
+                          onClick={() => copyToClipboard(`https://us-central1-${import.meta.env.VITE_FIREBASE_PROJECT_ID || 'leads-management-tz'}.cloudfunctions.net/metaWebhook`, 'Meta Webhook URL')}
                           style={{ height: '28px', fontSize: '10px', padding: '0 8px', background: 'var(--primary)', color: '#ffffff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '700' }}
                         >
                           Copy
