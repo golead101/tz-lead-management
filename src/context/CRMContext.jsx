@@ -96,6 +96,51 @@ const DEFAULT_INTEGRATIONS = {
 // Rich Seed Data of 12 Leads (Cleaned/Removed)
 const SEED_LEADS = [];
 
+// Helper to decrypt credentials locally using Web Crypto API
+const decryptCredential = async (encryptedText) => {
+  if (!encryptedText) return '';
+  const parts = encryptedText.split(':');
+  if (parts.length !== 2) {
+    return encryptedText;
+  }
+  try {
+    const ivHex = parts[0];
+    const cipherHex = parts[1];
+    const hexToBytes = (hex) => {
+      const bytes = new Uint8Array(hex.length / 2);
+      for (let i = 0; i < bytes.length; i++) {
+        bytes[i] = parseInt(hex.substr(i * 2, 2), 16);
+      }
+      return bytes;
+    };
+    const iv = hexToBytes(ivHex);
+    const cipherBytes = hexToBytes(cipherHex);
+    const keyRaw = import.meta.env.VITE_ENCRYPTION_KEY || 'tz_lead_crm_google_ads_key_2026_default';
+    const encoder = new TextEncoder();
+    const keyHashBuffer = await window.crypto.subtle.digest('SHA-256', encoder.encode(keyRaw));
+    const cryptoKey = await window.crypto.subtle.importKey(
+      'raw',
+      keyHashBuffer,
+      { name: 'AES-CBC' },
+      false,
+      ['decrypt']
+    );
+    const decryptedBuffer = await window.crypto.subtle.decrypt(
+      {
+        name: 'AES-CBC',
+        iv: iv
+      },
+      cryptoKey,
+      cipherBytes
+    );
+    const decoder = new TextDecoder();
+    return decoder.decode(decryptedBuffer);
+  } catch (err) {
+    console.error('Decryption failed locally, returning ciphertext:', err);
+    return encryptedText;
+  }
+};
+
 export const CRMProvider = ({ children }) => {
   // Database States
   const [leads, setLeads] = useState(() => {
@@ -202,6 +247,99 @@ export const CRMProvider = ({ children }) => {
   });
 
   const [isFirebaseEnabled, setIsFirebaseEnabled] = useState(false);
+
+  // Helper to send WhatsApp messages locally
+  const localSendWhatsAppMessage = async (leadId, recipientPhone, messageText, templateData = null, counselorName = 'System') => {
+    let cleanPhone = recipientPhone.replace(/[^0-9]/g, '').trim();
+    if (cleanPhone.length === 10) {
+      cleanPhone = '91' + cleanPhone;
+    }
+    if (cleanPhone.startsWith('00')) {
+      cleanPhone = cleanPhone.substring(2);
+    }
+    if (!cleanPhone.startsWith('+')) {
+      cleanPhone = '+' + cleanPhone;
+    }
+
+    const whatsapp = integrations.whatsapp || {};
+    const apiVersion = whatsapp.apiVersion || 'v20.0';
+    const phoneNumberId = whatsapp.phoneNumberId || '';
+    const encryptedAccessToken = whatsapp.accessToken || whatsapp.systemToken || '';
+
+    if (!phoneNumberId || !encryptedAccessToken) {
+      throw new Error('WhatsApp integration credentials are not configured.');
+    }
+
+    const accessToken = await decryptCredential(encryptedAccessToken);
+
+    let payload = {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: cleanPhone.replace('+', '')
+    };
+
+    if (templateData) {
+      payload.type = 'template';
+      payload.template = templateData;
+    } else {
+      payload.type = 'text';
+      payload.text = { body: messageText };
+    }
+
+    const url = `https://graph.facebook.com/${apiVersion}/${phoneNumberId}/messages`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken.trim()}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error?.message || 'Meta Graph API returned an error.');
+    }
+
+    const responseData = await response.json();
+    const messageId = responseData.messages?.[0]?.id;
+
+    if (leadId) {
+      const activeLead = leads.find(l => l.id === leadId);
+      if (activeLead) {
+        const outboundMsg = {
+          id: `msg-sent-${Date.now()}`,
+          sender: 'counselor',
+          text: messageText || (templateData ? `[Template: ${templateData.name} dispatched]` : ''),
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          waMessageId: messageId || null,
+          status: 'sent',
+          timestamp: new Date().toISOString()
+        };
+
+        const updatedChat = [...(activeLead.whatsappMessages || []), outboundMsg];
+        const nextTimeline = [...(activeLead.timeline || []), {
+          id: `log-wa-${Date.now()}`,
+          type: 'whatsapp',
+          title: templateData ? 'WhatsApp Template Logs' : 'WhatsApp Chat Logs',
+          content: messageText || `[Template: ${templateData.name}]`,
+          timestamp: new Date().toISOString(),
+          user: counselorName
+        }];
+
+        const updatedLead = {
+          ...activeLead,
+          whatsappMessages: updatedChat,
+          timeline: nextTimeline,
+          lastContacted: new Date().toISOString()
+        };
+
+        await setDoc(doc(db, 'leads', leadId), updatedLead);
+      }
+    }
+    return messageId;
+  };
 
   const login = async (email, password) => {
     try {
@@ -768,32 +906,14 @@ export const CRMProvider = ({ children }) => {
 
           // Dispatch to real WhatsApp API if integration is active
           if (integrations.whatsapp.enabled && lead.phone) {
-            const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'leads-management-tz';
-            const url = `https://us-central1-${projectId}.cloudfunctions.net/sendWhatsAppMessage`;
-            // Normalize to E.164: remove all non-digits, then prepend single '+'
-            const normalizedPhone1 = `+${lead.phone.replace(/\D/g, '')}`;
-            fetch(url, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                leadId: leadId,
-                recipientPhone: normalizedPhone1,
-                messageText: autoMsg,
-                counselorName: 'Automation Server'
-              })
-            })
-            .then(async (res) => {
-              const data = await res.json();
-              if (res.ok && data.success) {
-                console.log('Automated WhatsApp message delivered in real-time!');
-              } else {
-                console.error('Automated WhatsApp API failed:', data.error || data.details);
-              }
-            })
-            .catch((err) => {
-              console.error('Error dispatching automated WhatsApp to Cloud Function:', err);
+            localSendWhatsAppMessage(
+              leadId,
+              lead.phone,
+              autoMsg,
+              null,
+              'Automation Server'
+            ).catch((err) => {
+              console.error('Error dispatching local automated WhatsApp:', err);
             });
           }
         }
@@ -893,32 +1013,14 @@ export const CRMProvider = ({ children }) => {
 
             // Dispatch to real WhatsApp API if integration is active
             if (integrations.whatsapp.enabled && lead.phone) {
-              const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'leads-management-tz';
-              const url = `https://us-central1-${projectId}.cloudfunctions.net/sendWhatsAppMessage`;
-              // Normalize to E.164: remove all non-digits, then prepend single '+'
-              const normalizedPhone2 = `+${lead.phone.replace(/\D/g, '')}`;
-              fetch(url, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                  leadId: leadId,
-                  recipientPhone: normalizedPhone2,
-                  messageText: autoMsg,
-                  counselorName: 'Automation Server'
-                })
-              })
-              .then(async (res) => {
-                const data = await res.json();
-                if (res.ok && data.success) {
-                  console.log('Automated WhatsApp message delivered in real-time!');
-                } else {
-                  console.error('Automated WhatsApp API failed:', data.error || data.details);
-                }
-              })
-              .catch((err) => {
-                console.error('Error dispatching automated WhatsApp to Cloud Function:', err);
+              localSendWhatsAppMessage(
+                leadId,
+                lead.phone,
+                autoMsg,
+                null,
+                'Automation Server'
+              ).catch((err) => {
+                console.error('Error dispatching local automated WhatsApp:', err);
               });
             }
           }
@@ -1169,46 +1271,25 @@ export const CRMProvider = ({ children }) => {
   const sendWhatsAppMsg = async (leadId, messageText, templateData = null) => {
     if (!messageText.trim() && !templateData) return false;
 
-    // If real WhatsApp integration is active and enabled, make the HTTP call to Firebase Cloud Function
+    // If real WhatsApp integration is active and enabled, make the direct Graph API call locally
     if (integrations.whatsapp.enabled) {
       const activeLead = leads.find(l => l.id === leadId);
       if (activeLead && activeLead.phone) {
-        const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'leads-management-tz';
-        const url = `https://us-central1-${projectId}.cloudfunctions.net/sendWhatsAppMessage`;
-
-        // Normalize phone to valid E.164: strip everything except digits, then prepend a single '+'
-        // This fixes numbers like "++91 95154 77327", "+91-98765-43210", "0091...", etc.
-        const rawPhone = activeLead.phone;
-        const digitsOnly = rawPhone.replace(/\D/g, '');
-        const normalizedPhone = digitsOnly ? `+${digitsOnly}` : rawPhone;
-
         try {
-          const res = await fetch(url, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              leadId: leadId,
-              recipientPhone: normalizedPhone,
-              messageText: messageText,
-              counselorName: activeUser,
-              templateData: templateData
-            })
-          });
-
-          const data = await res.json();
-          if (res.ok && data.success) {
+          const messageId = await localSendWhatsAppMessage(
+            leadId,
+            activeLead.phone,
+            messageText,
+            templateData,
+            activeUser
+          );
+          if (messageId) {
             showToastMsg('WhatsApp message delivered in real-time!', 'success');
             return true;
-          } else {
-            console.error('WhatsApp API failed:', data.error, data.details, data);
-            showToastMsg(data.error || 'Failed to deliver WhatsApp message via API.', 'error');
-            return false;
           }
         } catch (err) {
-          console.error('Error dispatching WhatsApp to Cloud Function:', err);
-          showToastMsg('Could not reach WhatsApp gateway function.', 'error');
+          console.error('Error dispatching WhatsApp locally:', err);
+          showToastMsg(err.message || 'Failed to deliver WhatsApp message via API.', 'error');
           return false;
         }
       }
@@ -1673,7 +1754,8 @@ export const CRMProvider = ({ children }) => {
       clearNotifications,
       changeBrandingColors,
       showToastMsg,
-      updateIntegration
+      updateIntegration,
+      decryptCredential
     }}>
       {children}
       {toast && (

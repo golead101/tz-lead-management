@@ -4,6 +4,9 @@ import {
   CheckCircle, Image, Video, FileIcon, Phone, Globe, Copy, MessageSquare, Upload, Loader
 } from 'lucide-react';
 import { whatsappDb } from './whatsappDb';
+import { useCRM } from '../../context/CRMContext';
+import { db } from '../../firebase';
+import { doc, setDoc, deleteDoc, getDocs, collection, writeBatch } from 'firebase/firestore';
 
 const BRAND_BLUE = '#2563eb';
 
@@ -44,6 +47,7 @@ const inputStyle = {
 };
 
 export default function TemplatesPage() {
+  const { integrations, decryptCredential } = useCRM();
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreator, setShowCreator] = useState(false);
@@ -67,41 +71,80 @@ export default function TemplatesPage() {
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const fileInputRef = useRef(null);
 
-  const PROJECT_ID = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'leads-management-tz';
+
 
   useEffect(() => {
     loadTemplates();
   }, []);
 
-  // Fetch real templates from Meta WhatsApp Business Account via Cloud Function
+  // Fetch real templates from Meta WhatsApp Business Account locally
   const loadTemplates = async (showRefreshMsg = false) => {
     setLoading(true);
     try {
-      const url = `https://us-central1-${PROJECT_ID}.cloudfunctions.net/getWhatsAppTemplates`;
-      const res = await fetch(url, { method: 'POST' });
-      const data = await res.json();
+      const whatsapp = integrations.whatsapp || {};
+      const apiVersion = whatsapp.apiVersion || 'v20.0';
+      const businessAccountId = whatsapp.businessAccountId || '';
+      const encryptedAccessToken = whatsapp.accessToken || whatsapp.systemToken || '';
 
-      if (res.ok && data.success) {
-        setTemplates(data.templates || []);
-        whatsappDb.saveTemplates(data.templates || []);
-        if (showRefreshMsg) {
-          setToast({ type: 'success', message: `Synced ${data.count} templates from your Meta account.` });
-        }
-      } else {
-        // Fallback: load from local cache if API fails
-        const cached = whatsappDb.getTemplates();
-        setTemplates(cached);
-        if (showRefreshMsg) {
-          setToast({ type: 'error', message: data.error || 'Failed to sync from Meta. Showing cached templates.' });
-        }
-        console.error('[TemplatesPage] Meta API error:', data.error, data.details);
+      if (!businessAccountId || !encryptedAccessToken) {
+        throw new Error('WhatsApp integration is not fully configured in settings.');
+      }
+
+      const accessToken = await decryptCredential(encryptedAccessToken);
+
+      const url = `https://graph.facebook.com/${apiVersion}/${businessAccountId}/message_templates?fields=name,status,category,language,components,rejected_reason&limit=100&access_token=${accessToken.trim()}`;
+      
+      const res = await fetch(url);
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error?.message || 'Meta Graph API templates fetch rejected.');
+      }
+
+      const responseData = await res.json();
+      const metaTemplates = responseData.data || [];
+
+      // Normalize to our internal schema and cache in Firestore
+      const batch = writeBatch(db);
+      const existing = await getDocs(collection(db, 'whatsapp_templates'));
+      existing.docs.forEach(doc => batch.delete(doc.ref));
+
+      const normalized = metaTemplates.map(t => {
+        const safeComponents = (t.components || []).map(c => {
+          if (c.example) {
+            const { example, ...rest } = c;
+            return rest;
+          }
+          return c;
+        });
+        return {
+          name: t.name,
+          status: t.status,
+          category: t.category,
+          language: t.language,
+          components: safeComponents,
+          rejectedReason: t.rejected_reason || null
+        };
+      });
+
+      normalized.forEach(tpl => {
+        const ref = doc(db, 'whatsapp_templates', tpl.name);
+        batch.set(ref, tpl);
+      });
+
+      await batch.commit();
+
+      setTemplates(normalized);
+      whatsappDb.saveTemplates(normalized);
+
+      if (showRefreshMsg) {
+        setToast({ type: 'success', message: `Synced ${normalized.length} templates from your Meta account.` });
       }
     } catch (err) {
       // Fallback: load from local cache
       const cached = whatsappDb.getTemplates();
       setTemplates(cached);
       if (showRefreshMsg) {
-        setToast({ type: 'error', message: 'Could not reach Meta API. Showing cached templates.' });
+        setToast({ type: 'error', message: err.message || 'Could not reach Meta API. Showing cached templates.' });
       }
       console.error('[TemplatesPage] Fetch error:', err);
     } finally {
@@ -159,10 +202,25 @@ export default function TemplatesPage() {
     ].filter(Boolean);
 
     try {
-      const url = `https://us-central1-${PROJECT_ID}.cloudfunctions.net/createWhatsAppTemplate`;
+      const whatsapp = integrations.whatsapp || {};
+      const apiVersion = whatsapp.apiVersion || 'v20.0';
+      const businessAccountId = whatsapp.businessAccountId || '';
+      const encryptedAccessToken = whatsapp.accessToken || whatsapp.systemToken || '';
+
+      if (!businessAccountId || !encryptedAccessToken) {
+        throw new Error('WhatsApp integration credentials are not configured.');
+      }
+
+      const accessToken = await decryptCredential(encryptedAccessToken);
+
+      const url = `https://graph.facebook.com/${apiVersion}/${businessAccountId}/message_templates`;
+      
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Authorization': `Bearer ${accessToken.trim()}`,
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({
           name: cleanName,
           category: tplCategory,
@@ -170,20 +228,40 @@ export default function TemplatesPage() {
           components
         })
       });
-      const data = await res.json();
 
-      if (res.ok && data.success) {
-        setShowCreator(false);
-        resetForm();
-        setToast({ type: 'success', message: `Template "${cleanName}" submitted to Meta for approval. Status: PENDING.` });
-        // Refresh from Meta to show real status
-        await loadTemplates();
-      } else {
-        setToast({ type: 'error', message: data.error || 'Failed to submit template to Meta.' });
-        console.error('[handleCreate] Meta error:', data.details);
+      const created = await res.json();
+      if (!res.ok) {
+        throw new Error(created.error?.message || 'Failed to submit template to Meta.');
       }
+
+      // Strip example field before saving to Firestore
+      const componentsForFirestore = components.map(c => {
+        if (c.example) {
+          const { example, ...rest } = c;
+          return rest;
+        }
+        return c;
+      });
+
+      // Cache in Firestore with PENDING status
+      const templateDoc = {
+        name: cleanName,
+        status: created.status || 'PENDING',
+        category: tplCategory,
+        language: tplLanguage,
+        components: componentsForFirestore,
+        metaId: created.id || null,
+        rejectedReason: null
+      };
+
+      await setDoc(doc(db, 'whatsapp_templates', cleanName), templateDoc);
+
+      setShowCreator(false);
+      resetForm();
+      setToast({ type: 'success', message: `Template "${cleanName}" submitted to Meta for approval. Status: PENDING.` });
+      await loadTemplates();
     } catch (err) {
-      setToast({ type: 'error', message: 'Could not reach Meta API. Check your connection.' });
+      setToast({ type: 'error', message: err.message || 'Could not reach Meta API.' });
       console.error('[handleCreate] Error:', err);
     } finally {
       setCreating(false);
@@ -195,24 +273,37 @@ export default function TemplatesPage() {
     setDeleting(name);
 
     try {
-      const url = `https://us-central1-${PROJECT_ID}.cloudfunctions.net/deleteWhatsAppTemplate`;
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name })
-      });
-      const data = await res.json();
+      const whatsapp = integrations.whatsapp || {};
+      const apiVersion = whatsapp.apiVersion || 'v20.0';
+      const businessAccountId = whatsapp.businessAccountId || '';
+      const encryptedAccessToken = whatsapp.accessToken || whatsapp.systemToken || '';
 
-      if (res.ok && data.success) {
-        setToast({ type: 'success', message: `Template "${name}" deleted from Meta.` });
-        // Refresh to reflect Meta's actual state
-        await loadTemplates();
-      } else {
-        setToast({ type: 'error', message: data.error || 'Failed to delete from Meta.' });
-        console.error('[handleDelete] Meta error:', data.details);
+      if (!businessAccountId || !encryptedAccessToken) {
+        throw new Error('WhatsApp integration credentials are not configured.');
       }
+
+      const accessToken = await decryptCredential(encryptedAccessToken);
+
+      const url = `https://graph.facebook.com/${apiVersion}/${businessAccountId}/message_templates?name=${name}`;
+      
+      const res = await fetch(url, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${accessToken.trim()}`
+        }
+      });
+
+      const result = await res.json();
+      if (!res.ok) {
+        throw new Error(result.error?.message || 'Failed to delete template from Meta.');
+      }
+
+      await deleteDoc(doc(db, 'whatsapp_templates', name));
+
+      setToast({ type: 'success', message: `Template "${name}" deleted from Meta.` });
+      await loadTemplates();
     } catch (err) {
-      setToast({ type: 'error', message: 'Could not reach Meta API.' });
+      setToast({ type: 'error', message: err.message || 'Could not reach Meta API.' });
       console.error('[handleDelete] Error:', err);
     } finally {
       setDeleting(null);

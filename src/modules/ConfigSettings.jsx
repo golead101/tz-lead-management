@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { useCRM } from '../context/CRMContext';
-import { functions } from '../firebase';
-import { httpsCallable } from 'firebase/functions';
+import { db } from '../firebase';
+import { doc, setDoc } from 'firebase/firestore';
+import { initializeApp } from 'firebase/app';
+import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 
 export default function ConfigSettings() {
   const {
@@ -232,27 +234,53 @@ export default function ConfigSettings() {
     if (!cName.trim() || !cEmail.trim() || !cPassword.trim()) return;
     
     setIsCreatingUser(true);
+    let tempApp = null;
     try {
-      const createUserAccount = httpsCallable(functions, 'createUserAccount');
-      const result = await createUserAccount({
+      const firebaseConfig = {
+        apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+        authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+        projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+        storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+        messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+        appId: import.meta.env.VITE_FIREBASE_APP_ID,
+        measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
+      };
+
+      // Create a temporary secondary Firebase app instance
+      tempApp = initializeApp(firebaseConfig, `TempApp_${Date.now()}`);
+      const tempAuth = getAuth(tempApp);
+
+      // Create the credentials in Firebase Auth
+      const userCredential = await createUserWithEmailAndPassword(tempAuth, cEmail, cPassword);
+      const newUid = userCredential.user.uid;
+
+      // Save user profile directly in Firestore
+      await setDoc(doc(db, 'users', newUid), {
+        email: cEmail.toLowerCase().trim(),
         name: cName,
-        email: cEmail,
-        password: cPassword,
-        role: cRole
+        role: cRole,
+        status: 'Active',
+        id: newUid,
+        createdAt: new Date().toISOString()
       });
-      
-      if (result.data.success) {
-        alert(result.data.message);
-        setCName('');
-        setCEmail('');
-        setCPassword('');
-        setCRole('Counselor');
-        setCStatus('Active');
-      }
+
+      alert(`Successfully created user account for ${cName}`);
+      setCName('');
+      setCEmail('');
+      setCPassword('');
+      setCRole('Counselor');
+      setCStatus('Active');
     } catch (error) {
-      console.error('Error creating user account:', error);
+      console.error('Error creating user account locally:', error);
       alert('Failed to create user account: ' + error.message);
     } finally {
+      if (tempApp) {
+        try {
+          await tempApp.delete();
+        } catch (delErr) {
+          console.error('Failed to delete temp app instance:', delErr);
+        }
+      }
       setIsCreatingUser(false);
     }
   };

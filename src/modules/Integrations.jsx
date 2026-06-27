@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useCRM } from '../context/CRMContext';
 import { db } from '../firebase';
-import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot, setDoc, doc } from 'firebase/firestore';
 
 export default function Integrations() {
-  const { leads, integrations, updateIntegration, addLead, showToastMsg, setActiveView } = useCRM();
+  const { leads, integrations, updateIntegration, addLead, showToastMsg, setActiveView, decryptCredential } = useCRM();
 
   const getCapturedCount = (platform) => {
     let sourceNames = [];
@@ -105,37 +105,87 @@ export default function Integrations() {
     };
 
     try {
-      const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'tz-lead-management';
-      const functionUrl = `https://us-central1-${projectId}.cloudfunctions.net/googleAdsValidate`;
-      const response = await fetch(functionUrl, {
+      const developerToken = await decryptCredential(fieldsToValidate.developerToken);
+      const clientSecret = await decryptCredential(fieldsToValidate.clientSecret);
+      const refreshToken = await decryptCredential(fieldsToValidate.refreshToken);
+      const customerId = fieldsToValidate.customerId;
+      const managerCustomerId = fieldsToValidate.managerCustomerId;
+      const clientId = fieldsToValidate.clientId;
+
+      if (!customerId || !developerToken || !clientId || !clientSecret || !refreshToken) {
+        showToastMsg('All configuration credentials are required.', 'error');
+        setValidationResult({ success: false, message: 'All credentials must be provided.' });
+        return;
+      }
+
+      const cleanCustomerId = customerId.replace(/-/g, '').trim();
+
+      const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(fieldsToValidate)
+        body: JSON.stringify({
+          client_id: clientId,
+          client_secret: clientSecret,
+          refresh_token: refreshToken,
+          grant_type: 'refresh_token'
+        })
       });
-      const data = await response.json();
 
-      if (response.ok && data.success) {
-        setValidationResult({ success: true, message: 'Google Ads API authenticated successfully!' });
-        showToastMsg('Google Ads connection verified!', 'success');
-        updateIntegration('google', {
-          ...fieldsToValidate,
-          enabled: true,
-          status: 'Connected'
-        });
-      } else {
-        setValidationResult({ success: false, message: data.details || data.error || 'Connection verification failed.' });
-        showToastMsg(data.error || 'OAuth / API connection failed.', 'error');
-        updateIntegration('google', {
-          enabled: false,
-          status: 'Setup Required'
-        });
+      if (!tokenRes.ok) {
+        const tokenErr = await tokenRes.json();
+        throw new Error(tokenErr.error_description || 'OAuth token exchange failed.');
       }
+
+      const tokenData = await tokenRes.json();
+      const accessToken = tokenData.access_token;
+
+      const searchHeaders = {
+        'Authorization': `Bearer ${accessToken}`,
+        'developer-token': developerToken,
+        'Content-Type': 'application/json'
+      };
+
+      if (managerCustomerId) {
+        const cleanManagerCustomerId = managerCustomerId.replace(/-/g, '').trim();
+        if (cleanManagerCustomerId) {
+          searchHeaders['login-customer-id'] = cleanManagerCustomerId;
+        }
+      }
+
+      const searchRes = await fetch(`https://googleads.googleapis.com/v18/customers/${cleanCustomerId}/googleAds:search`, {
+        method: 'POST',
+        headers: searchHeaders,
+        body: JSON.stringify({
+          query: 'SELECT campaign.id, campaign.name FROM campaign LIMIT 1'
+        })
+      });
+
+      if (!searchRes.ok) {
+        const searchErr = await searchRes.json();
+        throw new Error(searchErr.error?.message || 'Google Ads query rejected.');
+      }
+
+      const logId = `val-log-${Date.now()}`;
+      await setDoc(doc(db, 'googleAdsLogs', logId), {
+        timestamp: new Date().toISOString(),
+        type: 'validation',
+        status: 'success',
+        message: 'Successfully validated and connected to Google Ads API locally.'
+      });
+
+      setValidationResult({ success: true, message: 'Google Ads API authenticated successfully!' });
+      showToastMsg('Google Ads connection verified!', 'success');
+      updateIntegration('google', {
+        ...fieldsToValidate,
+        enabled: true,
+        status: 'Connected'
+      });
     } catch (err) {
-      console.error('Validation error:', err);
-      setValidationResult({ success: false, message: 'Could not communicate with Firebase validation function.' });
-      showToastMsg('Could not reach Cloud Function.', 'error');
+      console.error('Local Validation error:', err);
+      setValidationResult({ success: false, message: err.message || 'Connection verification failed.' });
+      showToastMsg(err.message || 'OAuth / API connection failed.', 'error');
       updateIntegration('google', {
         enabled: false,
         status: 'Setup Required'
@@ -162,39 +212,35 @@ export default function Integrations() {
     setValidationResult(null);
 
     try {
-      const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'tz-lead-management';
-      const functionUrl = `https://us-central1-${projectId}.cloudfunctions.net/metaValidate`;
-      const response = await fetch(functionUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          verifyToken: fieldsToValidate.verifyToken
-        })
-      });
-      const data = await response.json();
+      const decryptedToken = await decryptCredential(fieldsToValidate.verifyToken);
 
-      if (response.ok && data.success) {
-        setValidationResult({ success: true, message: data.message || 'Meta API authenticated successfully!' });
-        showToastMsg('Meta connection verified!', 'success');
-        updateIntegration('meta', {
-          ...fieldsToValidate,
-          enabled: true,
-          status: 'Connected'
-        });
-      } else {
-        setValidationResult({ success: false, message: data.details || data.error || 'Connection verification failed.' });
-        showToastMsg(data.error || 'Meta API connection failed.', 'error');
-        updateIntegration('meta', {
-          enabled: false,
-          status: 'Setup Required'
-        });
+      let graphUrl = `https://graph.facebook.com/v20.0/me?access_token=${decryptedToken.trim()}`;
+      let response = await fetch(graphUrl);
+      
+      if (!response.ok) {
+        graphUrl = `https://graph.facebook.com/v20.0/app?access_token=${decryptedToken.trim()}`;
+        response = await fetch(graphUrl);
       }
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || 'Meta API returned an error.');
+      }
+
+      const data = await response.json();
+      const displayName = data.name ? `${data.name} (App)` : `Account ID: ${data.id}`;
+
+      setValidationResult({ success: true, message: `Successfully connected to Meta. Connected to ${displayName}` });
+      showToastMsg('Meta connection verified!', 'success');
+      updateIntegration('meta', {
+        ...fieldsToValidate,
+        enabled: true,
+        status: 'Connected'
+      });
     } catch (err) {
       console.error('Meta validation error:', err);
-      setValidationResult({ success: false, message: 'Could not communicate with Firebase Meta validation function.' });
-      showToastMsg('Could not reach Cloud Function.', 'error');
+      setValidationResult({ success: false, message: err.message || 'Meta connection validation failed.' });
+      showToastMsg(err.message || 'Meta API connection failed.', 'error');
       updateIntegration('meta', {
         enabled: false,
         status: 'Setup Required'
@@ -209,20 +255,170 @@ export default function Integrations() {
   const forceGoogleAdsSync = async () => {
     setIsSyncing(true);
     try {
-      const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'tz-lead-management';
-      const functionUrl = `https://us-central1-${projectId}.cloudfunctions.net/googleAdsSync`;
-      const response = await fetch(functionUrl, {
-        method: 'POST'
-      });
-      const data = await response.json();
-      if (response.ok && data.success) {
-        showToastMsg(`Sync successful! Imported ${data.leadsImported} leads.`, 'success');
-      } else {
-        showToastMsg(data.error || 'Sync execution failed.', 'error');
+      const google = integrations.google || {};
+      if (!google.enabled) {
+        showToastMsg('Google Ads integration is not active. Please enable it.', 'error');
+        setIsSyncing(false);
+        return;
       }
+
+      const developerToken = await decryptCredential(google.developerToken);
+      const clientSecret = await decryptCredential(google.clientSecret);
+      const refreshToken = await decryptCredential(google.refreshToken);
+      const customerId = google.customerId;
+      const managerCustomerId = google.managerCustomerId;
+      const clientId = google.clientId;
+
+      const cleanCustomerId = customerId.replace(/-/g, '').trim();
+
+      const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          client_id: clientId,
+          client_secret: clientSecret,
+          refresh_token: refreshToken,
+          grant_type: 'refresh_token'
+        })
+      });
+
+      if (!tokenRes.ok) {
+        throw new Error('Google OAuth authentication failed.');
+      }
+
+      const tokenData = await tokenRes.json();
+      const accessToken = tokenData.access_token;
+
+      const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+      const searchHeaders = {
+        'Authorization': `Bearer ${accessToken}`,
+        'developer-token': developerToken,
+        'Content-Type': 'application/json'
+      };
+
+      if (managerCustomerId) {
+        const cleanManagerCustomerId = managerCustomerId.replace(/-/g, '').trim();
+        if (cleanManagerCustomerId) {
+          searchHeaders['login-customer-id'] = cleanManagerCustomerId;
+        }
+      }
+
+      const queryStr = `
+        SELECT
+          lead_form_submission_data.id,
+          lead_form_submission_data.campaign,
+          lead_form_submission_data.ad_group,
+          lead_form_submission_data.lead_form_submission_fields,
+          lead_form_submission_data.submission_date_time
+        FROM lead_form_submission_data
+        WHERE lead_form_submission_data.submission_date_time >= '${fortyEightHoursAgo}'
+        LIMIT 100
+      `;
+
+      const searchRes = await fetch(`https://googleads.googleapis.com/v18/customers/${cleanCustomerId}/googleAds:search`, {
+        method: 'POST',
+        headers: searchHeaders,
+        body: JSON.stringify({ query: queryStr })
+      });
+
+      if (!searchRes.ok) {
+        const searchErr = await searchRes.json();
+        throw new Error(searchErr.error?.message || 'Failed to sync lead submissions.');
+      }
+
+      const searchData = await searchRes.json();
+      const rows = searchData.results || [];
+      let leadsImported = 0;
+      let leadsSkipped = 0;
+
+      for (const row of rows) {
+        const leadData = row.lead_form_submission_data;
+        const leadId = leadData.id;
+        const fields = leadData.lead_form_submission_fields || [];
+        const submissionTime = leadData.submission_date_time || new Date().toISOString();
+        const campaign = leadData.campaign || 'N/A';
+        const adGroup = leadData.ad_group || 'N/A';
+
+        const isDuplicate = leads.some(l => l.googleLeadId === leadId);
+        if (isDuplicate) {
+          leadsSkipped++;
+          continue;
+        }
+
+        let fullName = 'Google Ads Inquiry';
+        let email = '';
+        let phone = '';
+
+        fields.forEach(f => {
+          const colId = f.field_type;
+          const val = f.string_value || '';
+          if (colId === 'FULL_NAME') {
+            fullName = val;
+          } else if (colId === 'EMAIL') {
+            email = val.toLowerCase().trim();
+          } else if (colId === 'PHONE_NUMBER') {
+            phone = val;
+          }
+        });
+
+        const leadRecordId = `lead-gads-sync-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+        const leadRecord = {
+          id: leadRecordId,
+          googleLeadId: leadId,
+          name: fullName,
+          email: email,
+          phone: phone,
+          location: 'Google Ad',
+          education: 'Not Provided',
+          course: 'Data Science & Artificial Intelligence',
+          source: 'Google Ads',
+          stage: 'New Lead',
+          counselor: 'Maha',
+          createdDate: submissionTime,
+          lastContacted: new Date().toISOString(),
+          customFields: {
+            campaign: campaign,
+            adGroup: adGroup,
+            syncedVia: 'local_reconciliation_api'
+          },
+          timeline: [{
+            id: `log-${Date.now()}`,
+            type: 'system',
+            title: 'Lead Synced via Google Ads API',
+            content: `Reconciled lead. submission date: ${submissionTime}. Campaign: ${campaign}`,
+            timestamp: new Date().toISOString(),
+            user: 'API Sync Worker'
+          }],
+          whatsappMessages: []
+        };
+
+        await setDoc(doc(db, 'leads', leadRecordId), leadRecord);
+        leadsImported++;
+      }
+
+      const logId = `sync-log-${Date.now()}`;
+      await setDoc(doc(db, 'googleAdsLogs', logId), {
+        timestamp: new Date().toISOString(),
+        type: 'api_reconciliation',
+        status: 'success',
+        leadsImported: leadsImported,
+        leadsSkipped: leadsSkipped,
+        message: `Local API reconciliation sync completed. Imported ${leadsImported} new leads, skipped ${leadsSkipped} duplicates.`
+      });
+
+      await setDoc(doc(db, 'settings', 'integrations'), {
+        google: {
+          lastSyncedAt: new Date().toISOString()
+        }
+      }, { merge: true });
+
+      showToastMsg(`Sync successful! Imported ${leadsImported} leads.`, 'success');
     } catch (err) {
-      console.error('Manual sync error:', err);
-      showToastMsg('Sync function execution failed.', 'error');
+      console.error('Local manual sync error:', err);
+      showToastMsg(err.message || 'Sync function execution failed.', 'error');
     } finally {
       setIsSyncing(false);
     }
