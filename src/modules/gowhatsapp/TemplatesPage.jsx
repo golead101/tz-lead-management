@@ -83,6 +83,7 @@ export default function TemplatesPage() {
 
       if (res.ok && data.success) {
         setTemplates(data.templates || []);
+        whatsappDb.saveTemplates(data.templates || []);
         if (showRefreshMsg) {
           setToast({ type: 'success', message: `Synced ${data.count} templates from your Meta account.` });
         }

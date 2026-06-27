@@ -473,53 +473,9 @@ export const CRMProvider = ({ children }) => {
           const data = snapshot.data();
           const whatsappData = data.whatsapp || {};
           const metaData = data.meta || {};
-          const hasEnvConfig = import.meta.env.WHATSAPP_PHONE_NUMBER_ID && import.meta.env.WHATSAPP_ACCESS_TOKEN;
-          const hasMetaEnv = import.meta.env.META_APP_ID;
-
-          const whatsappNeedsSync = hasEnvConfig && (
-            !whatsappData.enabled || 
-            whatsappData.phoneNumberId !== import.meta.env.WHATSAPP_PHONE_NUMBER_ID ||
-            (whatsappData.accessToken || whatsappData.systemToken) !== import.meta.env.WHATSAPP_ACCESS_TOKEN
-          );
-
-          const metaNeedsSync = hasMetaEnv && (
-            metaData.appId !== import.meta.env.META_APP_ID
-          );
-
-          if (whatsappNeedsSync || metaNeedsSync) {
-            const updatedWhatsapp = whatsappNeedsSync ? {
-              ...whatsappData,
-              enabled: true,
-              status: 'Connected',
-              phoneNumberId: import.meta.env.WHATSAPP_PHONE_NUMBER_ID,
-              businessAccountId: import.meta.env.WHATSAPP_BUSINESS_ACCOUNT_ID || whatsappData.businessAccountId || '',
-              accessToken: import.meta.env.WHATSAPP_ACCESS_TOKEN,
-              systemToken: import.meta.env.WHATSAPP_ACCESS_TOKEN,
-              apiVersion: import.meta.env.WHATSAPP_API_VERSION || whatsappData.apiVersion || 'v20.0',
-              webhookVerifyToken: import.meta.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || whatsappData.webhookVerifyToken || ''
-            } : whatsappData;
-
-            const updatedMeta = metaNeedsSync ? {
-              ...metaData,
-              appId: import.meta.env.META_APP_ID,
-              appSecret: import.meta.env.META_APP_SECRET || metaData.appSecret || '',
-              webhookVerifyToken: import.meta.env.META_WEBHOOK_VERIFY_TOKEN || metaData.webhookVerifyToken || '',
-              verifyToken: import.meta.env.VERIFY_TOKEN || metaData.verifyToken || '',
-              redirectUri: import.meta.env.META_REDIRECT_URI || metaData.redirectUri || ''
-            } : metaData;
-
-            const updatedData = {
-              ...data,
-              whatsapp: updatedWhatsapp,
-              meta: updatedMeta
-            };
-
-            setDoc(doc(db, 'settings', 'integrations'), updatedData)
-              .then(() => console.log("Automatically synchronized WhatsApp/Meta env credentials to Firestore."))
-              .catch(err => console.error("Auto-syncing credentials failed:", err));
-          } else {
-            setIntegrations(data);
-          }
+          // We simply use the data from Firestore, allowing the user to update it via the UI
+          // without hardcoded .env variables overriding and causing infinite encryption loops.
+          setIntegrations(data);
         } else {
           setDoc(doc(db, 'settings', 'integrations'), DEFAULT_INTEGRATIONS)
             .catch(err => console.error("Firestore settings/integrations initialization failed:", err));
@@ -1246,7 +1202,7 @@ export const CRMProvider = ({ children }) => {
             showToastMsg('WhatsApp message delivered in real-time!', 'success');
             return true;
           } else {
-            console.error('WhatsApp API failed:', data.error || data.details);
+            console.error('WhatsApp API failed:', data.error, data.details, data);
             showToastMsg(data.error || 'Failed to deliver WhatsApp message via API.', 'error');
             return false;
           }

@@ -67,7 +67,11 @@ export default function GridView() {
 
   // Filter Leads
   const filteredLeads = leads.filter(lead => {
-    if (activeRole === 'Counselor' && lead.counselor !== activeUser) return false;
+    if (activeRole === 'Counselor' && lead.counselor !== activeUser) {
+      const src = (lead.source || '').toLowerCase();
+      const isGlobal = src.includes('meta') || src.includes('google') || src.includes('website');
+      if (!isGlobal) return false;
+    }
     if (selectedCourse !== 'All' && lead.course !== selectedCourse) return false;
     if (selectedStage !== 'All' && lead.stage !== selectedStage) return false;
     if (selectedCounselor !== 'All' && lead.counselor !== selectedCounselor) return false;

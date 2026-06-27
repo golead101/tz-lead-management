@@ -40,6 +40,7 @@ export default function ChatbotSettingsPage() {
     feeDetails: '',
     counselorPhone: '',
     brochureUrl: '',
+    metaCostRate: '0.80',
   });
   const [toast, setToast] = useState(null);
 
@@ -206,6 +207,26 @@ export default function ChatbotSettingsPage() {
               placeholder="https://firebasestorage.googleapis.com/..."
             />
             <p style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Direct link to your PDF brochure file</p>
+          </div>
+        </div>
+
+        {/* Meta Cost Rate Section */}
+        <div style={{ ...cardStyle, gridColumn: 'span 2' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, color: '#0f172a' }}>
+            <div style={{ width: 18, height: 18, borderRadius: 4, background: '#dcfce7', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: '700', color: '#16a34a' }}>₹</div>
+            Meta Cost Rate (INR)
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#475569' }}>Per Conversation Cost</label>
+            <input
+              type="number"
+              step="0.01"
+              value={settings.metaCostRate}
+              onChange={(e) => setSettings({ ...settings, metaCostRate: e.target.value })}
+              style={inputStyle}
+              placeholder="0.80"
+            />
+            <p style={{ fontSize: '0.75rem', color: '#94a3b8' }}>This rate is used to estimate billing on the dashboard.</p>
           </div>
         </div>
       </div>

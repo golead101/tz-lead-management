@@ -12,7 +12,7 @@ export default function Integrations() {
     else if (platform === 'google') sourceNames = ['Google Search', 'Google Ads', 'Google'];
     else if (platform === 'whatsapp') sourceNames = ['WhatsApp Inbound', 'WhatsApp'];
     else if (platform === 'webhooks') sourceNames = ['Website Form', 'Website'];
-    
+
     return leads.filter(l => sourceNames.includes(l.source)).length;
   };
 
@@ -56,8 +56,8 @@ export default function Integrations() {
       setWhatsAppFields({
         phoneNumberId: integrations.whatsapp.phoneNumberId || import.meta.env.WHATSAPP_PHONE_NUMBER_ID || '',
         businessAccountId: integrations.whatsapp.businessAccountId || import.meta.env.WHATSAPP_BUSINESS_ACCOUNT_ID || '',
-        systemToken: integrations.whatsapp.systemToken || integrations.whatsapp.accessToken || import.meta.env.WHATSAPP_ACCESS_TOKEN || '',
-        accessToken: integrations.whatsapp.accessToken || integrations.whatsapp.systemToken || import.meta.env.WHATSAPP_ACCESS_TOKEN || '',
+        systemToken: integrations.whatsapp.systemToken || integrations.whatsapp.accessToken || '',
+        accessToken: integrations.whatsapp.accessToken || integrations.whatsapp.systemToken || '',
         apiVersion: integrations.whatsapp.apiVersion || import.meta.env.WHATSAPP_API_VERSION || 'v20.0',
         webhookVerifyToken: integrations.whatsapp.webhookVerifyToken || import.meta.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || ''
       });
@@ -115,7 +115,7 @@ export default function Integrations() {
         body: JSON.stringify(fieldsToValidate)
       });
       const data = await response.json();
-      
+
       if (response.ok && data.success) {
         setValidationResult({ success: true, message: 'Google Ads API authenticated successfully!' });
         showToastMsg('Google Ads connection verified!', 'success');
@@ -174,7 +174,7 @@ export default function Integrations() {
         })
       });
       const data = await response.json();
-      
+
       if (response.ok && data.success) {
         setValidationResult({ success: true, message: data.message || 'Meta API authenticated successfully!' });
         showToastMsg('Meta connection verified!', 'success');
@@ -260,8 +260,8 @@ export default function Integrations() {
 
     const nextEnabled = !integrations[platform].enabled;
     const nextStatus = nextEnabled ? 'Connected' : 'Disconnected';
-    
-    updateIntegration(platform, { 
+
+    updateIntegration(platform, {
       enabled: nextEnabled,
       status: nextStatus
     });
@@ -276,8 +276,8 @@ export default function Integrations() {
       fieldsToSave = { ...metaFields };
       if (metaFields.appSecret === '••••••••••••••••') fieldsToSave.appSecret = integrations.meta.appSecret;
       if (metaFields.verifyToken === '••••••••••••••••') fieldsToSave.verifyToken = integrations.meta.verifyToken;
-      
-      const hasFieldsChanged = 
+
+      const hasFieldsChanged =
         fieldsToSave.appId !== integrations.meta.appId ||
         fieldsToSave.appSecret !== integrations.meta.appSecret ||
         fieldsToSave.webhookVerifyToken !== integrations.meta.webhookVerifyToken ||
@@ -298,7 +298,7 @@ export default function Integrations() {
       if (googleFields.clientSecret === '••••••••••••••••') fieldsToSave.clientSecret = integrations.google.clientSecret;
       if (googleFields.refreshToken === '••••••••••••••••') fieldsToSave.refreshToken = integrations.google.refreshToken;
 
-      const hasFieldsChanged = 
+      const hasFieldsChanged =
         fieldsToSave.customerId !== integrations.google.customerId ||
         fieldsToSave.managerCustomerId !== integrations.google.managerCustomerId ||
         fieldsToSave.developerToken !== integrations.google.developerToken ||
@@ -337,7 +337,7 @@ export default function Integrations() {
       enabled: isSetupValid,
       status: activeStatus
     });
-    
+
     setSelectedPlatform(null);
   };
 
@@ -353,7 +353,7 @@ export default function Integrations() {
 
     setTimeout(() => {
       let mockLead = {};
-      
+
       if (selectedPlatform === 'meta') {
         const firstNames = ['Aditi', 'Rohan', 'Kabir', 'Zoya', 'Tanvi', 'Rohan', 'Dia', 'Ishaan', 'Kavya', 'Yash'];
         const lastNames = ['Verma', 'Malhotra', 'Sinha', 'Chawla', 'Mehta', 'Kappor', 'Sen', 'Grover', 'Roy', 'Joshi'];
@@ -577,19 +577,19 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
 
       {/* Grid of 4 Premium Cards */}
       <div className="db-source-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '20px', marginBottom: '24px' }}>
-        
+
         {/* Meta Ads Card */}
         <div className="db-source-card integrations-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', height: '100%', minHeight: '230px', justifyContent: 'space-between' }}>
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
               <div className="db-source-icon-wrap meta" style={{ width: '42px', height: '42px' }}>
                 <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
-                  <path d="M16.924 6c-1.393 0-2.613.626-3.486 1.624L12 9.25 10.562 7.624C9.69 6.626 8.47 6 7.076 6 4.257 6 2 8.243 2 11c0 2.757 2.257 5 5.076 5 1.393 0 2.613-.626 3.486-1.624L12 12.75l1.438 1.626c.873.998 2.093 1.624 3.486 1.624 2.819 0 5.076-2.243 5.076-5 0-2.757-2.257-5-5.076-5zm0 8.5c-1.026 0-1.921-.497-2.522-1.282L12 10.5l-2.402 2.718c-.6.785-1.496 1.282-2.522 1.282-1.677 0-3.076-1.353-3.076-3s1.399-3 3.076-3c1.026 0 1.921.497 2.522 1.282L12 11.5l2.402-2.718c.6-.785 1.496-1.282 2.522-1.282 1.677 0 3.076 1.353 3.076 3s-1.399 3-3.076 3z"/>
+                  <path d="M16.924 6c-1.393 0-2.613.626-3.486 1.624L12 9.25 10.562 7.624C9.69 6.626 8.47 6 7.076 6 4.257 6 2 8.243 2 11c0 2.757 2.257 5 5.076 5 1.393 0 2.613-.626 3.486-1.624L12 12.75l1.438 1.626c.873.998 2.093 1.624 3.486 1.624 2.819 0 5.076-2.243 5.076-5 0-2.757-2.257-5-5.076-5zm0 8.5c-1.026 0-1.921-.497-2.522-1.282L12 10.5l-2.402 2.718c-.6.785-1.496 1.282-2.522 1.282-1.677 0-3.076-1.353-3.076-3s1.399-3 3.076-3c1.026 0 1.921.497 2.522 1.282L12 11.5l2.402-2.718c.6-.785 1.496-1.282 2.522-1.282 1.677 0 3.076 1.353 3.076 3s-1.399 3-3.076 3z" />
                 </svg>
               </div>
-              
+
               {/* Toggler Switch */}
-              <div 
+              <div
                 onClick={() => handleToggle('meta')}
                 className={`db-chart-dropdown ${integrations.meta.enabled ? 'active-toggle' : ''}`}
                 style={{
@@ -616,7 +616,7 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
           <div>
             {/* Meta status pill */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
-              <span className="db-source-badge" style={{ 
+              <span className="db-source-badge" style={{
                 background: integrations.meta.status === 'Connected' ? 'rgba(37,99,235,0.08)' : integrations.meta.status === 'Setup Required' ? 'rgba(249,115,22,0.08)' : 'rgba(239,68,68,0.08)',
                 color: integrations.meta.status === 'Connected' ? '#2563eb' : integrations.meta.status === 'Setup Required' ? '#f97316' : '#ef4444',
                 fontSize: '10px',
@@ -626,13 +626,13 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
               }}>
                 {integrations.meta.status}
               </span>
-              
+
               <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>
                 {getCapturedCount('meta').toLocaleString()} leads captured
               </span>
             </div>
 
-            <button 
+            <button
               className="primary-btn w-full mt-3"
               onClick={() => setSelectedPlatform('meta')}
               style={{
@@ -662,9 +662,9 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                   <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335" />
                 </svg>
               </div>
-              
+
               {/* Toggler Switch */}
-              <div 
+              <div
                 onClick={() => handleToggle('google')}
                 className={`db-chart-dropdown ${integrations.google.enabled ? 'active-toggle' : ''}`}
                 style={{
@@ -691,7 +691,7 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
           <div>
             {/* Google status pill */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
-              <span className="db-source-badge" style={{ 
+              <span className="db-source-badge" style={{
                 background: integrations.google.status === 'Connected' ? 'rgba(16,185,129,0.08)' : integrations.google.status === 'Setup Required' ? 'rgba(249,115,22,0.08)' : 'rgba(239,68,68,0.08)',
                 color: integrations.google.status === 'Connected' ? '#10b981' : integrations.google.status === 'Setup Required' ? '#f97316' : '#ef4444',
                 fontSize: '10px',
@@ -701,13 +701,13 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
               }}>
                 {integrations.google.status}
               </span>
-              
+
               <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>
                 {getCapturedCount('google').toLocaleString()} leads captured
               </span>
             </div>
 
-            <button 
+            <button
               className="primary-btn w-full mt-3"
               onClick={() => setSelectedPlatform('google')}
               style={{
@@ -734,9 +734,9 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                   <path d="M13.601 2.326A7.85 7.85 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.9 7.9 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.9 7.9 0 0 0 13.6 2.326zM7.994 14.521a6.6 6.6 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.56 6.56 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592m3.615-4.934c-.197-.099-1.17-.578-1.353-.646-.182-.065-.315-.099-.445.099-.133.197-.513.646-.627.775-.114.133-.232.148-.43.05-.197-.1-.836-.308-1.592-.985-.59-.525-.985-1.175-1.103-1.372-.114-.198-.011-.304.088-.403.087-.088.197-.232.296-.346.1-.114.133-.198.198-.33.065-.134.034-.248-.015-.347-.05-.099-.445-1.076-.612-1.47-.16-.389-.323-.335-.445-.34-.114-.007-.247-.007-.38-.007a.73.73 0 0 0-.529.247c-.182.198-.691.677-.691 1.654s.71 1.916.81 2.049c.098.133 1.394 2.132 3.383 2.992.47.205.84.326 1.129.418.475.152.904.129 1.246.08.38-.058 1.171-.48 1.338-.943.164-.464.164-.86.114-.943-.049-.084-.182-.133-.38-.232" />
                 </svg>
               </div>
-              
+
               {/* Toggler Switch */}
-              <div 
+              <div
                 onClick={() => handleToggle('whatsapp')}
                 className={`db-chart-dropdown ${integrations.whatsapp.enabled ? 'active-toggle' : ''}`}
                 style={{
@@ -763,7 +763,7 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
           <div>
             {/* WhatsApp status pill */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
-              <span className="db-source-badge" style={{ 
+              <span className="db-source-badge" style={{
                 background: integrations.whatsapp.status === 'Connected' ? 'rgba(16,185,129,0.08)' : integrations.whatsapp.status === 'Setup Required' ? 'rgba(249,115,22,0.08)' : 'rgba(239,68,68,0.08)',
                 color: integrations.whatsapp.status === 'Connected' ? '#10b981' : integrations.whatsapp.status === 'Setup Required' ? '#f97316' : '#ef4444',
                 fontSize: '10px',
@@ -773,13 +773,13 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
               }}>
                 {integrations.whatsapp.status}
               </span>
-              
+
               <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>
                 {getCapturedCount('whatsapp').toLocaleString()} leads captured
               </span>
             </div>
 
-            <button 
+            <button
               className="primary-btn w-full mt-3"
               onClick={() => setSelectedPlatform('whatsapp')}
               style={{
@@ -808,8 +808,8 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                   <line x1="6" y1="21" x2="6" y2="8" />
                 </svg>
               </div>
-              
-              <div 
+
+              <div
                 className="db-chart-dropdown active-toggle"
                 style={{
                   padding: '4px 10px',
@@ -833,7 +833,7 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
 
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
-              <span className="db-source-badge" style={{ 
+              <span className="db-source-badge" style={{
                 background: 'rgba(16,185,129,0.08)',
                 color: '#10b981',
                 fontSize: '10px',
@@ -843,13 +843,13 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
               }}>
                 Connected
               </span>
-              
+
               <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>
                 {getCapturedCount('webhooks').toLocaleString()} leads captured
               </span>
             </div>
 
-            <button 
+            <button
               className="primary-btn w-full mt-3"
               onClick={() => setActiveView('sandbox')}
               style={{
@@ -872,17 +872,17 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
       {/* Sleek Centered Configuration Modal Panel (Production-Grade UI) */}
       {selectedPlatform && (
         <div className="modal-overlay" style={{ zIndex: '9999' }}>
-          <div className="modal-card" style={{ 
-            maxWidth: '560px', 
-            width: '90%', 
-            maxHeight: '90vh', 
-            borderRadius: 'var(--radius-lg, 12px)', 
-            margin: 'auto', 
-            padding: '28px', 
-            display: 'flex', 
-            flexDirection: 'column', 
+          <div className="modal-card" style={{
+            maxWidth: '560px',
+            width: '90%',
+            maxHeight: '90vh',
+            borderRadius: 'var(--radius-lg, 12px)',
+            margin: 'auto',
+            padding: '28px',
+            display: 'flex',
+            flexDirection: 'column',
             justifyContent: 'space-between',
-            overflowY: 'auto', 
+            overflowY: 'auto',
             boxShadow: '0 15px 40px rgba(0,0,0,0.15)',
             background: 'var(--card-bg, #ffffff)',
             position: 'relative'
@@ -896,7 +896,7 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                   {selectedPlatform === 'whatsapp' && 'WhatsApp API Credentials'}
                   {selectedPlatform === 'webhooks' && 'Webhooks & HTML Form Embeds'}
                 </h3>
-                <button 
+                <button
                   onClick={() => setSelectedPlatform(null)}
                   style={{
                     background: 'rgba(0,0,0,0.03)',
@@ -928,16 +928,16 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
 
               {/* Dynamic Interactive Config Forms */}
               <form onSubmit={handleSaveConfig} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                
+
                 {/* Meta Configuration Fields */}
                 {selectedPlatform === 'meta' && (
                   <>
                     <div className="form-group">
                       <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>Meta App ID (META_APP_ID)</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         required
-                        className="form-control" 
+                        className="form-control"
                         style={{ height: '36px', fontSize: '12px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)' }}
                         placeholder="e.g. 1249581023849102"
                         value={metaFields.appId}
@@ -946,10 +946,10 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                     </div>
                     <div className="form-group">
                       <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>Meta App Secret (META_APP_SECRET)</label>
-                      <input 
-                        type="password" 
+                      <input
+                        type="password"
                         required
-                        className="form-control" 
+                        className="form-control"
                         style={{ height: '36px', fontSize: '12px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)' }}
                         placeholder="••••••••••••••••"
                         value={metaFields.appSecret}
@@ -958,10 +958,10 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                     </div>
                     <div className="form-group">
                       <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>Meta Webhook Verify Token (META_WEBHOOK_VERIFY_TOKEN)</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         required
-                        className="form-control" 
+                        className="form-control"
                         style={{ height: '36px', fontSize: '12px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)' }}
                         placeholder="e.g. meta_webhook_secret_2026"
                         value={metaFields.webhookVerifyToken}
@@ -970,10 +970,10 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                     </div>
                     <div className="form-group">
                       <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>Meta Access Token / Verify Token (VERIFY_TOKEN)</label>
-                      <input 
-                        type="password" 
+                      <input
+                        type="password"
                         required
-                        className="form-control" 
+                        className="form-control"
                         style={{ height: '36px', fontSize: '12px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)' }}
                         placeholder="••••••••••••••••"
                         value={metaFields.verifyToken}
@@ -985,14 +985,14 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                     <div style={{ marginTop: '8px', padding: '10px', borderRadius: '6px', background: 'rgba(0,0,0,0.02)', border: '1px solid var(--border-color)', fontSize: '11px' }}>
                       <label className="form-label" style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Webhook Callback URL</label>
                       <div style={{ display: 'flex', gap: '6px' }}>
-                        <input 
-                          type="text" 
-                          readOnly 
-                          className="form-control" 
+                        <input
+                          type="text"
+                          readOnly
+                          className="form-control"
                           style={{ height: '28px', fontSize: '10px', padding: '0 8px', background: 'rgba(0,0,0,0.04)', flex: '1', border: '1px solid var(--border-color)' }}
                           value={`https://us-central1-${import.meta.env.VITE_FIREBASE_PROJECT_ID || 'tz-lead-management'}.cloudfunctions.net/metaWebhook`}
                         />
-                        <button 
+                        <button
                           type="button"
                           onClick={() => copyToClipboard(`https://us-central1-${import.meta.env.VITE_FIREBASE_PROJECT_ID || 'tz-lead-management'}.cloudfunctions.net/metaWebhook`, 'Meta Webhook URL')}
                           style={{ height: '28px', fontSize: '10px', padding: '0 8px', background: 'var(--primary)', color: '#ffffff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '700' }}
@@ -1035,10 +1035,10 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                     </div>
 
                     {validationResult && (
-                      <div style={{ 
-                        marginTop: '8px', 
-                        padding: '10px', 
-                        borderRadius: '6px', 
+                      <div style={{
+                        marginTop: '8px',
+                        padding: '10px',
+                        borderRadius: '6px',
                         fontSize: '11px',
                         background: validationResult.success ? 'rgba(16,185,129,0.06)' : 'rgba(239,68,68,0.06)',
                         color: validationResult.success ? '#059669' : '#dc2626',
@@ -1057,10 +1057,10 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                   <>
                     <div className="form-group">
                       <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>Google Ads Customer ID</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         required
-                        className="form-control" 
+                        className="form-control"
                         style={{ height: '36px', fontSize: '12px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)' }}
                         placeholder="e.g. 123-456-7890"
                         value={googleFields.customerId}
@@ -1069,9 +1069,9 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                     </div>
                     <div className="form-group">
                       <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>Manager Customer ID (Optional)</label>
-                      <input 
-                        type="text" 
-                        className="form-control" 
+                      <input
+                        type="text"
+                        className="form-control"
                         style={{ height: '36px', fontSize: '12px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)' }}
                         placeholder="e.g. 123-456-7890 (if using a manager/MCC account)"
                         value={googleFields.managerCustomerId}
@@ -1080,10 +1080,10 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                     </div>
                     <div className="form-group">
                       <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>Developer Token</label>
-                      <input 
-                        type="password" 
+                      <input
+                        type="password"
                         required
-                        className="form-control" 
+                        className="form-control"
                         style={{ height: '36px', fontSize: '12px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)' }}
                         placeholder="••••••••••••••••••••"
                         value={googleFields.developerToken}
@@ -1093,10 +1093,10 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                       <div className="form-group">
                         <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>Client ID</label>
-                        <input 
-                          type="text" 
+                        <input
+                          type="text"
                           required
-                          className="form-control" 
+                          className="form-control"
                           style={{ height: '36px', fontSize: '11px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)' }}
                           placeholder="google-client-id"
                           value={googleFields.clientId}
@@ -1105,10 +1105,10 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                       </div>
                       <div className="form-group">
                         <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>Client Secret</label>
-                        <input 
-                          type="password" 
+                        <input
+                          type="password"
                           required
-                          className="form-control" 
+                          className="form-control"
                           style={{ height: '36px', fontSize: '11px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)' }}
                           placeholder="client-secret"
                           value={googleFields.clientSecret}
@@ -1118,10 +1118,10 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                     </div>
                     <div className="form-group">
                       <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>OAuth 2.0 Refresh Token</label>
-                      <input 
-                        type="password" 
+                      <input
+                        type="password"
                         required
-                        className="form-control" 
+                        className="form-control"
                         style={{ height: '36px', fontSize: '11px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)' }}
                         placeholder="OAuth 2.0 Refresh Token"
                         value={googleFields.refreshToken}
@@ -1130,10 +1130,10 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                     </div>
                     <div className="form-group">
                       <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>Google Webhook Security Passkey (Key)</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         required
-                        className="form-control" 
+                        className="form-control"
                         style={{ height: '36px', fontSize: '12px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)' }}
                         placeholder="e.g. google_ad_passkey_987"
                         value={googleFields.webhookPasskey}
@@ -1205,10 +1205,10 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                     </div>
 
                     {validationResult && (
-                      <div style={{ 
-                        marginTop: '8px', 
-                        padding: '10px', 
-                        borderRadius: '6px', 
+                      <div style={{
+                        marginTop: '8px',
+                        padding: '10px',
+                        borderRadius: '6px',
                         fontSize: '11px',
                         background: validationResult.success ? 'rgba(16,185,129,0.06)' : 'rgba(239,68,68,0.06)',
                         color: validationResult.success ? '#059669' : '#dc2626',
@@ -1230,17 +1230,17 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '150px', overflowY: 'auto' }}>
                           {syncLogs.map((log) => (
-                            <div key={log.id} style={{ 
-                              padding: '8px', 
-                              borderRadius: '4px', 
-                              background: 'rgba(0,0,0,0.015)', 
+                            <div key={log.id} style={{
+                              padding: '8px',
+                              borderRadius: '4px',
+                              background: 'rgba(0,0,0,0.015)',
                               border: '1px solid var(--border-color)',
                               fontSize: '10px',
                               lineHeight: '1.3'
                             }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
-                                <span style={{ 
-                                  fontWeight: '700', 
+                                <span style={{
+                                  fontWeight: '700',
                                   color: log.status === 'success' ? '#059669' : log.status === 'skipped' ? '#b45309' : '#dc2626',
                                   textTransform: 'uppercase',
                                   fontSize: '9px'
@@ -1267,10 +1267,10 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                   <>
                     <div className="form-group">
                       <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>WhatsApp Phone Number ID (WHATSAPP_PHONE_NUMBER_ID)</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         required
-                        className="form-control" 
+                        className="form-control"
                         style={{ height: '36px', fontSize: '12px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)' }}
                         placeholder="e.g. 102938471"
                         value={whatsappFields.phoneNumberId}
@@ -1279,10 +1279,10 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                     </div>
                     <div className="form-group">
                       <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>WhatsApp Business Account ID (WHATSAPP_BUSINESS_ACCOUNT_ID)</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         required
-                        className="form-control" 
+                        className="form-control"
                         style={{ height: '36px', fontSize: '12px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)' }}
                         placeholder="e.g. 982734912"
                         value={whatsappFields.businessAccountId}
@@ -1291,10 +1291,10 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                     </div>
                     <div className="form-group">
                       <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>WhatsApp API Version (WHATSAPP_API_VERSION)</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         required
-                        className="form-control" 
+                        className="form-control"
                         style={{ height: '36px', fontSize: '12px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)' }}
                         placeholder="e.g. v20.0"
                         value={whatsappFields.apiVersion}
@@ -1303,10 +1303,10 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                     </div>
                     <div className="form-group">
                       <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>WhatsApp Webhook Verify Token (WHATSAPP_WEBHOOK_VERIFY_TOKEN)</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         required
-                        className="form-control" 
+                        className="form-control"
                         style={{ height: '36px', fontSize: '12px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)' }}
                         placeholder="e.g. whatsapp_webhook_token_secure"
                         value={whatsappFields.webhookVerifyToken}
@@ -1315,14 +1315,14 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                     </div>
                     <div className="form-group">
                       <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>Permanent Access Token (WHATSAPP_ACCESS_TOKEN)</label>
-                      <textarea 
+                      <textarea
                         required
-                        className="form-control" 
+                        className="form-control"
                         style={{ height: '70px', fontSize: '11px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)', resize: 'none', padding: '8px' }}
                         placeholder="EAAGy7B_whatsapp_token..."
                         value={whatsappFields.accessToken || whatsappFields.systemToken}
-                        onChange={(e) => setWhatsAppFields({ 
-                          ...whatsappFields, 
+                        onChange={(e) => setWhatsAppFields({
+                          ...whatsappFields,
                           accessToken: e.target.value,
                           systemToken: e.target.value
                         })}
@@ -1336,10 +1336,10 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                   <>
                     <div className="form-group">
                       <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>Security Verification Secret</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         required
-                        className="form-control" 
+                        className="form-control"
                         style={{ height: '36px', fontSize: '12px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)' }}
                         placeholder="e.g. whsec_tz_83749281"
                         value={webhookFields.securitySecret}
@@ -1348,10 +1348,10 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                     </div>
                     <div className="form-group">
                       <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>URL Slug Identifier</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         required
-                        className="form-control" 
+                        className="form-control"
                         style={{ height: '36px', fontSize: '12px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)' }}
                         placeholder="e.g. inst_aarav_mumbai_786"
                         value={webhookFields.webhookUrlSlug}
@@ -1361,9 +1361,9 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                   </>
                 )}
 
-                <button 
-                  type="submit" 
-                  className="primary-btn w-full mt-2" 
+                <button
+                  type="submit"
+                  className="primary-btn w-full mt-2"
                   style={{ background: 'var(--primary)', color: '#ffffff', fontWeight: '700', height: '38px', fontSize: '12px' }}
                 >
                   Save Connection Configurations
@@ -1418,7 +1418,7 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
 
             {/* Close / Action Row */}
             <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
-              <button 
+              <button
                 onClick={() => setSelectedPlatform(null)}
                 className="secondary-btn w-full"
                 style={{ height: '36px', fontSize: '11.5px', fontWeight: '700', cursor: 'pointer' }}

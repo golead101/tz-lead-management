@@ -318,7 +318,7 @@ export default function InboxPage() {
                   const isOutbound = msg.direction === 'outbound' || msg.sender === 'counselor';
                   return (
                     <div key={msg.id} className={`message-bubble ${isOutbound ? 'bubble-outbound' : 'bubble-inbound'}`}>
-                      <div style={{ color: '#0f172a' }}>{msg.text}</div>
+                      <div style={{ color: '#0f172a', whiteSpace: 'pre-wrap' }}>{msg.text}</div>
                       <div className="message-time">
                         {getDisplayTime(msg)}
                         {isOutbound && <StatusIcon status={msg.status || 'read'} size={15} />}

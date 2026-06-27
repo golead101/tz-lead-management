@@ -147,6 +147,14 @@ export default function AnalyticsPage() {
     return true;
   });
 
+  const allRecipients = whatsappDb.getRecipients();
+  const campaignRecipients = campaignId ? (allRecipients[campaignId] || []) : [];
+  const campaignPhones = new Set(campaignRecipients.map(r => r.phone.replace(/\\D/g, '')));
+
+  const filteredLeads = campaignId 
+    ? contactLeads.filter(l => l.phone && campaignPhones.has(l.phone.replace(/\\D/g, '')))
+    : contactLeads;
+
   // Calculate live messaging metrics
   let totalSent = 0;
   let totalFailed = 0;
@@ -170,7 +178,7 @@ export default function AnalyticsPage() {
     return match ? parseInt(match[0], 10) : Date.now();
   };
 
-  contactLeads.forEach(lead => {
+  filteredLeads.forEach(lead => {
     const msgs = lead.whatsappMessages || [];
     if (msgs.length > 0) {
       activeConversations++;
@@ -249,14 +257,19 @@ export default function AnalyticsPage() {
     
     let outboundCount = 0;
     let inboundCount = 0;
+    const uniqueOutboundLeads = new Set();
     
-    contactLeads.forEach(lead => {
+    filteredLeads.forEach(lead => {
       (lead.whatsappMessages || []).forEach(m => {
         const ts = getMsgTimestamp(m);
         const mDateStr = new Date(ts).toISOString().split('T')[0];
         if (mDateStr === dateStr) {
-          if (m.sender === 'counselor' || m.direction === 'outbound') outboundCount++;
-          else if (m.sender === 'lead' || m.direction === 'inbound') inboundCount++;
+          if (m.sender === 'counselor' || m.direction === 'outbound') {
+            outboundCount++;
+            uniqueOutboundLeads.add(lead.id);
+          } else if (m.sender === 'lead' || m.direction === 'inbound') {
+            inboundCount++;
+          }
         }
       });
     });
@@ -265,7 +278,8 @@ export default function AnalyticsPage() {
     return {
       date: dateStr,
       outbound: totalDailyCount > 0 ? outboundCount : 0,
-      inbound: totalDailyCount > 0 ? inboundCount : 0
+      inbound: totalDailyCount > 0 ? inboundCount : 0,
+      uniqueConversations: uniqueOutboundLeads.size
     };
   });
 
@@ -274,7 +288,7 @@ export default function AnalyticsPage() {
     let sentCount = 0;
     let readCount = 0;
     
-    contactLeads.forEach(lead => {
+    filteredLeads.forEach(lead => {
       (lead.whatsappMessages || []).forEach(m => {
         if (m.sender === 'counselor' || m.direction === 'outbound') {
           const ts = getMsgTimestamp(m);
@@ -352,6 +366,9 @@ export default function AnalyticsPage() {
     .slice(0, 5);
 
   // Meta Insights data (Real-time estimated)
+  const chatbotSettings = whatsappDb.getChatbotSettings();
+  const metaCostRate = parseFloat(chatbotSettings.metaCostRate) || 0.80;
+  
   const last7Days = dailyVolume.slice(-7);
   const metaInsights = [
     {
@@ -366,8 +383,8 @@ export default function AnalyticsPage() {
     },
     {
       title: 'Messaging Cost (Estimated)',
-      values: last7Days.map(d => ({ value: Number((d.outbound * 0.015).toFixed(2)), end_time: d.date })),
-      description: 'Estimated standard conversation pricing ($0.015 per outbound).',
+      values: last7Days.map(d => ({ value: Number((d.uniqueConversations * metaCostRate).toFixed(2)), end_time: d.date })),
+      description: `Estimated standard conversation pricing (₹${metaCostRate.toFixed(2)} per 24h conversation).`,
     }
   ];
 
@@ -530,12 +547,12 @@ export default function AnalyticsPage() {
               const totalValue = insight.values.reduce((sum, v) => sum + v.value, 0);
               const chartData = insight.values.map((v, i) => ({ date: `06/${10+i}`, value: v.value }));
               return (
-                <div key={idx} style={{ padding: '16px', borderRadius: 12, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                <div key={idx} style={{ padding: '16px', borderRadius: 12, background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column' }}>
                   <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', marginBottom: 4 }}>
                     {insight.title}
                   </div>
                   <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a', marginBottom: 12 }}>
-                    {idx === 2 ? `$${totalValue}` : totalValue}
+                    {idx === 2 ? `₹${totalValue.toFixed(2)}` : totalValue}
                   </div>
                   <div style={{ height: 60 }}>
                     <ResponsiveContainer width="100%" height="100%">
@@ -547,6 +564,26 @@ export default function AnalyticsPage() {
                   <div style={{ fontSize: '0.65rem', color: '#94a3b8', marginTop: 8 }}>
                     {insight.description}
                   </div>
+                  {idx === 2 && (
+                    <a
+                      href="https://business.facebook.com/latest/billing_hub/accounts/details/?asset_id=1315754280759817&business_id=302373778508874&payment_account_id=2002480427032686&placement=whatsapp_account"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        marginTop: 'auto',
+                        padding: '8px 0',
+                        fontSize: '0.8rem',
+                        fontWeight: 600,
+                        color: BRAND_BLUE,
+                        textDecoration: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6
+                      }}
+                    >
+                      View Live Billing on Meta <Activity size={14} />
+                    </a>
+                  )}
                 </div>
               );
             })}

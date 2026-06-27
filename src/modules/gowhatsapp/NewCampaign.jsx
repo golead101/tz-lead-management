@@ -177,7 +177,7 @@ export default function NewCampaign({ setSubView }) {
   }, [selectedTemplate, columns, templates]);
 
   const loadExistingLists = () => {
-    const lists = whatsappDb.getContactLists();
+    const lists = whatsappDb.getContactLists().filter(l => l.id !== 'crm-leads-all');
     const crmList = {
       id: 'crm-leads-all',
       name: 'Active CRM Leads (Live)',
@@ -278,7 +278,20 @@ export default function NewCampaign({ setSubView }) {
 
   const getContactPhone = (contact) => {
     if (phoneColumn) return String(contact[phoneColumn] || '').trim();
-    return String(contact.phone || contact.Phone || contact.mobile || contact.Mobile || contact.number || contact.Number || '').trim();
+    
+    // Check standard hardcoded keys
+    const directMatch = contact.phone || contact.Phone || contact.mobile || contact.Mobile || contact.number || contact.Number;
+    if (directMatch) return String(directMatch).trim();
+    
+    // Search through all keys for a match
+    for (const key of Object.keys(contact)) {
+      const lowerKey = key.toLowerCase().replace(/[^a-z]/g, '');
+      if (lowerKey.includes('phone') || lowerKey.includes('mobile') || lowerKey.includes('contactnumber')) {
+        return String(contact[key] || '').trim();
+      }
+    }
+    
+    return '';
   };
 
   const insertVariable = (col) => {
@@ -416,6 +429,21 @@ export default function NewCampaign({ setSubView }) {
         });
       }
       const components = [];
+      const headerType = getTemplateHeaderType();
+      if (headerType && ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(headerType) && headerMediaUrl) {
+        components.push({
+          type: 'header',
+          parameters: [
+            {
+              type: headerType.toLowerCase(),
+              [headerType.toLowerCase()]: {
+                link: headerMediaUrl
+              }
+            }
+          ]
+        });
+      }
+
       if (parameters.length > 0) {
         components.push({
           type: 'body',
@@ -429,16 +457,20 @@ export default function NewCampaign({ setSubView }) {
       };
     };
 
+    // Track individual success results
+    const deliveryResults = [];
+
     // Process sequentially or use Promise.all. Using sequential to avoid rate limits
     for (const contact of targetContacts) {
       let phone = getContactPhone(contact);
       if (!phone) {
         failedCount++;
+        deliveryResults.push(false);
         continue;
       }
       
       const cleanPhone = phone.replace(/\D/g, '');
-      let existingLead = leads.find(l => l.phone.replace(/\D/g, '') === cleanPhone);
+      let existingLead = leads.find(l => l.phone && l.phone.replace(/\D/g, '') === cleanPhone);
       const messageToDeliver = getMessageForContact(contact);
       const templateData = getTemplateDataForContact(contact);
 
@@ -455,11 +487,16 @@ export default function NewCampaign({ setSubView }) {
       }
 
       const success = await sendWhatsAppMsg(leadIdToUse, messageToDeliver, templateData);
+      
+      // Delay for 1 second between messages to prevent Google Cloud from rate-limiting the IP (which causes fake CORS errors)
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
       if (success) {
         sentCount++;
       } else {
         failedCount++;
       }
+      deliveryResults.push(success);
     }
 
     const newCamp = {
@@ -488,10 +525,7 @@ export default function NewCampaign({ setSubView }) {
     allRecipients[newCamp.id] = targetContacts.map((c, i) => {
       let phone = getContactPhone(c);
       const msg = getMessageForContact(c);
-      // Determine if this specific one failed (simplified logic)
-      // Since we don't map individual success array, we randomly assign fails to reach failedCount
-      // A more robust implementation would track success per contact
-      const isFailed = !phone || (i >= sentCount); 
+      const isFailed = !deliveryResults[i]; 
       return {
         id: `r-${newCamp.id}-${i}`,
         name: c.name || `Recipient ${i + 1}`,
@@ -880,25 +914,21 @@ export default function NewCampaign({ setSubView }) {
                         This template requires a {getTemplateHeaderType().toLowerCase()} header *
                       </label>
                       <input
-                        ref={headerMediaInputRef}
-                        type="file"
-                        onChange={handleHeaderMediaUpload}
-                        style={{ display: 'none' }}
+                        type="text"
+                        placeholder={`Paste public ${getTemplateHeaderType().toLowerCase()} URL (https://...)`}
+                        value={headerMediaUrl}
+                        onChange={(e) => {
+                          setHeaderMediaUrl(e.target.value);
+                          setHeaderMediaFileName('Media Link Attached');
+                        }}
+                        style={{
+                          width: '100%', padding: '10px 14px', borderRadius: 8,
+                          border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.95rem', boxSizing: 'border-box'
+                        }}
                       />
-                      {headerMediaUrl ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, background: '#f0fdf4', borderRadius: 8, border: '1px solid #bbf7d0' }}>
-                          <CheckCircle size={18} color="#16a34a" />
-                          <div style={{ flex: 1, fontSize: '0.85rem', color: '#16a34a' }}>{headerMediaFileName} (Loaded)</div>
-                          <button onClick={() => setHeaderMediaUrl('')} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}>Remove</button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => headerMediaInputRef.current?.click()}
-                          style={{ width: '100%', padding: 20, border: '2px dashed #cbd5e1', borderRadius: 8, cursor: 'pointer', background: '#fafafa', color: '#64748b', fontSize: '0.85rem' }}
-                        >
-                          Click to upload sample media file
-                        </button>
-                      )}
+                      <div style={{ fontSize: '0.75rem', color: '#92400e', marginTop: 6 }}>
+                        Note: Meta API requires a public URL (e.g. Imgur, AWS) to deliver media.
+                      </div>
                     </div>
                   )}
 

@@ -42,10 +42,12 @@ export default function Dashboard() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Filter leads based on counselor permissions (counselors only see their own leads)
+  // Filter leads based on counselor permissions
   const roleFilteredLeads = leads.filter(lead => {
     if (activeRole === 'Counselor') {
-      return lead.counselor === activeUser;
+      const src = (lead.source || '').toLowerCase();
+      const isGlobal = src.includes('meta') || src.includes('google') || src.includes('website');
+      return lead.counselor === activeUser || isGlobal;
     }
     return true;
   });

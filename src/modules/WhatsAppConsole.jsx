@@ -18,7 +18,9 @@ export default function WhatsAppConsole() {
   // Filter contacts by counselor permissions
   const contactLeads = leads.filter(lead => {
     if (activeRole === 'Counselor') {
-      return lead.counselor === activeUser;
+      const src = (lead.source || '').toLowerCase();
+      const isGlobal = src.includes('meta') || src.includes('google') || src.includes('website');
+      return lead.counselor === activeUser || isGlobal;
     }
     return true;
   });
