@@ -457,92 +457,50 @@ export default function NewCampaign({ setSubView }) {
       };
     };
 
-    // Track individual success results
-    const deliveryResults = [];
+    // Prepare contacts with the dynamic message body and template payload attached
+    const preparedContacts = targetContacts.map(contact => ({
+      ...contact,
+      _messageToDeliver: getMessageForContact(contact),
+      _templateData: getTemplateDataForContact(contact)
+    }));
 
-    // Process sequentially or use Promise.all. Using sequential to avoid rate limits
-    for (const contact of targetContacts) {
-      let phone = getContactPhone(contact);
-      if (!phone) {
-        failedCount++;
-        deliveryResults.push(false);
-        continue;
-      }
-      
-      const cleanPhone = phone.replace(/\D/g, '');
-      let existingLead = leads.find(l => l.phone && l.phone.replace(/\D/g, '') === cleanPhone);
-      const messageToDeliver = getMessageForContact(contact);
-      const templateData = getTemplateDataForContact(contact);
+    try {
+      const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'leads-management-tz';
+      const url = `https://us-central1-${projectId}.cloudfunctions.net/sendBulkWhatsAppCampaign`;
 
-      let leadIdToUse = existingLead?.id;
-      if (!existingLead) {
-        const newLead = addLead({
-          name: contact.name || contact.Name || 'Campaign Contact',
-          phone: phone,
-          course: contact.course || contact.Course || '',
-          source: 'WhatsApp Campaign',
-          subSource: campaignName || 'Bulk Campaign'
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetContacts: preparedContacts,
+          campaignName,
+          messageType,
+          selectedTemplate,
+          templateLanguage,
+          messageText: messageType === 'text' ? messageText : '',
+          counselorName: 'Counselor'
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        // Backend saves campaign and recipients, the onSnapshot listener in whatsappDb will sync UI
+        setResult({
+          totalRecipients: data.campaign?.totalRecipients || totalCount,
+          sent: data.results?.sent || 0,
+          failed: data.results?.failed || 0
         });
-        leadIdToUse = newLead.id;
-      }
-
-      const success = await sendWhatsAppMsg(leadIdToUse, messageToDeliver, templateData);
-      
-      // Delay for 1 second between messages to prevent Google Cloud from rate-limiting the IP (which causes fake CORS errors)
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      if (success) {
-        sentCount++;
       } else {
-        failedCount++;
+        alert('Campaign failed: ' + (data.error || 'Unknown error') + '\nDetails: ' + (data.details || ''));
+        setResult({ totalRecipients: totalCount, sent: 0, failed: totalCount });
       }
-      deliveryResults.push(success);
+    } catch (err) {
+      console.error('Failed to dispatch bulk campaign:', err);
+      alert('Failed to reach bulk campaign gateway. Check your connection or Firebase deployment.');
+      setResult({ totalRecipients: totalCount, sent: 0, failed: totalCount });
+    } finally {
+      setSending(false);
     }
-
-    const newCamp = {
-      id: `camp-${Date.now()}`,
-      name: campaignName || `Campaign - ${new Date().toLocaleDateString()}`,
-      status: 'completed',
-      totalRecipients: totalCount,
-      sent: sentCount,
-      failed: failedCount,
-      delivered: sentCount, // Assuming delivered if sent
-      read: Math.round(sentCount * 0.95), // simulate some reads for stats
-      replied: 0,
-      type: messageType,
-      templateName: selectedTemplate || null,
-      languageCode: templateLanguage || null,
-      message: messageType === 'text' ? messageText : getTemplateBody(),
-      createdAt: { _seconds: Math.floor(Date.now() / 1000) },
-      completedAt: { _seconds: Math.floor(Date.now() / 1000) + 10 }
-    };
-
-    const campaignsList = whatsappDb.getCampaigns();
-    whatsappDb.saveCampaigns([newCamp, ...campaignsList]);
-
-    // Save recipient list details for report
-    const allRecipients = whatsappDb.getRecipients();
-    allRecipients[newCamp.id] = targetContacts.map((c, i) => {
-      let phone = getContactPhone(c);
-      const msg = getMessageForContact(c);
-      const isFailed = !deliveryResults[i]; 
-      return {
-        id: `r-${newCamp.id}-${i}`,
-        name: c.name || `Recipient ${i + 1}`,
-        phone: phone || 'N/A',
-        status: isFailed ? 'failed' : i % 3 === 0 ? 'delivered' : 'read',
-        error: isFailed ? 'Delivery failed' : null,
-        errorCode: isFailed ? '400' : null,
-        messageId: `msg-${Date.now()}-${i}`,
-        deliveredAt: isFailed ? null : Date.now(),
-        readAt: isFailed || i % 3 === 0 ? null : Date.now() + 100,
-        replied: false
-      };
-    });
-    whatsappDb.saveRecipients(allRecipients);
-
-    setSending(false);
-    setResult({ totalRecipients: totalCount, sent: sentCount, failed: failedCount });
   };
 
   if (result) {

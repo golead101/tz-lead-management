@@ -34,41 +34,36 @@ service cloud.firestore {
 
     // ─────────────────────────────────────────────
     // /users collection
+    //  All Staff   → read all user profiles (needed for counselor dropdowns)
     //  Admin       → full read/write on all user documents
-    //  Counselor/Telecaller → read their own profile only
     // ─────────────────────────────────────────────
     match /users/{userId} {
-      allow read: if isAuthenticated() &&
-                     (request.auth.uid == userId || isAdmin());
+      allow read: if isStaff();
       allow create, update, delete: if isAdmin();
     }
 
     // ─────────────────────────────────────────────
     // /leads collection
-    //  Admin      → full read & write on all leads
-    //  Counselor  → read & update only their assigned leads
-    //               (lead.counselor == their display name)
-    //  Telecaller → read all leads (to call them),
-    //               update allowed fields only (stage, followUpDate,
-    //               timeline, notes, whatsappMessages, lastContacted,
-    //               callAttempts, status)
-    //               cannot delete or create leads
+    //  All Staff  → read all leads (UI handles filtering)
+    //  Anyone     → create leads (allows unauthenticated website forms to submit)
+    //  Admin      → full update & delete
+    //  Counselor  → update only their assigned leads
+    //  Telecaller → update allowed fields only
     // ─────────────────────────────────────────────
     match /leads/{leadId} {
-      // Read access
-      allow read: if isAdmin();
-      allow read: if isCounselor() &&
-                     resource.data.counselor == userData().name;
-      allow read: if isTelecaller(); // Telecallers read all leads to call
+      // Read access: allow all staff so the React onSnapshot listener doesn't crash
+      allow read: if isStaff();
 
-      // Create: Admin only
-      allow create: if isAdmin();
+      // Create: allow anyone so the public website EmbedForm can submit leads
+      allow create: if true;
 
       // Update: Admin unrestricted
       allow update: if isAdmin();
+      
       // Counselor: only their assigned leads
       allow update: if isCounselor() &&
                        resource.data.counselor == userData().name;
+                       
       // Telecaller: only safe fields
       allow update: if isTelecaller() &&
                        request.resource.data.diff(resource.data).affectedKeys()
@@ -82,138 +77,77 @@ service cloud.firestore {
 
     // ─────────────────────────────────────────────
     // /settings collection
-    //  live_form       → public read (contact form on website)
-    //  whatsapp/other  → Admin read/write;
-    //                    Counselor & Telecaller can read chatbot settings
     // ─────────────────────────────────────────────
     match /settings/{documentId} {
-      // Public: live_form config readable by anyone (website iframe)
       allow read: if documentId == 'live_form';
-
-      // WhatsApp chatbot settings readable by all staff
-      allow read: if isStaff() &&
-                     (documentId == 'whatsapp_chatbot' ||
-                      documentId == 'whatsapp_api');
-
-      // Admin reads and writes everything
-      allow read:  if isAdmin();
-      allow write: if isAdmin();
-    }
-
-    // ─────────────────────────────────────────────
-    // /whatsapp_templates collection
-    //  Admin      → full CRUD (create, edit, delete templates)
-    //  Counselor  → read only (to select templates when messaging)
-    //  Telecaller → read only
-    // ─────────────────────────────────────────────
-    match /whatsapp_templates/{templateId} {
-      allow read:  if isStaff();
-      allow write: if isAdmin();
-    }
-
-    // ─────────────────────────────────────────────
-    // /whatsapp_campaigns collection
-    //  Admin/Telecaller/Counselor → full CRUD
-    //  (all staff manage campaigns)
-    // ─────────────────────────────────────────────
-    match /whatsapp_campaigns/{campaignId} {
-      allow read, write: if isStaff();
-    }
-
-    // ─────────────────────────────────────────────
-    // /whatsapp_contact_lists collection
-    //  Admin/Telecaller/Counselor → full CRUD
-    //  (all staff create and delete contact lists)
-    // ─────────────────────────────────────────────
-    match /whatsapp_contact_lists/{listId} {
-      allow read, write: if isStaff();
-    }
-
-    // ─────────────────────────────────────────────
-    // /whatsapp_contacts collection
-    //  Admin/Telecaller/Counselor → full CRUD
-    // ─────────────────────────────────────────────
-    match /whatsapp_contacts/{docId} {
-      allow read, write: if isStaff();
-    }
-
-    // ─────────────────────────────────────────────
-    // /whatsapp_recipients collection
-    //  Admin/Telecaller/Counselor → full CRUD
-    // ─────────────────────────────────────────────
-    match /whatsapp_recipients/{docId} {
-      allow read, write: if isStaff();
-    }
-
-    // ─────────────────────────────────────────────
-    // /courses collection
-    //  Admin              → full CRUD
-    //  Counselor/Telecaller → read only
-    // ─────────────────────────────────────────────
-    match /courses/{courseId} {
-      allow read:  if isStaff();
-      allow write: if isAdmin();
-    }
-
-    // ─────────────────────────────────────────────
-    // /pipelineStages collection
-    //  Admin              → full CRUD
-    //  Counselor/Telecaller → read only
-    // ─────────────────────────────────────────────
-    match /pipelineStages/{stageId} {
-      allow read:  if isStaff();
-      allow write: if isAdmin();
-    }
-
-    // ─────────────────────────────────────────────
-    // /customFields collection
-    //  Admin              → full CRUD
-    //  Counselor/Telecaller → read only
-    // ─────────────────────────────────────────────
-    match /customFields/{fieldId} {
-      allow read:  if isStaff();
-      allow write: if isAdmin();
-    }
-
-    // ─────────────────────────────────────────────
-    // /googleAdsLogs collection
-    //  Admin only — API sync logs are sensitive
-    // ─────────────────────────────────────────────
-    match /googleAdsLogs/{documentId} {
+      allow read: if isStaff() && (documentId == 'whatsapp_chatbot' || documentId == 'whatsapp_api');
       allow read, write: if isAdmin();
     }
 
     // ─────────────────────────────────────────────
-    // /i-frame collection (live enquiry form submissions)
-    //  Anyone can submit a new lead (create)
-    //  Only authenticated staff can read/update/delete
+    // /whatsapp_templates collection
+    //  All Staff → read and write (so they can save new templates)
     // ─────────────────────────────────────────────
+    match /whatsapp_templates/{templateId} {
+      allow read, write: if isStaff();
+    }
+
+    // ─────────────────────────────────────────────
+    // WhatsApp Campaign & Contact Collections
+    // ─────────────────────────────────────────────
+    match /whatsapp_campaigns/{campaignId} {
+      allow read, write: if isStaff();
+    }
+    match /whatsapp_contact_lists/{listId} {
+      allow read, write: if isStaff();
+    }
+    match /whatsapp_contacts/{docId} {
+      allow read, write: if isStaff();
+    }
+    match /whatsapp_recipients/{docId} {
+      allow read, write: if isStaff();
+    }
+    match /whatsapp_campaigns/{docId} {
+      allow read, write: if isStaff();
+    }
+
+    // ─────────────────────────────────────────────
+    // Config Collections (courses, stages, fields)
+    // ─────────────────────────────────────────────
+    match /courses/{courseId} {
+      allow read: if isStaff();
+      allow write: if isAdmin();
+    }
+    match /pipelineStages/{stageId} {
+      allow read: if isStaff();
+      allow write: if isAdmin();
+    }
+    match /customFields/{fieldId} {
+      allow read: if isStaff();
+      allow write: if isAdmin();
+    }
+
+    // ─────────────────────────────────────────────
+    // Logs & Webhooks
+    // ─────────────────────────────────────────────
+    match /googleAdsLogs/{documentId} {
+      allow read, write: if isAdmin();
+    }
     match /i-frame/{documentId} {
       allow create: if true;
       allow read, update, delete: if isStaff();
     }
 
     // ─────────────────────────────────────────────
-    // /phoneCallLeads collection (synced from dialer app)
-    //  Admin/Telecaller → read (dashboard + performance ranking)
-    //  Counselor        → read
-    //  Write            → Admin only (external dialer sync)
+    // Dialer Integrations
     // ─────────────────────────────────────────────
     match /phoneCallLeads/{docId} {
       allow read: if isStaff();
       allow write: if isAdmin();
     }
-
-    // ─────────────────────────────────────────────
-    // /phoneCallActivities collection (synced from dialer app)
-    //  Admin/Telecaller → read (analytics performance)
-    //  Counselor        → read
-    //  Write            → Admin only (external dialer sync)
-    // ─────────────────────────────────────────────
     match /phoneCallActivities/{docId} {
       allow read: if isStaff();
       allow write: if isAdmin();
     }
-
   }
 }

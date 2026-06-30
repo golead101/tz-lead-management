@@ -242,30 +242,7 @@ export default function Integrations() {
     return false;
   };
 
-  const handleToggle = (platform) => {
-    if (platform === 'google' && !integrations.google.enabled && integrations.google.status !== 'Connected') {
-      showToastMsg('Please run a successful "Test API Connection" before activating the Google Ads integration.', 'error');
-      return;
-    }
 
-    if (platform === 'meta' && !integrations.meta.enabled && integrations.meta.status !== 'Connected') {
-      showToastMsg('Please run a successful "Test API Connection" before activating the Meta Ads integration.', 'error');
-      return;
-    }
-
-    if (!integrations[platform].enabled && !hasConfig(platform)) {
-      showToastMsg(`Please configure credentials for ${platform.toUpperCase()} before activating this integration.`, 'error');
-      return;
-    }
-
-    const nextEnabled = !integrations[platform].enabled;
-    const nextStatus = nextEnabled ? 'Connected' : 'Disconnected';
-
-    updateIntegration(platform, {
-      enabled: nextEnabled,
-      status: nextStatus
-    });
-  };
 
   const handleSaveConfig = (e) => {
     e.preventDefault();
@@ -366,9 +343,10 @@ export default function Integrations() {
           phone: `+91 98${Math.floor(10000000 + Math.random() * 90000000)}`,
           location: 'Mumbai',
           education: 'Undergraduate',
-          course: 'Full-Stack Web Development',
+          course: '',
           source: 'Meta Ads',
           stage: 'New Lead',
+          counselor: 'Unassigned',
           customFields: {}
         };
       } else if (selectedPlatform === 'google') {
@@ -383,9 +361,10 @@ export default function Integrations() {
           phone: `+91 97${Math.floor(10000000 + Math.random() * 90000000)}`,
           location: 'Delhi',
           education: 'Graduate',
-          course: 'Data Science & Artificial Intelligence',
-          source: 'Google Search',
+          course: '',
+          source: 'Google Ads',
           stage: 'New Lead',
+          counselor: 'Unassigned',
           customFields: {}
         };
       } else if (selectedPlatform === 'whatsapp') {
@@ -588,23 +567,7 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                 </svg>
               </div>
 
-              {/* Toggler Switch */}
-              <div
-                onClick={() => handleToggle('meta')}
-                className={`db-chart-dropdown ${integrations.meta.enabled ? 'active-toggle' : ''}`}
-                style={{
-                  cursor: 'pointer',
-                  padding: '4px 10px',
-                  borderRadius: '12px',
-                  fontSize: '11px',
-                  background: integrations.meta.enabled ? 'var(--primary-glow, rgba(47,107,255,0.08))' : 'rgba(0,0,0,0.04)',
-                  color: integrations.meta.enabled ? 'var(--primary)' : 'var(--text-muted)',
-                  borderColor: integrations.meta.enabled ? 'var(--primary)' : 'var(--border-color)',
-                  fontWeight: '700'
-                }}
-              >
-                {integrations.meta.enabled ? 'Active ●' : 'Inactive ○'}
-              </div>
+
             </div>
 
             <h3 style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '6px' }}>Meta Ads Connector</h3>
@@ -663,23 +626,7 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                 </svg>
               </div>
 
-              {/* Toggler Switch */}
-              <div
-                onClick={() => handleToggle('google')}
-                className={`db-chart-dropdown ${integrations.google.enabled ? 'active-toggle' : ''}`}
-                style={{
-                  cursor: 'pointer',
-                  padding: '4px 10px',
-                  borderRadius: '12px',
-                  fontSize: '11px',
-                  background: integrations.google.enabled ? 'var(--primary-glow, rgba(47,107,255,0.08))' : 'rgba(0,0,0,0.04)',
-                  color: integrations.google.enabled ? 'var(--primary)' : 'var(--text-muted)',
-                  borderColor: integrations.google.enabled ? 'var(--primary)' : 'var(--border-color)',
-                  fontWeight: '700'
-                }}
-              >
-                {integrations.google.enabled ? 'Active ●' : 'Inactive ○'}
-              </div>
+
             </div>
 
             <h3 style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '6px' }}>Google Ads Connector</h3>
@@ -735,23 +682,7 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                 </svg>
               </div>
 
-              {/* Toggler Switch */}
-              <div
-                onClick={() => handleToggle('whatsapp')}
-                className={`db-chart-dropdown ${integrations.whatsapp.enabled ? 'active-toggle' : ''}`}
-                style={{
-                  cursor: 'pointer',
-                  padding: '4px 10px',
-                  borderRadius: '12px',
-                  fontSize: '11px',
-                  background: integrations.whatsapp.enabled ? 'var(--primary-glow, rgba(47,107,255,0.08))' : 'rgba(0,0,0,0.04)',
-                  color: integrations.whatsapp.enabled ? 'var(--primary)' : 'var(--text-muted)',
-                  borderColor: integrations.whatsapp.enabled ? 'var(--primary)' : 'var(--border-color)',
-                  fontWeight: '700'
-                }}
-              >
-                {integrations.whatsapp.enabled ? 'Active ●' : 'Inactive ○'}
-              </div>
+
             </div>
 
             <h3 style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '6px' }}>WhatsApp Business</h3>
@@ -809,20 +740,7 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                 </svg>
               </div>
 
-              <div
-                className="db-chart-dropdown active-toggle"
-                style={{
-                  padding: '4px 10px',
-                  borderRadius: '12px',
-                  fontSize: '11px',
-                  background: 'var(--primary-glow, rgba(47,107,255,0.08))',
-                  color: 'var(--primary)',
-                  borderColor: 'var(--primary)',
-                  fontWeight: '700'
-                }}
-              >
-                Active ●
-              </div>
+
             </div>
 
             <h3 style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '6px' }}>Iframe Web Connector</h3>
