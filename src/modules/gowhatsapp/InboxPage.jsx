@@ -47,7 +47,7 @@ function getDisplayTime(msg) {
 function formatPhone(phone) {
   if (!phone) return '';
   // Strip ALL leading '+' signs first (handles ++91, +91, etc.)
-  const clean = phone.replace(/^\++/, '');
+  const clean = String(phone).replace(/^\++/, '');
   if (clean.length === 12 && clean.startsWith('91')) {
     return `+${clean.slice(0, 2)} ${clean.slice(2, 7)} ${clean.slice(7)}`;
   }

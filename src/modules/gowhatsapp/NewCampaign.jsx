@@ -467,7 +467,7 @@ export default function NewCampaign({ setSubView }) {
         }
         
         const cleanPhone = phone.replace(/\D/g, '');
-        let existingLead = leads.find(l => l.phone && l.phone.replace(/\D/g, '') === cleanPhone);
+        let existingLead = leads.find(l => l.phone && String(l.phone).replace(/\D/g, '') === cleanPhone);
         const messageToDeliver = getMessageForContact(contact);
         const templateData = getTemplateDataForContact(contact);
 

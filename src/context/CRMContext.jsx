@@ -1179,7 +1179,7 @@ export const CRMProvider = ({ children }) => {
 
         // Normalize phone to valid E.164: strip everything except digits, then prepend a single '+'
         // This fixes numbers like "++91 95154 77327", "+91-98765-43210", "0091...", etc.
-        const rawPhone = recipientPhone;
+        const rawPhone = String(recipientPhone);
         const digitsOnly = rawPhone.replace(/\D/g, '');
         const normalizedPhone = digitsOnly ? `+${digitsOnly}` : rawPhone;
 
