@@ -49,13 +49,13 @@ export default function FollowUps() {
     setShowDetailModal(false);
   };
 
-  // Filter leads that have followupDate set
-  const followUpLeads = leads.filter(lead => lead.followupDate);
+  // Filter leads that have followupDate set OR stage is Follow-up
+  const followUpLeads = leads.filter(lead => lead.followupDate || lead.stage === 'Follow-up');
 
   // Group into overdue and upcoming
   const now = new Date();
-  const overdueLeads = followUpLeads.filter(lead => new Date(lead.followupDate) < now);
-  const upcomingLeads = followUpLeads.filter(lead => new Date(lead.followupDate) >= now);
+  const overdueLeads = followUpLeads.filter(lead => lead.followupDate && new Date(lead.followupDate) < now);
+  const upcomingLeads = followUpLeads.filter(lead => !lead.followupDate || new Date(lead.followupDate) >= now);
 
   const displayedLeads = activeTab === 'overdue' ? overdueLeads : upcomingLeads;
 

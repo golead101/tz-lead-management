@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useCRM } from '../context/CRMContext';
 import DetailTimeline from './DetailTimeline';
+import * as XLSX from 'xlsx';
+
 
 export default function GridView() {
   const {
@@ -47,6 +49,7 @@ export default function GridView() {
   // Import CSV Modal State
   const [importOpen, setImportOpen] = useState(false);
   const [csvText, setCsvText] = useState('');
+  const [uploadedFileData, setUploadedFileData] = useState(null);
 
   // Bulk operation popovers
   const [bulkReassignOpen, setBulkReassignOpen] = useState(false);
@@ -205,8 +208,9 @@ export default function GridView() {
 
   // CSV Import Parser with Deduplication Algorithm
   const handleCsvImport = () => {
-    if (!csvText.trim()) return;
-    const lines = csvText.split('\n');
+    const dataToProcess = uploadedFileData || csvText;
+    if (!dataToProcess || typeof dataToProcess !== 'string' || !dataToProcess.trim()) return;
+    const lines = dataToProcess.split('\n');
     let addedCount = 0;
     let dupCount = 0;
 
@@ -245,6 +249,28 @@ export default function GridView() {
     }
     setImportOpen(false);
     setCsvText('');
+    setUploadedFileData(null);
+  };
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) {
+      setUploadedFileData(null);
+      return;
+    }
+
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+      const csv = XLSX.utils.sheet_to_csv(worksheet);
+      setUploadedFileData(csv);
+    } catch (error) {
+      console.error("Error parsing file:", error);
+      showToastMsg("Error parsing file. Please check format.", "error");
+      setUploadedFileData(null);
+    }
   };
 
   const handleRowClick = (leadId) => {
@@ -271,6 +297,7 @@ export default function GridView() {
   const [editStage, setEditStage] = useState('');
   const [editSource, setEditSource] = useState('');
   const [editSubSource, setEditSubSource] = useState('');
+  const [editFollowupDate, setEditFollowupDate] = useState('');
 
   const handleEditStart = (lead) => {
     setEditName(lead.name || '');
@@ -282,6 +309,7 @@ export default function GridView() {
     setEditStage(lead.stage || 'New Lead');
     setEditSource(lead.source || 'Walk-in');
     setEditSubSource(lead.subSource || '');
+    setEditFollowupDate(lead.followupDate || '');
     setIsEditing(true);
   };
 
@@ -299,7 +327,8 @@ export default function GridView() {
       counselor: editCounselor,
       stage: editStage,
       source: editSource,
-      subSource: editSubSource
+      subSource: editSubSource,
+      followupDate: editStage === 'Follow-up' ? editFollowupDate : null
     });
     setIsEditing(false);
   };
@@ -489,7 +518,7 @@ export default function GridView() {
           </label>
           <div
             className="gv-filter-select"
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', background: 'var(--dark-surface-solid)', userSelect: 'none' }}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', background: 'var(--dark-surface-solid)', userSelect: 'none', backgroundImage: 'none' }}
             onClick={() => setDateFilterOpen(!dateFilterOpen)}
           >
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{getDisplayDateRange()}</span>
@@ -606,36 +635,39 @@ export default function GridView() {
                   </label>
                 </th>
                 <th className="gv-th-sortable" onClick={() => handleSort('name')}>
-                  <span>Student</span>
+                  <span>Student Name</span>
                   <span className="gv-sort-icon">{getSortIcon('name')}</span>
                 </th>
                 <th className="gv-th-sortable" onClick={() => handleSort('course')}>
-                  <span>Program</span>
+                  <span>program</span>
                   <span className="gv-sort-icon">{getSortIcon('course')}</span>
                 </th>
+                <th className="gv-th-sortable" onClick={() => handleSort('phone')}>
+                  <span>phone number</span>
+                  <span className="gv-sort-icon">{getSortIcon('phone')}</span>
+                </th>
                 <th className="gv-th-sortable" onClick={() => handleSort('stage')}>
-                  <span>Status</span>
+                  <span>status</span>
                   <span className="gv-sort-icon">{getSortIcon('stage')}</span>
                 </th>
                 <th className="gv-th-sortable" onClick={() => handleSort('source')}>
-                  <span>Source</span>
+                  <span>source</span>
                   <span className="gv-sort-icon">{getSortIcon('source')}</span>
                 </th>
                 <th className="gv-th-sortable" onClick={() => handleSort('counselor')}>
-                  <span>Owner</span>
+                  <span>owner</span>
                   <span className="gv-sort-icon">{getSortIcon('counselor')}</span>
                 </th>
                 <th className="gv-th-sortable" onClick={() => handleSort('createdDate')}>
                   <span>Created</span>
                   <span className="gv-sort-icon">{getSortIcon('createdDate')}</span>
                 </th>
-                <th style={{ width: '80px', textAlign: 'center' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {paginatedLeads.length === 0 ? (
                 <tr>
-                  <td colSpan="8">
+                  <td colSpan="7">
                     <div className="gv-empty-state">
                       <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="1.2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 3a4 4 0 100 8 4 4 0 000-8z"/></svg>
                       <h4>No leads found</h4>
@@ -686,6 +718,13 @@ export default function GridView() {
                         <span className="gv-course-text">{lead.course}</span>
                       </td>
 
+                      {/* Phone Number */}
+                      <td>
+                        <span className="gv-phone-text" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                          {lead.phone || '-'}
+                        </span>
+                      </td>
+
                       {/* Status */}
                       <td>
                         <span className={`gv-status-badge status-${lead.stage.toLowerCase().replace(/ /g, '-')}`}>
@@ -713,20 +752,6 @@ export default function GridView() {
                       {/* Created */}
                       <td>
                         <span className="gv-time-text">{getRelativeTime(lead.createdDate)}</span>
-                      </td>
-
-                      {/* Actions */}
-                      <td onClick={(e) => e.stopPropagation()}>
-                        <div className="gv-row-actions">
-                          <button
-                            className="gv-action-icon"
-                            title="View Detail"
-                            onClick={() => handleRowClick(lead.id)}
-                          >
-                            <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" strokeWidth="2" fill="none"/><circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" fill="none"/></svg>
-                          </button>
-
-                        </div>
                       </td>
                     </tr>
                   );
@@ -800,7 +825,7 @@ export default function GridView() {
                 <h4 className="modal-title">Import Leads from CSV</h4>
                 <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>Bulk import student inquiries from spreadsheet data</p>
               </div>
-              <button className="modal-close-btn" onClick={() => setImportOpen(false)}>
+              <button className="modal-close-btn" onClick={() => { setImportOpen(false); setUploadedFileData(null); setCsvText(''); }}>
                 <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" strokeWidth="2.5"/></svg>
               </button>
             </div>
@@ -810,7 +835,18 @@ export default function GridView() {
                 <strong style={{ color: '#2563eb' }}>Format:</strong> Each row should follow — <code style={{ background: 'rgba(0,0,0,0.04)', padding: '1px 6px', borderRadius: '4px', fontSize: '11px' }}>Name, Email, Phone, Course, Source</code>
               </div>
 
+              <div className="form-group" style={{ marginBottom: '16px' }}>
+                <label style={{ fontSize: '12px', fontWeight: '600', marginBottom: '8px', display: 'block', color: 'var(--text-primary)' }}>Upload CSV or Excel Document</label>
+                <input 
+                  type="file" 
+                  accept=".csv, .xlsx, .xls"
+                  onChange={handleFileUpload}
+                  style={{ fontSize: '12px', padding: '8px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', width: '100%', background: 'var(--bg-primary)' }}
+                />
+              </div>
+
               <div className="form-group">
+                <label style={{ fontSize: '12px', fontWeight: '600', marginBottom: '8px', display: 'block', color: 'var(--text-primary)' }}>Or paste data here</label>
                 <textarea
                   className="form-control"
                   style={{ minHeight: '160px', fontFamily: 'monospace', fontSize: '12px', lineHeight: '1.6' }}
@@ -827,7 +863,7 @@ export default function GridView() {
             </div>
 
             <div className="modal-footer">
-              <button className="secondary-btn" onClick={() => setImportOpen(false)}>Cancel</button>
+              <button className="secondary-btn" onClick={() => { setImportOpen(false); setUploadedFileData(null); setCsvText(''); }}>Cancel</button>
               <button className="primary-btn" onClick={handleCsvImport}>
                 <svg viewBox="0 0 24 24" width="15" height="15"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" stroke="currentColor" strokeWidth="2" fill="none"/></svg>
                 Parse & Import
@@ -1000,6 +1036,19 @@ export default function GridView() {
                           ))}
                         </select>
                       </div>
+
+                      {editStage === 'Follow-up' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#475569' }}>Follow-up Date & Time</label>
+                          <input
+                            type="datetime-local"
+                            className="form-control"
+                            value={editFollowupDate}
+                            onChange={(e) => setEditFollowupDate(e.target.value)}
+                            style={{ padding: '8px 12px', fontSize: '13px', height: '38px' }}
+                          />
+                        </div>
+                      )}
 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                         <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#475569' }}>Assigned Agent</label>

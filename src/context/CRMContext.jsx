@@ -19,7 +19,7 @@ const DEFAULT_STAGES = [
   { id: 'st-interest', name: 'Interested', color: '--color-interested', description: 'Expressed core interest' },
   { id: 'st-demosched', name: 'Demo Scheduled', color: '--color-demo-sched', description: 'Class scheduled' },
   { id: 'st-demoattend', name: 'Demo Attended', color: '--color-demo-attend', description: 'Attended the demo' },
-  { id: 'st-followup', name: 'Follow-up Pending', color: '--color-followup', description: 'Awaiting callback' },
+  { id: 'st-followup', name: 'Follow-up', color: '--color-followup', description: 'Awaiting callback' },
   { id: 'st-notinterest', name: 'Not Interested', color: '--color-not-interested', description: 'Declined enrollment' },
   { id: 'st-converted', name: 'Converted', color: '--color-converted', description: 'Successfully enrolled' },
   { id: 'st-closed', name: 'Closed', color: '--color-closed', description: 'No further action' }
@@ -114,7 +114,7 @@ export const CRMProvider = ({ children }) => {
           course: '',
           education: '',
           source: 'WhatsApp Inbound',
-          stage: 'New Lead',
+          stage: lead.stage === 'Follow-up Pending' ? 'Follow-up' : (lead.stage || 'New Lead'),
           counselor: 'Unassigned',
           lastContacted: lead.createdDate || new Date().toISOString(),
           timeline: [],
@@ -135,7 +135,23 @@ export const CRMProvider = ({ children }) => {
 
   const [pipelineStages, setPipelineStages] = useState(() => {
     const local = localStorage.getItem('crm_stages');
-    return local ? JSON.parse(local) : DEFAULT_STAGES;
+    let stages = local ? JSON.parse(local) : DEFAULT_STAGES;
+    
+    // Migration for Follow-up name change
+    let migrated = false;
+    stages = stages.map(st => {
+      if (st.name === 'Follow-up Pending') {
+        migrated = true;
+        return { ...st, name: 'Follow-up' };
+      }
+      return st;
+    });
+    
+    if (migrated) {
+      localStorage.setItem('crm_stages', JSON.stringify(stages));
+    }
+    
+    return stages;
   });
 
   const [customFields, setCustomFields] = useState(() => {
@@ -151,6 +167,20 @@ export const CRMProvider = ({ children }) => {
     }
     return DEFAULT_BRANDING;
   });
+
+  useEffect(() => {
+    let migrated = false;
+    const newStages = pipelineStages.map(st => {
+      if (st.name === 'Follow-up Pending') {
+        migrated = true;
+        return { ...st, name: 'Follow-up' };
+      }
+      return st;
+    });
+    if (migrated) {
+      setPipelineStages(newStages);
+    }
+  }, [pipelineStages]);
 
   const [integrations, setIntegrations] = useState(() => {
     const hasReset = localStorage.getItem('crm_integrations_seed_reset_v3');
@@ -851,7 +881,7 @@ export const CRMProvider = ({ children }) => {
           } else if (callDetails.status === 'Interested') {
             targetStage = 'Interested';
           } else if (callDetails.status === 'Call Later') {
-            targetStage = 'Follow-up Pending';
+            targetStage = 'Follow-up';
           }
         }
 
