@@ -916,13 +916,10 @@ exports.createUserAccount = functions.https.onCall(async (data, context) => {
  */
 async function getDecryptedWhatsAppCredentials() {
   const integrationDoc = await db.collection('settings').doc('integrations').get();
-  if (!integrationDoc.exists) {
-    throw new Error('WhatsApp integration is not configured in settings.');
-  }
-  const data = integrationDoc.data();
-  const whatsapp = data.whatsapp;
-  if (!whatsapp) {
-    throw new Error('WhatsApp settings not found.');
+  let whatsapp = {};
+  if (integrationDoc.exists) {
+    const data = integrationDoc.data();
+    whatsapp = data.whatsapp || {};
   }
 
   // Support both encrypted and plaintext access tokens
@@ -938,14 +935,30 @@ async function getDecryptedWhatsAppCredentials() {
     }
   }
 
+  let finalAccessToken = accessToken || process.env.WHATSAPP_ACCESS_TOKEN || '';
+  
+  // Clean finalAccessToken (strip prefix and outer quotes if pasted accidentally)
+  finalAccessToken = finalAccessToken.trim();
+  if (finalAccessToken.startsWith('WHATSAPP_ACCESS_TOKEN=')) {
+    finalAccessToken = finalAccessToken.substring('WHATSAPP_ACCESS_TOKEN='.length);
+  }
+  finalAccessToken = finalAccessToken.replace(/^["']|["']$/g, '').trim();
+
+  const finalPhoneNumberId = (whatsapp.phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID || '').trim().replace(/^["']|["']$/g, '');
+  const finalBusinessAccountId = (whatsapp.businessAccountId || process.env.WHATSAPP_BUSINESS_ACCOUNT_ID || '').trim().replace(/^["']|["']$/g, '');
+  const finalApiVersion = whatsapp.apiVersion || process.env.WHATSAPP_API_VERSION || 'v20.0';
+  const finalWebhookVerifyToken = whatsapp.webhookVerifyToken || process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || '';
+  const finalEnabled = whatsapp.enabled !== undefined ? whatsapp.enabled : (!!(finalAccessToken && finalPhoneNumberId));
+  const finalStatus = whatsapp.status || (finalEnabled ? 'Connected' : 'Setup Required');
+
   return {
-    phoneNumberId: whatsapp.phoneNumberId || '',
-    businessAccountId: whatsapp.businessAccountId || '',
-    accessToken: accessToken,
-    apiVersion: whatsapp.apiVersion || 'v20.0',
-    webhookVerifyToken: whatsapp.webhookVerifyToken || '',
-    enabled: whatsapp.enabled || false,
-    status: whatsapp.status || 'Setup Required'
+    phoneNumberId: finalPhoneNumberId,
+    businessAccountId: finalBusinessAccountId,
+    accessToken: finalAccessToken,
+    apiVersion: finalApiVersion,
+    webhookVerifyToken: finalWebhookVerifyToken,
+    enabled: finalEnabled,
+    status: finalStatus
   };
 }
 

@@ -482,7 +482,7 @@ export default function NewCampaign({ setSubView }) {
         leadIdToUse = newLead.id;
       }
 
-      const success = await sendWhatsAppMsg(leadIdToUse, messageToDeliver, templateData);
+      const success = await sendWhatsAppMsg(leadIdToUse, messageToDeliver, templateData, phone);
       if (success) {
         sentCount++;
       } else {

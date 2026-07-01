@@ -101,8 +101,8 @@ export default function AnalyticsPage() {
           : new Date(c.createdAt).getTime();
 
         const repliedCount = list.filter(r => {
-          const cleanRepPhone = r.phone.replace(/\D/g, '');
-          const lead = leads.find(l => l.phone && l.phone.replace(/\D/g, '') === cleanRepPhone);
+          const cleanRepPhone = String(r.phone || '').replace(/\D/g, '');
+          const lead = leads.find(l => l.phone && String(l.phone).replace(/\D/g, '') === cleanRepPhone);
           const msgs = lead?.whatsappMessages || [];
           return msgs.some(m => {
             const isIncoming = m.sender === 'lead' || m.direction === 'inbound';
@@ -149,10 +149,10 @@ export default function AnalyticsPage() {
 
   const allRecipients = whatsappDb.getRecipients();
   const campaignRecipients = campaignId ? (allRecipients[campaignId] || []) : [];
-  const campaignPhones = new Set(campaignRecipients.map(r => r.phone.replace(/\\D/g, '')));
+  const campaignPhones = new Set(campaignRecipients.map(r => String(r.phone || '').replace(/\D/g, '')));
 
   const filteredLeads = campaignId 
-    ? contactLeads.filter(l => l.phone && campaignPhones.has(l.phone.replace(/\\D/g, '')))
+    ? contactLeads.filter(l => l.phone && campaignPhones.has(String(l.phone).replace(/\D/g, '')))
     : contactLeads;
 
   // Calculate live messaging metrics

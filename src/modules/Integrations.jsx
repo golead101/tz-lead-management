@@ -316,13 +316,44 @@ export default function Integrations() {
       }
     } else if (selectedPlatform === 'whatsapp') {
       fieldsToSave = { ...whatsappFields };
+      
+      // Sanitize fields (remove spaces, quotes, or env prefixes)
+      if (fieldsToSave.accessToken) {
+        fieldsToSave.accessToken = fieldsToSave.accessToken.trim().replace(/^["']|["']$/g, '');
+        if (fieldsToSave.accessToken.startsWith('WHATSAPP_ACCESS_TOKEN=')) {
+          fieldsToSave.accessToken = fieldsToSave.accessToken.substring('WHATSAPP_ACCESS_TOKEN='.length);
+        }
+        fieldsToSave.accessToken = fieldsToSave.accessToken.trim();
+      }
+      if (fieldsToSave.systemToken) {
+        fieldsToSave.systemToken = fieldsToSave.systemToken.trim().replace(/^["']|["']$/g, '');
+        if (fieldsToSave.systemToken.startsWith('WHATSAPP_ACCESS_TOKEN=')) {
+          fieldsToSave.systemToken = fieldsToSave.systemToken.substring('WHATSAPP_ACCESS_TOKEN='.length);
+        }
+        fieldsToSave.systemToken = fieldsToSave.systemToken.trim();
+      }
+      if (fieldsToSave.phoneNumberId) {
+        fieldsToSave.phoneNumberId = fieldsToSave.phoneNumberId.trim().replace(/^["']|["']$/g, '');
+        if (fieldsToSave.phoneNumberId.startsWith('WHATSAPP_PHONE_NUMBER_ID=')) {
+          fieldsToSave.phoneNumberId = fieldsToSave.phoneNumberId.substring('WHATSAPP_PHONE_NUMBER_ID='.length);
+        }
+        fieldsToSave.phoneNumberId = fieldsToSave.phoneNumberId.trim();
+      }
+      if (fieldsToSave.businessAccountId) {
+        fieldsToSave.businessAccountId = fieldsToSave.businessAccountId.trim().replace(/^["']|["']$/g, '');
+        if (fieldsToSave.businessAccountId.startsWith('WHATSAPP_BUSINESS_ACCOUNT_ID=')) {
+          fieldsToSave.businessAccountId = fieldsToSave.businessAccountId.substring('WHATSAPP_BUSINESS_ACCOUNT_ID='.length);
+        }
+        fieldsToSave.businessAccountId = fieldsToSave.businessAccountId.trim();
+      }
+
       // Ensure systemToken is always set (synchronised with accessToken) for backward compatibility
       if (fieldsToSave.accessToken && !fieldsToSave.systemToken) {
         fieldsToSave.systemToken = fieldsToSave.accessToken;
       } else if (fieldsToSave.systemToken && !fieldsToSave.accessToken) {
         fieldsToSave.accessToken = fieldsToSave.systemToken;
       }
-      if (!whatsappFields.phoneNumberId || !(whatsappFields.systemToken || whatsappFields.accessToken)) {
+      if (!fieldsToSave.phoneNumberId || !(fieldsToSave.systemToken || fieldsToSave.accessToken)) {
         activeStatus = 'Setup Required';
       }
     } else if (selectedPlatform === 'webhooks') {

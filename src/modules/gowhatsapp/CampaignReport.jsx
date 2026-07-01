@@ -61,8 +61,8 @@ export default function CampaignReport({ campaignId, setSubView }) {
       };
 
       const updatedList = list.map(r => {
-        const cleanRepPhone = r.phone.replace(/\D/g, '');
-        const lead = leads.find(l => l.phone && l.phone.replace(/\D/g, '') === cleanRepPhone);
+        const cleanRepPhone = String(r.phone || '').replace(/\D/g, '');
+        const lead = leads.find(l => l.phone && String(l.phone).replace(/\D/g, '') === cleanRepPhone);
         const msgs = lead?.whatsappMessages || [];
         const hasReplied = msgs.some(m => {
           const isIncoming = m.sender === 'lead' || m.direction === 'inbound';

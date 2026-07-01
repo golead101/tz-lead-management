@@ -68,7 +68,7 @@ export default function ContactsPage() {
       let phone = String(contact.phone || contact.Phone || '').trim();
       if (!phone) return;
       const cleanPhone = phone.replace(/\D/g, '');
-      const existing = leads.find(l => l.phone && l.phone.replace(/\D/g, '') === cleanPhone);
+      const existing = leads.find(l => l.phone && String(l.phone).replace(/\D/g, '') === cleanPhone);
       if (!existing) {
         addLead({
           name: contact.name || contact.Name || 'Campaign Contact',

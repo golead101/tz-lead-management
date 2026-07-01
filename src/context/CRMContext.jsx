@@ -1166,19 +1166,20 @@ export const CRMProvider = ({ children }) => {
   };
 
   // Sending custom WhatsApp logs & triggering bot automated simulated reply
-  const sendWhatsAppMsg = async (leadId, messageText, templateData = null) => {
+  const sendWhatsAppMsg = async (leadId, messageText, templateData = null, fallbackPhone = null) => {
     if (!messageText.trim() && !templateData) return false;
 
     // If real WhatsApp integration is active and enabled, make the HTTP call to Firebase Cloud Function
     if (integrations.whatsapp.enabled) {
       const activeLead = leads.find(l => l.id === leadId);
-      if (activeLead && activeLead.phone) {
+      const recipientPhone = fallbackPhone || activeLead?.phone;
+      if (recipientPhone) {
         const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'leads-management-tz';
         const url = `https://us-central1-${projectId}.cloudfunctions.net/sendWhatsAppMessage`;
 
         // Normalize phone to valid E.164: strip everything except digits, then prepend a single '+'
         // This fixes numbers like "++91 95154 77327", "+91-98765-43210", "0091...", etc.
-        const rawPhone = activeLead.phone;
+        const rawPhone = recipientPhone;
         const digitsOnly = rawPhone.replace(/\D/g, '');
         const normalizedPhone = digitsOnly ? `+${digitsOnly}` : rawPhone;
 
