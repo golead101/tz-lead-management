@@ -1889,6 +1889,7 @@ a {
 .status-demo-attend { background: rgba(5, 150, 105, 0.09); color: #059669; }
 .status-follow-up-pending { background: rgba(239, 68, 68, 0.09); color: #ef4444; }
 .status-followup { background: rgba(239, 68, 68, 0.09); color: #ef4444; }
+.status-follow-up { background: rgba(239, 68, 68, 0.09); color: #ef4444; }
 .status-not-interested { background: rgba(113, 113, 122, 0.09); color: #71717a; }
 .status-converted { background: rgba(5, 150, 105, 0.12); color: #059669; border: 1px solid rgba(5, 150, 105, 0.2); }
 .status-closed { background: rgba(63, 63, 70, 0.09); color: #71717a; }

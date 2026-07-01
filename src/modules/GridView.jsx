@@ -106,7 +106,11 @@ export default function GridView() {
     if (dateRangeFilter !== 'All Time') {
       const leadDate = new Date(lead.createdDate);
       const today = new Date();
-      if (dateRangeFilter === 'Last 7 Days') {
+      if (dateRangeFilter === 'Today') {
+        const startOfDay = new Date(today);
+        startOfDay.setHours(0,0,0,0);
+        if (leadDate < startOfDay) return false;
+      } else if (dateRangeFilter === 'Last 7 Days') {
         const past = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
         if (leadDate < past) return false;
       } else if (dateRangeFilter === 'Last 30 Days') {
@@ -532,7 +536,7 @@ export default function GridView() {
           {dateFilterOpen && (
             <div className="gv-popover" style={{ width: '240px', padding: '8px 0', zIndex: 100, top: 'calc(100% + 4px)', left: 0, boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                 {['All Time', 'Last 7 Days', 'Last 30 Days', 'This Month'].map(option => (
+                 {['All Time', 'Today', 'Last 7 Days', 'Last 30 Days', 'This Month'].map(option => (
                    <div 
                      key={option}
                      style={{ padding: '8px 16px', cursor: 'pointer', fontSize: '13px', background: dateRangeFilter === option ? 'rgba(37, 99, 235, 0.08)' : 'transparent', color: dateRangeFilter === option ? '#2563eb' : 'inherit', fontWeight: dateRangeFilter === option ? 600 : 400, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}

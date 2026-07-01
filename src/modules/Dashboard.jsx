@@ -56,7 +56,9 @@ export default function Dashboard() {
     if (dateRange.label !== 'Custom Range') {
       const end = new Date();
       let start = new Date();
-      if (dateRange.label === 'Last 7 Days') {
+      if (dateRange.label === 'Today') {
+        // start is today
+      } else if (dateRange.label === 'Last 7 Days') {
         start.setDate(end.getDate() - 7);
       } else if (dateRange.label === 'Last 30 Days') {
         start.setDate(end.getDate() - 30);
@@ -90,7 +92,9 @@ export default function Dashboard() {
     end.setHours(23, 59, 59, 999);
 
     let start = new Date();
-    if (dateRange.label === 'Last 7 Days') {
+    if (dateRange.label === 'Today') {
+      start.setHours(0, 0, 0, 0);
+    } else if (dateRange.label === 'Last 7 Days') {
       start.setDate(end.getDate() - 7);
       start.setHours(0, 0, 0, 0);
     } else if (dateRange.label === 'Last 30 Days') {
@@ -350,7 +354,7 @@ export default function Dashboard() {
                 }}
                 onClick={(e) => e.stopPropagation()}
               >
-                {['All Time', 'Last 7 Days', 'Last 30 Days', 'This Month', 'Custom Range'].map(opt => (
+                {['All Time', 'Today', 'Last 7 Days', 'Last 30 Days', 'This Month', 'Custom Range'].map(opt => (
                   <div
                     key={opt}
                     style={{
