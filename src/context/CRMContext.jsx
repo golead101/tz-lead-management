@@ -1170,8 +1170,8 @@ export const CRMProvider = ({ children }) => {
     if (!messageText.trim() && !templateData) return false;
 
     // If real WhatsApp integration is active and enabled, make the HTTP call to Firebase Cloud Function
-    if (integrations.whatsapp.enabled) {
-      const activeLead = leads.find(l => l.id === leadId);
+    if (integrations?.whatsapp?.enabled) {
+      const activeLead = leads?.find(l => l.id === leadId);
       const recipientPhone = fallbackPhone || activeLead?.phone;
       if (recipientPhone) {
         const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'leads-management-tz';
