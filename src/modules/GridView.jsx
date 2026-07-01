@@ -219,7 +219,7 @@ export default function GridView() {
       const [name, email, phone, course, source] = parts;
       const duplicateExists = leads.some(lead =>
         (email && lead.email.toLowerCase() === email.toLowerCase()) ||
-        (phone && lead.phone.replace(/[^0-9]/g, '') === phone.replace(/[^0-9]/g, ''))
+        (phone && String(lead.phone || '').replace(/[^0-9]/g, '') === String(phone || '').replace(/[^0-9]/g, ''))
       );
       if (duplicateExists) {
         dupCount++;

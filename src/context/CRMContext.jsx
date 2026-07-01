@@ -771,7 +771,7 @@ export const CRMProvider = ({ children }) => {
             const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'leads-management-tz';
             const url = `https://us-central1-${projectId}.cloudfunctions.net/sendWhatsAppMessage`;
             // Normalize to E.164: remove all non-digits, then prepend single '+'
-            const normalizedPhone1 = `+${lead.phone.replace(/\D/g, '')}`;
+            const normalizedPhone1 = `+${String(lead.phone || '').replace(/\D/g, '')}`;
             fetch(url, {
               method: 'POST',
               headers: {
@@ -896,7 +896,7 @@ export const CRMProvider = ({ children }) => {
               const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'leads-management-tz';
               const url = `https://us-central1-${projectId}.cloudfunctions.net/sendWhatsAppMessage`;
               // Normalize to E.164: remove all non-digits, then prepend single '+'
-              const normalizedPhone2 = `+${lead.phone.replace(/\D/g, '')}`;
+              const normalizedPhone2 = `+${String(lead.phone || '').replace(/\D/g, '')}`;
               fetch(url, {
                 method: 'POST',
                 headers: {
