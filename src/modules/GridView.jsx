@@ -38,6 +38,7 @@ export default function GridView() {
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [dateFilterOpen, setDateFilterOpen] = useState(false);
+  const [gridSearch, setGridSearch] = useState('');
 
   // Sorting State
   const [sortBy, setSortBy] = useState('createdDate');
@@ -132,13 +133,23 @@ export default function GridView() {
       }
     }
 
+    if (gridSearch) {
+      const q = gridSearch.toLowerCase();
+      if (
+        !String(lead.name || '').toLowerCase().includes(q) &&
+        !String(lead.phone || '').includes(q)
+      ) {
+        return false;
+      }
+    }
+
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       return (
-        lead.name.toLowerCase().includes(q) ||
-        lead.email.toLowerCase().includes(q) ||
-        lead.phone.includes(q) ||
-        lead.location.toLowerCase().includes(q)
+        String(lead.name || '').toLowerCase().includes(q) ||
+        String(lead.email || '').toLowerCase().includes(q) ||
+        String(lead.phone || '').includes(q) ||
+        String(lead.location || '').toLowerCase().includes(q)
       );
     }
     return true;
@@ -225,15 +236,21 @@ export default function GridView() {
       const parts = line.split(',').map(p => p.trim());
       if (parts.length < 3) return;
       const [name, email, phone, course, source] = parts;
+      
+      if (!name && !email && !phone) return; // Skip completely empty rows
+
+      const cleanPhone = phone ? String(phone).replace(/[^0-9]/g, '') : '';
+      const cleanEmail = email ? email.toLowerCase() : '';
+
       const duplicateExists = leads.some(lead =>
-        (email && lead.email.toLowerCase() === email.toLowerCase()) ||
-        (phone && lead.phone.replace(/[^0-9]/g, '') === phone.replace(/[^0-9]/g, ''))
+        (cleanEmail && lead.email && lead.email.toLowerCase() === cleanEmail) ||
+        (cleanPhone && String(lead.phone || '').replace(/[^0-9]/g, '') === cleanPhone)
       );
       if (duplicateExists) {
         dupCount++;
       } else {
         addLead({
-          name: name,
+          name: name || 'Unknown',
           email: email || '',
           phone: phone || '',
           course: course || courses[0]?.name,
@@ -249,7 +266,7 @@ export default function GridView() {
       showToastMsg(`CSV parsing completed. Imported ${addedCount} leads.`);
     }
     if (dupCount > 0) {
-      showToastMsg(`Identified & bypassed ${dupCount} duplicate records.`, 'error');
+      showToastMsg(`Identified & bypassed ${dupCount} duplicate records.`);
     }
     setImportOpen(false);
     setCsvText('');
@@ -432,7 +449,7 @@ export default function GridView() {
             <span style={{ color: 'var(--primary)', fontWeight: 600 }}>{activeFiltersCount} filter{activeFiltersCount > 1 ? 's' : ''} active</span>
             <button
               className="gv-clear-filters"
-              onClick={() => { setSelectedCourse('All'); setSelectedStage('All'); setSelectedCounselor('All'); setSelectedSource('All'); setDateRangeFilter('All Time'); setCustomStartDate(''); setCustomEndDate(''); setCurrentPage(1); }}
+              onClick={() => { setSelectedCourse('All'); setSelectedStage('All'); setSelectedCounselor('All'); setSelectedSource('All'); setDateRangeFilter('All Time'); setCustomStartDate(''); setCustomEndDate(''); setGridSearch(''); setCurrentPage(1); }}
             >Clear</button>
           </div>
         )}
@@ -571,6 +588,21 @@ export default function GridView() {
               )}
             </div>
           )}
+        </div>
+
+        <div className="gv-filter-group">
+          <label className="gv-filter-label">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            Search Lead
+          </label>
+          <input
+            type="text"
+            className="gv-filter-select"
+            placeholder="Name or phone..."
+            value={gridSearch}
+            onChange={(e) => { setGridSearch(e.target.value); setCurrentPage(1); }}
+            style={{ width: '160px', padding: '6px 12px' }}
+          />
         </div>
       </div>
 

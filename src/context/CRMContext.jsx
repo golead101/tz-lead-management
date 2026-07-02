@@ -724,14 +724,24 @@ export const CRMProvider = ({ children }) => {
     }));
 
     if (isFirebaseEnabled) {
-      const batch = writeBatch(db);
-      newLeads.forEach(lead => {
-        batch.set(doc(db, 'leads', lead.id), lead);
-      });
-      batch.commit().catch(err => {
-        console.error("Firestore addBulkLeads failed, falling back to local update:", err);
-        setLeads(prev => [...newLeads, ...prev]);
-      });
+      // Firestore batch size limit is 500
+      const CHUNK_SIZE = 450;
+      const processBatches = async () => {
+        try {
+          for (let i = 0; i < newLeads.length; i += CHUNK_SIZE) {
+            const chunk = newLeads.slice(i, i + CHUNK_SIZE);
+            const batch = writeBatch(db);
+            chunk.forEach(lead => {
+              batch.set(doc(db, 'leads', lead.id), lead);
+            });
+            await batch.commit();
+          }
+        } catch (err) {
+          console.error("Firestore addBulkLeads batch failed, falling back to local update:", err);
+          setLeads(prev => [...newLeads, ...prev]);
+        }
+      };
+      processBatches();
     } else {
       setLeads(prev => [...newLeads, ...prev]);
     }

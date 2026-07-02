@@ -120,7 +120,7 @@ export default function NewCampaign({ setSubView }) {
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState(null);
 
-  const { leads, courses, addLead, sendWhatsAppMsg } = useCRM();
+  const { leads, courses, addLead, addBulkLeads, sendWhatsAppMsg } = useCRM();
 
   // Filters for CRM Leads
   const [campaignCourseFilter, setCampaignCourseFilter] = useState('');
@@ -247,10 +247,44 @@ export default function NewCampaign({ setSubView }) {
       ];
 
       const allContacts = whatsappDb.getContacts();
-      allContacts[newListId] = uploadedContacts.map((c, i) => ({ id: `c-${Date.now()}-${i}`, ...c }));
+      const mappedContacts = uploadedContacts.map((c, i) => ({ id: `c-${Date.now()}-${i}`, ...c }));
+      allContacts[newListId] = mappedContacts;
 
       whatsappDb.saveContactLists(newLists);
       whatsappDb.saveContacts(allContacts);
+
+      // Sync uploaded contacts to global CRM Leads
+      const leadsToImport = mappedContacts.map(c => {
+        let phone = '';
+        if (phoneColumn) {
+          phone = String(c[phoneColumn] || '').trim();
+        } else {
+          const directMatch = c.phone || c.Phone || c.mobile || c.Mobile || c.number || c.Number;
+          if (directMatch) {
+            phone = String(directMatch).trim();
+          } else {
+            for (const key of Object.keys(c)) {
+              const lowerKey = key.toLowerCase().replace(/[^a-z]/g, '');
+              if (lowerKey.includes('phone') || lowerKey.includes('mobile') || lowerKey.includes('contactnumber')) {
+                phone = String(c[key] || '').trim();
+                break;
+              }
+            }
+          }
+        }
+        
+        return {
+          name: c.name || c.Name || c.first_name || 'Campaign Contact',
+          phone: phone,
+          email: c.email || c.Email || '',
+          course: c.course || c.Course || '',
+          source: 'Campaign Upload'
+        };
+      });
+      
+      if (addBulkLeads && leadsToImport.length > 0) {
+        addBulkLeads(leadsToImport);
+      }
 
       setSelectedListId(newListId);
       setExistingLists(newLists);
