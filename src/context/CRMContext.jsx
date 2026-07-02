@@ -692,6 +692,54 @@ export const CRMProvider = ({ children }) => {
     return newLead;
   };
 
+  const addBulkLeads = (leadsArray) => {
+    if (!leadsArray || leadsArray.length === 0) return [];
+    
+    const newLeads = leadsArray.map((leadData, index) => ({
+      id: `lead-${Date.now()}-${index}`,
+      name: leadData.name || 'Anonymous Inquiry',
+      email: leadData.email || '',
+      phone: leadData.phone || '',
+      location: leadData.location || 'Campaign Upload',
+      education: leadData.education || 'Not Provided',
+      course: leadData.course || (courses[0] ? courses[0].name : ''),
+      source: leadData.source || 'Campaign Upload',
+      subSource: leadData.subSource || '',
+      counselor: leadData.counselor || activeUser,
+      stage: leadData.stage || 'New Lead',
+      createdDate: new Date().toISOString(),
+      lastContacted: new Date().toISOString(),
+      customFields: leadData.customFields || {},
+      timeline: [
+        {
+          id: `log-${Date.now()}-${index}`,
+          type: 'system',
+          title: 'Lead Captured',
+          content: 'Inquiry successfully entered system via Campaign Upload.',
+          timestamp: new Date().toISOString(),
+          user: 'System'
+        }
+      ],
+      whatsappMessages: []
+    }));
+
+    if (isFirebaseEnabled) {
+      const batch = writeBatch(db);
+      newLeads.forEach(lead => {
+        batch.set(doc(db, 'leads', lead.id), lead);
+      });
+      batch.commit().catch(err => {
+        console.error("Firestore addBulkLeads failed, falling back to local update:", err);
+        setLeads(prev => [...newLeads, ...prev]);
+      });
+    } else {
+      setLeads(prev => [...newLeads, ...prev]);
+    }
+
+    showToastMsg(`${newLeads.length} leads successfully imported!`);
+    return newLeads;
+  };
+
   // Editing lead variables
   const updateLead = (leadId, updatedFields) => {
     let updatedLead = null;
@@ -1685,6 +1733,7 @@ export const CRMProvider = ({ children }) => {
       setSearchQuery,
       setShowDetailModal,
       addLead,
+      addBulkLeads,
       updateLead,
       deleteLead,
       updateLeadStage,
