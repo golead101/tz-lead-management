@@ -799,8 +799,10 @@ exports.metaWebhook = functions.https.onRequest(async (req, res) => {
       const location = fields.city || fields.location || 'Meta Ad';
       const education = fields.education || 'Not Provided';
 
+      const leadDocId = phone || leadId;
+
       const leadRecord = {
-        id: leadId, // Use leadgen_id directly to avoid duplicates
+        id: leadDocId, // Use phone as ID to avoid duplicates across campaigns
         metaLeadId: leadId,
         name: fullName,
         email: email,
@@ -829,9 +831,9 @@ exports.metaWebhook = functions.https.onRequest(async (req, res) => {
         whatsappMessages: []
       };
 
-      // Store in Firestore using Meta Lead ID as doc name (deduplicates naturally)
-      await db.collection('leads').doc(leadId).set(leadRecord, { merge: true });
-      console.log(`Successfully stored Meta webhook lead in Firestore: ${leadId}`);
+      // Store in Firestore using phone number as doc name (deduplicates naturally)
+      await db.collection('leads').doc(leadDocId).set(leadRecord, { merge: true });
+      console.log(`Successfully stored Meta webhook lead in Firestore: ${leadDocId}`);
 
       return res.status(200).send('Success');
     } catch (err) {
