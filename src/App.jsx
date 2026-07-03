@@ -7,7 +7,6 @@ import LoginScreen from './components/LoginScreen';
 import Dashboard from './modules/Dashboard';
 import GridView from './modules/GridView';
 import DetailTimeline from './modules/DetailTimeline';
-import WhatsAppConsole from './modules/WhatsAppConsole';
 import Analytics from './modules/Analytics';
 import GoWhatsApp from './modules/gowhatsapp/GoWhatsApp';
 import Sandbox from './modules/Sandbox';
@@ -59,7 +58,7 @@ function MainAppContent() {
     const isCounselorRestricted = isCounselor && ['analytics', 'sandbox', 'settings', 'history', 'integrations'].includes(activeView);
     const isManagerRestricted = isManager && ['sandbox', 'settings', 'analytics', 'integrations'].includes(activeView);
     const isAdminRestricted = isAdmin && ['history'].includes(activeView);
-    const isTelecallerRestricted = activeRole === 'Telecaller' && (activeView === 'whatsapp' || activeView === 'gowhatsapp' || activeView === 'history');
+    const isTelecallerRestricted = activeRole === 'Telecaller' && (activeView === 'gowhatsapp' || activeView === 'history');
 
     if (isCounselorRestricted || isManagerRestricted || isAdminRestricted || isTelecallerRestricted) {
       setActiveView('dashboard');
@@ -93,8 +92,6 @@ function MainAppContent() {
         return <DetailTimeline />;
       case 'followups':
         return <FollowUps />;
-      case 'whatsapp':
-        return <WhatsAppConsole />;
       case 'gowhatsapp':
         return <GoWhatsApp />;
       case 'analytics':

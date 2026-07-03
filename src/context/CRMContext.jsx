@@ -304,6 +304,8 @@ export const CRMProvider = ({ children }) => {
     return sessionStorage.getItem('gowha_subview') || 'dashboard';
   });
 
+  const [prefilledCampaignLeads, setPrefilledCampaignLeads] = useState(null);
+
   const changeWhatsappSubView = (view) => {
     sessionStorage.setItem('gowha_subview', view);
     setWhatsappSubView(view);
@@ -1746,6 +1748,8 @@ export const CRMProvider = ({ children }) => {
       addBulkLeads,
       updateLead,
       deleteLead,
+      prefilledCampaignLeads,
+      setPrefilledCampaignLeads,
       updateLeadStage,
       logCall,
       logNote,

@@ -120,7 +120,17 @@ export default function NewCampaign({ setSubView }) {
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState(null);
 
-  const { leads, courses, addLead, addBulkLeads, sendWhatsAppMsg } = useCRM();
+  const { leads, courses, addLead, addBulkLeads, sendWhatsAppMsg, prefilledCampaignLeads, setPrefilledCampaignLeads } = useCRM();
+
+  useEffect(() => {
+    if (prefilledCampaignLeads && prefilledCampaignLeads.length > 0) {
+      setUploadedContacts(prefilledCampaignLeads);
+      setPreviewContacts(prefilledCampaignLeads.slice(0, 3));
+      setSelectedListId('');
+      setStep(2);
+      setPrefilledCampaignLeads(null);
+    }
+  }, [prefilledCampaignLeads, setPrefilledCampaignLeads]);
 
   // Filters for CRM Leads
   const [campaignCourseFilter, setCampaignCourseFilter] = useState('');

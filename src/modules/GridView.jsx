@@ -25,7 +25,9 @@ export default function GridView() {
     updateLeadStage,
     logNote,
     updateLead,
-    deleteLead
+    deleteLead,
+    setWhatsappSubView,
+    setPrefilledCampaignLeads
   } = useCRM();
 
   // Filter States
@@ -219,6 +221,14 @@ export default function GridView() {
     bulkUpdateStage(selectedIds, bulkStageName);
     setSelectedIds([]);
     setBulkStageOpen(false);
+  };
+
+  const executeSendCampaign = () => {
+    const selected = leads.filter(l => selectedIds.includes(l.id));
+    setPrefilledCampaignLeads(selected);
+    setSelectedIds([]);
+    setActiveView('gowhatsapp');
+    setWhatsappSubView('new-campaign');
   };
 
   // CSV Import Parser with Deduplication Algorithm
@@ -645,6 +655,11 @@ export default function GridView() {
                 </div>
               )}
             </div>
+
+            <button className="gv-btn-outline gv-btn-sm" onClick={executeSendCampaign}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 2L11 13M22 2L15 22L11 13L2 9L22 2Z"/></svg>
+              Send Campaign
+            </button>
 
             <button className="gv-btn-ghost gv-btn-sm" onClick={() => setSelectedIds([])}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
