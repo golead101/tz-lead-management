@@ -31,3 +31,5 @@ try {
 }
 
 export { app, db, auth, functions, analytics };
+// Rebuild trigger: 2026-07-03T10:44:00Z
+
