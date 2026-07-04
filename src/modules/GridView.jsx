@@ -150,7 +150,6 @@ export default function GridView() {
       const q = searchQuery.toLowerCase();
       return (
         String(lead.name || '').toLowerCase().includes(q) ||
-        String(lead.email || '').toLowerCase().includes(q) ||
         String(lead.phone || '').includes(q) ||
         String(lead.location || '').toLowerCase().includes(q)
       );
@@ -241,12 +240,49 @@ export default function GridView() {
     let dupCount = 0;
 
     lines.forEach((line, index) => {
-      if (index === 0 && (line.toLowerCase().includes('name') || line.toLowerCase().includes('email'))) {
+      if (index === 0 && (line.toLowerCase().includes('name') || line.toLowerCase().includes('email') || line.toLowerCase().includes('phone'))) {
         return;
       }
+    });
+
+    let nameIdx = 0, emailIdx = 1, phoneIdx = 2, courseIdx = 3, sourceIdx = 4;
+    let hasHeader = false;
+
+    if (lines.length > 0) {
+      const headerLine = lines[0].toLowerCase();
+      if (headerLine.includes('name') || headerLine.includes('email') || headerLine.includes('phone') || headerLine.includes('program')) {
+        hasHeader = true;
+        const headers = lines[0].split(',').map(p => p.trim().toLowerCase());
+        
+        nameIdx = headers.findIndex(h => h.includes('name'));
+        emailIdx = headers.findIndex(h => h.includes('email'));
+        phoneIdx = headers.findIndex(h => h.includes('phone') || h.includes('contact') || h.includes('mobile'));
+        courseIdx = headers.findIndex(h => h.includes('course') || h.includes('program'));
+        sourceIdx = headers.findIndex(h => h.includes('source'));
+      }
+    }
+
+    lines.forEach((line, index) => {
+      if (index === 0 && hasHeader) return;
+      
       const parts = line.split(',').map(p => p.trim());
-      if (parts.length < 3) return;
-      const [name, email, phone, course, source] = parts;
+      if (parts.length < 2) return;
+      
+      let name = '', email = '', phone = '', course = '', source = '';
+      
+      if (hasHeader) {
+         name = nameIdx !== -1 && nameIdx < parts.length ? parts[nameIdx] : '';
+         email = emailIdx !== -1 && emailIdx < parts.length ? parts[emailIdx] : '';
+         phone = phoneIdx !== -1 && phoneIdx < parts.length ? parts[phoneIdx] : '';
+         course = courseIdx !== -1 && courseIdx < parts.length ? parts[courseIdx] : '';
+         source = sourceIdx !== -1 && sourceIdx < parts.length ? parts[sourceIdx] : '';
+      } else {
+         name = parts[0];
+         email = parts[1];
+         phone = parts[2];
+         course = parts[3];
+         source = parts[4];
+      }
       
       if (!name && !email && !phone) return; // Skip completely empty rows
 
@@ -342,7 +378,6 @@ export default function GridView() {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState('');
   const [editPhone, setEditPhone] = useState('');
-  const [editEmail, setEditEmail] = useState('');
   const [editEducation, setEditEducation] = useState('');
   const [editCourse, setEditCourse] = useState('');
   const [editCounselor, setEditCounselor] = useState('');
@@ -354,7 +389,6 @@ export default function GridView() {
   const handleEditStart = (lead) => {
     setEditName(lead.name || '');
     setEditPhone(lead.phone || '');
-    setEditEmail(lead.email || '');
     setEditEducation(lead.education || '');
     setEditCourse(lead.course || '');
     setEditCounselor(lead.counselor || 'Unassigned');
@@ -373,7 +407,6 @@ export default function GridView() {
     updateLead(leadId, {
       name: editName,
       phone: editPhone,
-      email: editEmail,
       education: editEducation,
       course: editCourse,
       counselor: editCounselor,
@@ -780,7 +813,6 @@ export default function GridView() {
                           </div>
                           <div className="gv-student-info">
                             <span className="gv-student-name">{lead.name}</span>
-                            <span className="gv-student-meta">{lead.email}</span>
                           </div>
                         </div>
                       </td>
@@ -1126,18 +1158,6 @@ export default function GridView() {
                       </div>
 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#475569' }}>Email</label>
-                        <input
-                          type="email"
-                          className="form-control"
-                          value={editEmail}
-                          onChange={(e) => setEditEmail(e.target.value)}
-                          placeholder="Email"
-                          style={{ padding: '8px 12px', fontSize: '13px' }}
-                        />
-                      </div>
-
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                         <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#475569' }}>Lead Status</label>
                         <select
                           className="form-control"
@@ -1323,10 +1343,6 @@ export default function GridView() {
                               </div>
                             </>
                           )}
-                          <div>
-                            <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase', marginBottom: '2px', letterSpacing: '0.03em' }}>Email</div>
-                            <div style={{ fontSize: '13px', color: '#1e293b', fontWeight: '600' }}>{lead.email || 'Not Provided'}</div>
-                          </div>
                           <div>
                             <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase', marginBottom: '2px', letterSpacing: '0.03em' }}>Education</div>
                             <div style={{ fontSize: '13px', color: '#1e293b', fontWeight: '600' }}>{lead.education || 'Not Provided'}</div>
