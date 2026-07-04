@@ -148,7 +148,11 @@ export default function TemplatesPage() {
     }
 
     const components = [
-      tplHeaderType !== 'NONE' ? { type: 'HEADER', format: tplHeaderType, ...(tplHeaderType === 'TEXT' ? { text: tplHeaderText } : {}) } : null,
+      tplHeaderType !== 'NONE' ? { 
+        type: 'HEADER', 
+        format: tplHeaderType, 
+        ...(tplHeaderType === 'TEXT' ? { text: tplHeaderText } : { example: { header_handle: [mediaHandle || 'mock_handle'] } }) 
+      } : null,
       {
         type: 'BODY',
         text: tplBody,
