@@ -349,22 +349,24 @@ export const CRMProvider = ({ children }) => {
 
       const updateLeads = () => {
         const combined = [...mainLeads, ...iframeLeads];
-        combined.sort((a, b) => new Date(b.createdDate) - new Date(a.createdDate));
-        setLeads(combined);
+        const uniqueLeadsMap = new Map();
+        combined.forEach(lead => {
+            uniqueLeadsMap.set(lead.id, lead);
+        });
+        const uniqueLeads = Array.from(uniqueLeadsMap.values());
+        
+        uniqueLeads.sort((a, b) => new Date(b.createdDate) - new Date(a.createdDate));
+        setLeads(uniqueLeads);
       };
 
       // 1. Leads
       leadsUnsub = onSnapshot(collection(db, 'leads'), (snapshot) => {
         if (!active) return;
         if (snapshot.empty) {
-          console.log("Firestore leads collection is empty. Seeding with DEFAULT leads...");
-          const batch = writeBatch(db);
-          SEED_LEADS.forEach((lead) => {
-            batch.set(doc(db, 'leads', lead.id), lead);
-          });
-          batch.commit()
-            .then(() => console.log("Firestore leads successfully seeded."))
-            .catch(err => console.error("Firestore leads seeding failed:", err));
+          console.log("Firestore leads collection is empty. Starting fresh with no data.");
+          mainLeads = [];
+          updateLeads();
+          setIsFirebaseEnabled(true);
         } else {
           mainLeads = snapshot.docs.map(doc => {
             const data = doc.data();
@@ -638,8 +640,46 @@ export const CRMProvider = ({ children }) => {
 
   // Adding a brand new inquiry
   const addLead = (leadData) => {
+    const cleanPhone = leadData.phone ? String(leadData.phone).replace(/\D/g, '') : '';
+    
+    // Check if lead already exists by phone
+    if (cleanPhone) {
+      const existingLead = leads.find(l => {
+        const lPhone = l.phone ? String(l.phone).replace(/\D/g, '') : '';
+        return lPhone === cleanPhone;
+      });
+      
+      if (existingLead) {
+        // Append to existing lead instead of creating a new one
+        const reinquiryLog = {
+          id: `log-${Date.now()}`,
+          type: 'system',
+          title: 'Re-inquiry Captured',
+          content: `User submitted another inquiry for course: ${leadData.course || 'Unknown'} via ${leadData.source || 'Website Form'}`,
+          timestamp: new Date().toISOString(),
+          user: 'System'
+        };
+        
+        const updatedLead = {
+          ...existingLead,
+          stage: 'New Lead', // Bring them back to New Lead stage to ensure they get attention
+          lastContacted: new Date().toISOString(),
+          timeline: [...(existingLead.timeline || []), reinquiryLog]
+        };
+        
+        if (isFirebaseEnabled) {
+          setDoc(doc(db, 'leads', existingLead.id), updatedLead).catch(console.error);
+        }
+        setLeads(prev => prev.map(l => l.id === existingLead.id ? updatedLead : l));
+        showToastMsg(`Existing lead found. Inquiry added to timeline!`);
+        return updatedLead;
+      }
+    }
+
+    // New Lead Creation
+    const newLeadId = cleanPhone ? `lead-${cleanPhone}` : `lead-${Date.now()}`;
     const newLead = {
-      id: `lead-${Date.now()}`,
+      id: newLeadId,
       name: leadData.name || 'Anonymous Inquiry',
       email: leadData.email || '',
       phone: leadData.phone || '',
@@ -798,11 +838,13 @@ export const CRMProvider = ({ children }) => {
   // Delete Lead
   const deleteLead = (leadId) => {
     if (isFirebaseEnabled) {
-      deleteDoc(doc(db, 'leads', leadId))
-        .catch(err => {
-          console.error("Firestore deleteLead failed, falling back to local delete:", err);
-          setLeads(prev => prev.filter(l => l.id !== leadId));
-        });
+      deleteDoc(doc(db, 'leads', leadId)).catch(err => {
+        console.error("Firestore deleteLead from 'leads' failed:", err);
+      });
+      deleteDoc(doc(db, 'i-frame', leadId)).catch(err => {
+        console.error("Firestore deleteLead from 'i-frame' failed:", err);
+      });
+      setLeads(prev => prev.filter(l => l.id !== leadId));
     } else {
       setLeads(prev => prev.filter(l => l.id !== leadId));
     }

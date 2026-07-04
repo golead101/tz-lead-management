@@ -15,6 +15,7 @@ export default function ConfigSettings() {
     addStage,
     addCustomField,
     addCounselor,
+    removeCounselor,
     updateCounselorStatus,
     changeBrandingColors,
     activeRole
@@ -874,36 +875,50 @@ export default function ConfigSettings() {
                       </div>
                       
                       {activeRole === 'Admin' && c.role !== 'Admin' && (
-                        <label className="status-toggle-switch" style={{ position: 'relative', display: 'inline-block', width: '36px', height: '20px', margin: 0 }}>
-                          <input 
-                            type="checkbox" 
-                            checked={isActive} 
-                            onChange={handleToggleStatus}
-                            style={{ opacity: 0, width: 0, height: 0 }}
-                          />
-                          <span className="status-toggle-slider" style={{
-                            position: 'absolute',
-                            cursor: 'pointer',
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                            backgroundColor: isActive ? 'var(--primary, #2F6BFF)' : '#cbd5e1',
-                            transition: '0.3s',
-                            borderRadius: '20px'
-                          }}>
-                            <span className="status-toggle-knob" style={{
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                          <label className="status-toggle-switch" style={{ position: 'relative', display: 'inline-block', width: '36px', height: '20px', margin: 0 }}>
+                            <input 
+                              type="checkbox" 
+                              checked={isActive} 
+                              onChange={handleToggleStatus}
+                              style={{ opacity: 0, width: 0, height: 0 }}
+                            />
+                            <span className="status-toggle-slider" style={{
                               position: 'absolute',
-                              height: '14px',
-                              width: '14px',
-                              left: isActive ? '18px' : '4px',
-                              bottom: '3px',
-                              backgroundColor: 'white',
+                              cursor: 'pointer',
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              bottom: 0,
+                              backgroundColor: isActive ? 'var(--primary, #2F6BFF)' : '#cbd5e1',
                               transition: '0.3s',
-                              borderRadius: '50%'
-                            }} />
-                          </span>
-                        </label>
+                              borderRadius: '20px'
+                            }}>
+                              <span className="status-toggle-knob" style={{
+                                position: 'absolute',
+                                height: '14px',
+                                width: '14px',
+                                left: isActive ? '18px' : '4px',
+                                bottom: '3px',
+                                backgroundColor: 'white',
+                                transition: '0.3s',
+                                borderRadius: '50%'
+                              }} />
+                            </span>
+                          </label>
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              if (window.confirm(`Are you sure you want to permanently delete user "${c.name}"?`)) {
+                                removeCounselor(c.id);
+                              }
+                            }}
+                            title="Delete User"
+                            style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px', display: 'flex' }}
+                          >
+                            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                          </button>
+                        </div>
                       )}
                     </div>
                   );

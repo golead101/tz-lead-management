@@ -24,6 +24,7 @@ export default function GridView() {
     setShowDetailModal,
     updateLeadStage,
     logNote,
+    logCall,
     updateLead,
     deleteLead,
     setWhatsappSubView,
@@ -310,6 +311,26 @@ export default function GridView() {
   };
 
   const [timelineNoteText, setTimelineNoteText] = useState('');
+
+  const [callOutcome, setCallOutcome] = useState('No Answer');
+  const [callNotes, setCallNotes] = useState('');
+  const [scheduleFollowup, setScheduleFollowup] = useState(false);
+  const [followupDate, setFollowupDate] = useState('');
+
+  const handleLogCallSubmit = () => {
+    if (!selectedLeadId) return;
+    logCall(selectedLeadId, {
+      status: callOutcome,
+      notes: callNotes,
+      scheduleFollowup: scheduleFollowup,
+      followupDate: followupDate,
+      updateStage: scheduleFollowup ? 'Follow-up' : ''
+    });
+    setCallNotes('');
+    setScheduleFollowup(false);
+    setFollowupDate('');
+    setCallOutcome('No Answer');
+  };
 
   const handleAddNoteSubmit = () => {
     if (!timelineNoteText.trim() || !selectedLeadId) return;
@@ -954,6 +975,10 @@ export default function GridView() {
         const lead = leads.find(l => l.id === selectedLeadId);
         if (!lead) return null;
         
+        const currentLeadIndex = sortedLeads.findIndex(l => l.id === selectedLeadId);
+        const hasPrev = currentLeadIndex > 0;
+        const hasNext = currentLeadIndex >= 0 && currentLeadIndex < sortedLeads.length - 1;
+        
         // Formatted creation date
         const formattedCreatedDate = lead.createdDate 
           ? new Date(lead.createdDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ', ' + 
@@ -981,6 +1006,44 @@ export default function GridView() {
                 </div>
                 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+
+                  {/* Navigation Buttons */}
+                  {!isEditing && (
+                    <div style={{ display: 'flex', gap: '4px', marginRight: '4px' }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (hasPrev) {
+                            setSelectedLeadId(sortedLeads[currentLeadIndex - 1].id);
+                            setTimelineNoteText('');
+                            setIsEditing(false);
+                          }
+                        }}
+                        disabled={!hasPrev}
+                        className="gv-btn-outline"
+                        style={{ padding: '6px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: !hasPrev ? 0.5 : 1, cursor: !hasPrev ? 'not-allowed' : 'pointer' }}
+                        title="Previous Lead"
+                      >
+                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2.5" fill="none"><path d="M15 18l-6-6 6-6"/></svg>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (hasNext) {
+                            setSelectedLeadId(sortedLeads[currentLeadIndex + 1].id);
+                            setTimelineNoteText('');
+                            setIsEditing(false);
+                          }
+                        }}
+                        disabled={!hasNext}
+                        className="gv-btn-outline"
+                        style={{ padding: '6px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: !hasNext ? 0.5 : 1, cursor: !hasNext ? 'not-allowed' : 'pointer' }}
+                        title="Next Lead"
+                      >
+                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2.5" fill="none"><path d="M9 18l6-6-6-6"/></svg>
+                      </button>
+                    </div>
+                  )}
 
                   {/* Edit Lead Option */}
                   {!isEditing && (
@@ -1274,7 +1337,44 @@ export default function GridView() {
 
                 {/* Right Column: Activity Timeline */}
                 <div style={{ width: '55%', padding: '24px 28px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                  <h4 style={{ margin: '0 0 16px 0', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#475569', letterSpacing: '0.05em' }}>Activity Timeline</h4>
+                  <h4 style={{ margin: '0 0 12px 0', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#475569', letterSpacing: '0.05em' }}>Activity Timeline</h4>
+                  
+                  {/* Add Note/Remark Input */}
+                  <div style={{ padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', marginBottom: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                      <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', color: '#64748b', marginBottom: '4px', display: 'block' }}>Call Outcome</label>
+                        <select className="form-control" value={callOutcome} onChange={(e) => setCallOutcome(e.target.value)} style={{ padding: '8px 12px', fontSize: '13px', height: '36px', width: '100%' }}>
+                          <option value="Answered">Answered</option>
+                          <option value="No Answer">No Answer</option>
+                          <option value="Busy">Busy</option>
+                          <option value="Wrong Number">Wrong Number</option>
+                          <option value="Interested">Interested</option>
+                          <option value="Not Interested">Not Interested</option>
+                          <option value="Call Later">Call Later</option>
+                        </select>
+                      </div>
+                      <div style={{ flex: 2 }}>
+                        <label style={{ fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', color: '#64748b', marginBottom: '4px', display: 'block' }}>Notes</label>
+                        <input type="text" className="form-control" placeholder="Additional remarks..." value={callNotes} onChange={(e) => setCallNotes(e.target.value)} style={{ padding: '8px 12px', fontSize: '13px', height: '36px', width: '100%' }} />
+                      </div>
+                    </div>
+                    
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', cursor: 'pointer', color: '#334155' }}>
+                          <input type="checkbox" checked={scheduleFollowup} onChange={(e) => setScheduleFollowup(e.target.checked)} />
+                          Schedule Follow-up
+                        </label>
+                        {scheduleFollowup && (
+                          <input type="datetime-local" className="form-control" value={followupDate} onChange={(e) => setFollowupDate(e.target.value)} style={{ padding: '4px 8px', fontSize: '12px', height: '28px' }} />
+                        )}
+                      </div>
+                      <button type="button" onClick={handleLogCallSubmit} className="gv-btn-primary" style={{ padding: '0 16px', fontSize: '12px', height: '32px' }}>
+                        Log Activity
+                      </button>
+                    </div>
+                  </div>
                   
                   {/* Timeline stream */}
                   <div style={{ flex: 1, overflowY: 'auto', paddingRight: '4px', display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '0px' }}>
