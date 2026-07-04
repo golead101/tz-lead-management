@@ -353,7 +353,9 @@ export const CRMProvider = ({ children }) => {
         combined.forEach(lead => {
             uniqueLeadsMap.set(lead.id, lead);
         });
-        const uniqueLeads = Array.from(uniqueLeadsMap.values());
+        
+        // Filter out WhatsApp Campaign leads from showing in the CRM list
+        const uniqueLeads = Array.from(uniqueLeadsMap.values()).filter(lead => lead.source !== 'WhatsApp Campaign');
         
         uniqueLeads.sort((a, b) => new Date(b.createdDate) - new Date(a.createdDate));
         setLeads(uniqueLeads);

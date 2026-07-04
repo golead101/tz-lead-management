@@ -1170,7 +1170,14 @@ export default function GridView() {
                           className="form-control"
                           value={editCounselor}
                           onChange={(e) => setEditCounselor(e.target.value)}
-                          style={{ padding: '8px 12px', fontSize: '13px', height: '38px' }}
+                          disabled={activeRole !== 'Admin'}
+                          style={{ 
+                            padding: '8px 12px', 
+                            fontSize: '13px', 
+                            height: '38px',
+                            backgroundColor: activeRole !== 'Admin' ? '#f1f5f9' : undefined,
+                            cursor: activeRole !== 'Admin' ? 'not-allowed' : undefined
+                          }}
                         >
                           <option value="Unassigned">Unassigned</option>
                           {counselors.filter(c => c.status === 'Active').map(c => (
