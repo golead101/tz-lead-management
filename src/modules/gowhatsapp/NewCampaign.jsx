@@ -5,6 +5,8 @@ import {
 import * as XLSX from 'xlsx';
 import { whatsappDb } from './whatsappDb';
 import { useCRM } from '../../context/CRMContext';
+import { storage } from '../../firebase';
+import { ref, uploadBytesResumable, getDownloadURL, listAll } from 'firebase/storage';
 
 const BRAND_BLUE = '#2563eb';
 
@@ -114,6 +116,28 @@ export default function NewCampaign({ setSubView }) {
   const [headerMediaMode, setHeaderMediaMode] = useState('upload');
   const [headerMediaUploading, setHeaderMediaUploading] = useState(false);
   const [headerMediaFileName, setHeaderMediaFileName] = useState('');
+  const [availableMedia, setAvailableMedia] = useState([]);
+  const [loadingMedia, setLoadingMedia] = useState(false);
+
+  // Fetch available media on mount
+  useEffect(() => {
+    const fetchMedia = async () => {
+      setLoadingMedia(true);
+      try {
+        const listRef = ref(storage, 'campaign_media');
+        const res = await listAll(listRef);
+        const mediaList = await Promise.all(res.items.map(async (itemRef) => {
+          const url = await getDownloadURL(itemRef);
+          return { name: itemRef.name, url };
+        }));
+        setAvailableMedia(mediaList);
+      } catch (err) {
+        console.error("Error fetching media from storage", err);
+      }
+      setLoadingMedia(false);
+    };
+    fetchMedia();
+  }, []);
 
   // Preview / Send
   const [previewContacts, setPreviewContacts] = useState([]);
@@ -405,11 +429,30 @@ export default function NewCampaign({ setSubView }) {
     if (!file) return;
 
     setHeaderMediaUploading(true);
-    setTimeout(() => {
-      setHeaderMediaUrl(URL.createObjectURL(file));
-      setHeaderMediaFileName(file.name);
+    try {
+      const storageRef = ref(storage, `campaign_media/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`);
+      const uploadTask = uploadBytesResumable(storageRef, file);
+      
+      uploadTask.on('state_changed', 
+        (snapshot) => {}, 
+        (error) => {
+          console.error("Upload failed", error);
+          alert("Failed to upload image.");
+          setHeaderMediaUploading(false);
+        }, 
+        async () => {
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+          setHeaderMediaUrl(downloadURL);
+          setHeaderMediaFileName(file.name);
+          setHeaderMediaUploading(false);
+          // Add newly uploaded file to availableMedia dropdown instantly
+          setAvailableMedia(prev => [...prev, { name: file.name, url: downloadURL }]);
+        }
+      );
+    } catch (err) {
+      console.error(err);
       setHeaderMediaUploading(false);
-    }, 1000);
+    }
   };
 
   const getMessageForContact = (contact) => {
@@ -915,21 +958,73 @@ export default function NewCampaign({ setSubView }) {
                       <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#92400e', marginBottom: 10 }}>
                         This template requires a {getTemplateHeaderType().toLowerCase()} header *
                       </label>
-                      <input
-                        type="text"
-                        placeholder={`Paste public ${getTemplateHeaderType().toLowerCase()} URL (https://...)`}
-                        value={headerMediaUrl}
-                        onChange={(e) => {
-                          setHeaderMediaUrl(e.target.value);
-                          setHeaderMediaFileName('Media Link Attached');
-                        }}
-                        style={{
-                          width: '100%', padding: '10px 14px', borderRadius: 8,
-                          border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.95rem', boxSizing: 'border-box'
-                        }}
-                      />
-                      <div style={{ fontSize: '0.75rem', color: '#92400e', marginTop: 6 }}>
-                        Note: Meta API requires a public URL (e.g. Imgur, AWS) to deliver media.
+                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        <input
+                          type="text"
+                          placeholder={`Paste public ${getTemplateHeaderType().toLowerCase()} URL (https://...)`}
+                          value={headerMediaUrl}
+                          onChange={(e) => {
+                            setHeaderMediaUrl(e.target.value);
+                            setHeaderMediaFileName('');
+                          }}
+                          style={{
+                            flex: 1, padding: '10px 14px', borderRadius: 8,
+                            border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.95rem', boxSizing: 'border-box'
+                          }}
+                        />
+                        <span style={{ fontSize: '0.85rem', fontWeight: '600', color: '#92400e' }}>OR</span>
+                        <input 
+                          type="file" 
+                          ref={headerMediaInputRef} 
+                          style={{ display: 'none' }} 
+                          accept={getTemplateHeaderType() === 'IMAGE' ? 'image/*' : getTemplateHeaderType() === 'VIDEO' ? 'video/*' : '*/*'}
+                          onChange={handleHeaderMediaUpload} 
+                        />
+                        <button
+                          onClick={() => headerMediaInputRef.current?.click()}
+                          disabled={headerMediaUploading}
+                          style={{
+                            padding: '10px 16px', background: '#d97706', color: '#fff',
+                            border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600,
+                            display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap'
+                          }}
+                        >
+                          {headerMediaUploading ? (
+                            <><Loader2 size={16} className="spinner" /> Uploading...</>
+                          ) : (
+                            <><Upload size={16} /> Upload File</>
+                          )}
+                        </button>
+                      </div>
+
+                      {/* Select existing uploaded file */}
+                      {availableMedia.length > 0 && (
+                        <div style={{ marginTop: 12 }}>
+                          <select
+                            onChange={(e) => {
+                              const selected = availableMedia.find(m => m.url === e.target.value);
+                              if (selected) {
+                                setHeaderMediaUrl(selected.url);
+                                setHeaderMediaFileName(selected.name);
+                              }
+                            }}
+                            value={availableMedia.find(m => m.url === headerMediaUrl)?.url || ''}
+                            style={{
+                              width: '100%', padding: '10px 14px', borderRadius: 8,
+                              border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.90rem',
+                              background: '#fff', cursor: 'pointer'
+                            }}
+                          >
+                            <option value="">Or select an image you uploaded previously...</option>
+                            {availableMedia.map(m => (
+                              <option key={m.url} value={m.url}>{m.name.split('_').slice(1).join('_') || m.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      <div style={{ fontSize: '0.75rem', color: '#92400e', marginTop: 8 }}>
+                        {headerMediaFileName ? `✅ Attached: ${headerMediaFileName}` : "Note: Meta API requires a public URL to deliver media."}
                       </div>
                     </div>
                   )}

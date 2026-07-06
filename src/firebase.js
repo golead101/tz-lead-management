@@ -3,6 +3,7 @@ import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { getFunctions } from "firebase/functions";
 import { getAnalytics } from "firebase/analytics";
+import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -30,4 +31,6 @@ try {
   console.warn("Firebase Analytics initialization skipped or failed: ", err);
 }
 
-export { app, db, auth, functions, analytics };
+const storage = getStorage(app);
+
+export { app, db, auth, functions, analytics, storage };

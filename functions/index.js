@@ -1595,12 +1595,12 @@ exports.sendBulkWhatsAppCampaign = functions.https.onRequest((req, res) => {
               id: `r-${campaignId}-${globalIndex}`,
               name: leadData.name || `Recipient ${globalIndex + 1}`,
               phone: cleanPhone || 'N/A',
-              status: 'delivered',
+              status: 'sent',
               error: null,
               errorCode: null,
               messageId: messageId || `msg-${Date.now()}-${globalIndex}`,
-              deliveredAt: Date.now(),
-              readAt: Date.now() + 100, // mock
+              deliveredAt: null,
+              readAt: null,
               replied: false
             });
 
@@ -1642,8 +1642,8 @@ exports.sendBulkWhatsAppCampaign = functions.https.onRequest((req, res) => {
         totalRecipients: targetContacts.length,
         sent: sentCount,
         failed: failedCount,
-        delivered: sentCount, 
-        read: Math.round(sentCount * 0.95), 
+        delivered: 0, 
+        read: 0, 
         replied: 0,
         type: messageType,
         templateName: selectedTemplate || null,
