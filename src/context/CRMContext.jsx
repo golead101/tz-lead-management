@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
-import { collection, doc, setDoc, deleteDoc, onSnapshot, writeBatch, getDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, onSnapshot, writeBatch, getDoc, getDocs } from 'firebase/firestore';
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
 const CRMContext = createContext();
 
@@ -679,7 +679,7 @@ export const CRMProvider = ({ children }) => {
     }
 
     // New Lead Creation
-    const newLeadId = cleanPhone ? `lead-${cleanPhone}` : `lead-${Date.now()}`;
+    const newLeadId = cleanPhone ? cleanPhone : `lead-${Date.now()}`;
     const newLead = {
       id: newLeadId,
       name: leadData.name || 'Anonymous Inquiry',
@@ -739,8 +739,10 @@ export const CRMProvider = ({ children }) => {
   const addBulkLeads = (leadsArray) => {
     if (!leadsArray || leadsArray.length === 0) return [];
     
-    const newLeads = leadsArray.map((leadData, index) => ({
-      id: `lead-${Date.now()}-${index}`,
+    const newLeads = leadsArray.map((leadData, index) => {
+      const cleanPhone = leadData.phone ? String(leadData.phone).replace(/\D/g, '') : '';
+      return {
+      id: cleanPhone ? cleanPhone : `lead-${Date.now()}-${index}`,
       name: leadData.name || 'Anonymous Inquiry',
       email: leadData.email || '',
       phone: leadData.phone || '',
@@ -765,7 +767,8 @@ export const CRMProvider = ({ children }) => {
         }
       ],
       whatsappMessages: []
-    }));
+    };
+    });
 
     if (isFirebaseEnabled) {
       // Firestore batch size limit is 500

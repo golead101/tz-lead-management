@@ -740,16 +740,8 @@ export default function GridView() {
                   </label>
                 </th>
                 <th className="gv-th-sortable" onClick={() => handleSort('name')}>
-                  <span>Student Name</span>
+                  <span>Name & Contact</span>
                   <span className="gv-sort-icon">{getSortIcon('name')}</span>
-                </th>
-                <th className="gv-th-sortable" onClick={() => handleSort('course')}>
-                  <span>program</span>
-                  <span className="gv-sort-icon">{getSortIcon('course')}</span>
-                </th>
-                <th className="gv-th-sortable" onClick={() => handleSort('phone')}>
-                  <span>phone number</span>
-                  <span className="gv-sort-icon">{getSortIcon('phone')}</span>
                 </th>
                 <th className="gv-th-sortable" onClick={() => handleSort('stage')}>
                   <span>status</span>
@@ -760,11 +752,11 @@ export default function GridView() {
                   <span className="gv-sort-icon">{getSortIcon('source')}</span>
                 </th>
                 <th className="gv-th-sortable" onClick={() => handleSort('counselor')}>
-                  <span>owner</span>
+                  <span>Assigned To</span>
                   <span className="gv-sort-icon">{getSortIcon('counselor')}</span>
                 </th>
                 <th className="gv-th-sortable" onClick={() => handleSort('createdDate')}>
-                  <span>Created</span>
+                  <span>Date</span>
                   <span className="gv-sort-icon">{getSortIcon('createdDate')}</span>
                 </th>
               </tr>
@@ -813,20 +805,9 @@ export default function GridView() {
                           </div>
                           <div className="gv-student-info">
                             <span className="gv-student-name">{lead.name}</span>
+                            <span className="gv-student-meta" style={{ fontFamily: 'monospace', opacity: 0.8 }}>{lead.phone || '-'}</span>
                           </div>
                         </div>
-                      </td>
-
-                      {/* Program */}
-                      <td>
-                        <span className="gv-course-text">{lead.course}</span>
-                      </td>
-
-                      {/* Phone Number */}
-                      <td>
-                        <span className="gv-phone-text" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                          {lead.phone || '-'}
-                        </span>
                       </td>
 
                       {/* Status */}
@@ -853,9 +834,16 @@ export default function GridView() {
                         </div>
                       </td>
 
-                      {/* Created */}
+                      {/* Date */}
                       <td>
-                        <span className="gv-time-text">{getRelativeTime(lead.createdDate)}</span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                            {new Date(lead.createdDate).toLocaleDateString()}
+                          </span>
+                          <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                            {new Date(lead.createdDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
                       </td>
                     </tr>
                   );

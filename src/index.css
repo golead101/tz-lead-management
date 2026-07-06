@@ -1363,11 +1363,11 @@ a {
 
 /* Table Card Container */
 .gv-table-card {
-  background: #ffffff;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.02), 0 4px 12px rgba(0,0,0,0.01);
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  overflow: visible;
+  box-shadow: none;
 }
 
 .gv-table-scroll {
@@ -1378,13 +1378,14 @@ a {
 /* The Table */
 .gv-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0 12px;
   text-align: left;
 }
 
 .gv-table thead tr {
-  background: rgba(248, 249, 250, 0.8);
-  border-bottom: 2px solid rgba(0, 0, 0, 0.05);
+  background: transparent;
+  border-bottom: none;
 }
 
 .gv-table th {
@@ -1429,33 +1430,50 @@ a {
 }
 
 .gv-table td {
-  padding: 14px 16px;
-  border-bottom: 1px solid rgba(0,0,0,0.04);
+  padding: 16px 16px;
   font-size: 13px;
   vertical-align: middle;
   color: var(--text-primary);
-  transition: background-color var(--transition-fast);
+  background: #ffffff;
+  border-top: 1px solid var(--glass-border);
+  border-bottom: 1px solid var(--glass-border);
+  transition: all var(--transition-fast);
+}
+
+.gv-table td:first-child {
+  border-left: 1px solid var(--glass-border);
+  border-top-left-radius: 12px;
+  border-bottom-left-radius: 12px;
+}
+
+.gv-table td:last-child {
+  border-right: 1px solid var(--glass-border);
+  border-top-right-radius: 12px;
+  border-bottom-right-radius: 12px;
 }
 
 .gv-table tbody tr {
   cursor: pointer;
-  transition: background-color var(--transition-fast);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.02);
 }
 
 .gv-table tbody tr:hover {
-  background-color: rgba(0, 0, 0, 0.015);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.06);
 }
 
 .gv-table tbody tr:hover td {
-  border-bottom-color: transparent;
+  border-color: rgba(0,0,0,0.1);
 }
 
-.gv-table tbody tr.gv-row-selected {
-  background-color: rgba(239, 68, 68, 0.03);
+.gv-table tbody tr.gv-row-selected td {
+  background-color: rgba(239, 68, 68, 0.02);
+  border-color: rgba(239, 68, 68, 0.15);
 }
 
-.gv-table tbody tr.gv-row-overdue {
-  border-left: 3px solid #ef4444;
+.gv-table tbody tr.gv-row-overdue td:first-child {
+  border-left: 4px solid #ef4444;
 }
 
 /* Custom Checkbox */

@@ -1190,7 +1190,7 @@ exports.whatsappWebhook = functions.https.onRequest((req, res) => {
               formattedPhone = `+${senderPhoneRaw}`;
             }
 
-            const newLeadId = `lead-wa-inbound-${Date.now()}`;
+            const newLeadId = cleanedSenderPhone || `lead-wa-inbound-${Date.now()}`;
             const newLead = {
               id: newLeadId,
               name: senderName,
@@ -1517,7 +1517,7 @@ exports.sendBulkWhatsAppCampaign = functions.https.onRequest((req, res) => {
               leadData = snapshot.docs[0].data();
             } else {
               // Create lead
-              leadId = `lead-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+              leadId = cleanPhone || `lead-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
               leadData = {
                 name: contact.name || contact.Name || 'Campaign Contact',
                 phone: phone,
