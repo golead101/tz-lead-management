@@ -692,6 +692,7 @@ export const CRMProvider = ({ children }) => {
       subSource: leadData.subSource || '',
       counselor: leadData.counselor || activeUser,
       stage: leadData.stage || 'New Lead',
+      temperature: leadData.temperature || 'Warm',
       createdDate: new Date().toISOString(),
       lastContacted: new Date().toISOString(),
       customFields: leadData.customFields || {},

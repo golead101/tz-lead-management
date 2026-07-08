@@ -55,6 +55,7 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
   const [formEducation, setFormEducation] = useState(lead ? lead.education : '');
   const [formCourse, setFormCourse] = useState(lead ? lead.course : courses[0]?.name || '');
   const [formSource, setFormSource] = useState(lead ? lead.source : 'Walk-in');
+  const [formTemperature, setFormTemperature] = useState(lead ? (lead.temperature || 'Warm') : 'Warm');
 
   // Dynamic list of unique sub-sources for walk-in leads
   const [localSubSources, setLocalSubSources] = useState([]);
@@ -153,6 +154,7 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
       setFormEducation(lead.education);
       setFormCourse(lead.course);
       setFormSource(lead.source);
+      setFormTemperature(lead.temperature || 'Warm');
       setFormSubSource(lead.subSource || 'Walk-in');
       setCustomSubSource('');
       setFormCounselor(lead.counselor);
@@ -167,6 +169,7 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
       setFormEducation('');
       setFormCourse(courses[0]?.name || '');
       setFormSource('Walk-in');
+      setFormTemperature('Warm');
       setFormSubSource('Walk-in');
       setCustomSubSource('');
       setFormCounselor(activeRole === 'Counselor' ? activeUser : (counselors.filter(c => c.status === 'Active' && c.role !== 'Admin' && c.name.toLowerCase() !== 'admin')[0]?.name || activeUser));
@@ -193,6 +196,7 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
       subSource: isWalkin ? (finalSubSource || 'Walk-in') : (lead?.subSource || ''),
       counselor: formCounselor,
       stage: formStage,
+      temperature: formTemperature,
       customFields: formCustomFields
     };
 
@@ -303,6 +307,18 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
                   <span className={`status-badge status-${lead.stage.toLowerCase().replace(/ /g, '-')}`}>
                     {lead.stage}
                   </span>
+                  {lead.temperature && lead.temperature !== 'Unassigned' && (
+                    <span style={{ 
+                      display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 8px', 
+                      borderRadius: '4px', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase',
+                      background: lead.temperature === 'Hot' ? '#fef2f2' : lead.temperature === 'Cold' ? '#f0f9ff' : '#fefce8',
+                      color: lead.temperature === 'Hot' ? '#ef4444' : lead.temperature === 'Cold' ? '#0ea5e9' : '#eab308',
+                      border: `1px solid ${lead.temperature === 'Hot' ? '#fecaca' : lead.temperature === 'Cold' ? '#bae6fd' : '#fef08a'}`,
+                      marginLeft: '6px'
+                    }}>
+                      {lead.temperature === 'Hot' ? '🔥' : lead.temperature === 'Cold' ? '❄️' : '☀️'} {lead.temperature}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -502,6 +518,19 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
                   onChange={(e) => setFormCourse(e.target.value)}
                 >
                   {courses.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Lead Temperature</label>
+                <select
+                  className="form-control"
+                  value={formTemperature}
+                  onChange={(e) => setFormTemperature(e.target.value)}
+                >
+                  <option value="Hot">🔥 Hot</option>
+                  <option value="Warm">☀️ Warm</option>
+                  <option value="Cold">❄️ Cold</option>
                 </select>
               </div>
 

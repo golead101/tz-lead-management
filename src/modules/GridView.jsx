@@ -36,6 +36,7 @@ export default function GridView() {
   const [selectedStage, setSelectedStage] = useState('All');
   const [selectedCounselor, setSelectedCounselor] = useState('All');
   const [selectedSource, setSelectedSource] = useState('All');
+  const [selectedTemperature, setSelectedTemperature] = useState('All');
 
   const [dateRangeFilter, setDateRangeFilter] = useState('All Time');
   const [customStartDate, setCustomStartDate] = useState('');
@@ -81,6 +82,7 @@ export default function GridView() {
     }
     if (selectedCourse !== 'All' && lead.course !== selectedCourse) return false;
     if (selectedStage !== 'All' && lead.stage !== selectedStage) return false;
+    if (selectedTemperature !== 'All' && (lead.temperature || 'Warm') !== selectedTemperature) return false;
     if (selectedCounselor !== 'All' && lead.counselor !== selectedCounselor) return false;
     if (selectedSource !== 'All') {
       const srcLower = (lead.source || '').toLowerCase();
@@ -554,6 +556,22 @@ export default function GridView() {
             ))}
           </select>
         </div>
+        <div className="gv-filter-group">
+          <label className="gv-filter-label">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" strokeLinecap="round"/><circle cx="12" cy="12" r="4"/></svg>
+            Temperature
+          </label>
+          <select
+            value={selectedTemperature}
+            onChange={(e) => { setSelectedTemperature(e.target.value); setCurrentPage(1); }}
+            className="gv-filter-select"
+          >
+            <option value="All">All Leads</option>
+            <option value="Hot">🔥 Hot Leads</option>
+            <option value="Warm">☀️ Warm Leads</option>
+            <option value="Cold">❄️ Cold Leads</option>
+          </select>
+        </div>
 
         {activeRole !== 'Counselor' && (
           <div className="gv-filter-group">
@@ -804,7 +822,17 @@ export default function GridView() {
                             {getInitials(lead.name)}
                           </div>
                           <div className="gv-student-info">
-                            <span className="gv-student-name">{lead.name}</span>
+                            <span className="gv-student-name">
+                              {lead.name}
+                              {lead.temperature && lead.temperature !== 'Unassigned' && (
+                                <span style={{
+                                  display: 'inline-flex', alignItems: 'center', marginLeft: '6px', fontSize: '10px', fontWeight: 'bold',
+                                  color: lead.temperature === 'Hot' ? '#ef4444' : lead.temperature === 'Cold' ? '#0ea5e9' : '#eab308'
+                                }} title={`${lead.temperature} Lead`}>
+                                  {lead.temperature === 'Hot' ? '🔥' : lead.temperature === 'Cold' ? '❄️' : '☀️'}
+                                </span>
+                              )}
+                            </span>
                             <span className="gv-student-meta" style={{ fontFamily: 'monospace', opacity: 0.8 }}>{lead.phone || '-'}</span>
                           </div>
                         </div>
