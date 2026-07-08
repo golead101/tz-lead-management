@@ -1670,3 +1670,77 @@ exports.sendBulkWhatsAppCampaign = functions.https.onRequest((req, res) => {
     }
   });
 });
+
+/**
+ * onLeadCreated
+ * Triggered automatically when a new lead is added to Firestore.
+ * Sends the 'thanks' template to the new lead via WhatsApp Cloud API.
+ */
+exports.onLeadCreated = functions.firestore
+  .document('leads/{leadId}')
+  .onCreate(async (snap, context) => {
+    const newLead = snap.data();
+    const leadId = context.params.leadId;
+
+    if (!newLead.phone) {
+      console.log(`[onLeadCreated] No phone number for lead ${leadId}. Skipping auto-reply.`);
+      return null;
+    }
+
+    try {
+      // 1. Load WhatsApp Config
+      const creds = await getDecryptedWhatsAppCredentials();
+      if (!creds.enabled || !creds.phoneNumberId || !creds.accessToken) {
+        console.log('[onLeadCreated] WhatsApp Integration not setup. Skipping auto-reply.');
+        return null;
+      }
+
+      // 2. Format phone number
+      let cleanPhone = newLead.phone.replace(/[^0-9]/g, '').trim();
+      if (cleanPhone.length === 10) cleanPhone = '91' + cleanPhone;
+      if (cleanPhone.startsWith('00')) cleanPhone = cleanPhone.substring(2);
+
+      // 3. Build Template Payload using the user's template
+      const payload = {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: cleanPhone,
+        type: 'template',
+        template: {
+          name: 'thanks',
+          language: { code: 'en' }
+        }
+      };
+
+      const url = `https://graph.facebook.com/${creds.apiVersion}/${creds.phoneNumberId}/messages`;
+
+      // 4. Send API Request
+      const response = await axios.post(url, payload, {
+        headers: {
+          'Authorization': `Bearer ${creds.accessToken.trim()}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      // 5. Update timeline in the CRM for this lead
+      const messageId = response.data.messages?.[0]?.id || `msg-sent-${Date.now()}`;
+      const outboundMsg = {
+        id: messageId,
+        type: 'whatsapp',
+        title: 'Auto-Reply Sent',
+        content: `Sent 'thanks' welcome template via automation.`,
+        user: 'System Automation',
+        timestamp: new Date().toISOString()
+      };
+
+      await db.collection('leads').doc(leadId).update({
+        timeline: admin.firestore.FieldValue.arrayUnion(outboundMsg),
+        lastAction: 'Welcome Template Sent',
+        lastActionDate: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+    } catch (error) {
+      console.error(`[onLeadCreated] Error:`, error.response?.data || error.message);
+    }
+    return null;
+  });

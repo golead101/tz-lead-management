@@ -532,8 +532,8 @@ export default function GridView() {
             className="gv-filter-select"
           >
             <option value="All">All Programs</option>
-            {courses.map(c => (
-              <option key={c.id} value={c.name}>{c.code} — {c.name}</option>
+            {courses.map((c, index) => (
+              <option key={`${c.id}-${index}`} value={c.name}>{c.code} — {c.name}</option>
             ))}
           </select>
         </div>
@@ -567,8 +567,8 @@ export default function GridView() {
               className="gv-filter-select"
             >
               <option key="all" value="All">All Counselors</option>
-              {counselors.map(c => (
-                <option key={c.id} value={c.name}>
+              {counselors.map((c, index) => (
+                <option key={`${c.id}-${index}`} value={c.name}>
                   {c.name} {c.status === 'Deactivated' ? '(Deactivated)' : ''}
                 </option>
               ))}

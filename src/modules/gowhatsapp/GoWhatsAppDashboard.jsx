@@ -591,7 +591,7 @@ export default function GoWhatsAppDashboard({ setSubView, navigateToReport }) {
                     {idx === 2 ? `₹${totalValue.toFixed(2)}` : totalValue}
                   </div>
                   <div style={{ height: 60 }}>
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={1}>
                       <AreaChart data={chartData}>
                         <Area type="monotone" dataKey="value" stroke={CHART_PAL[idx % CHART_PAL.length]} fill={`${CHART_PAL[idx % CHART_PAL.length]}20`} />
                       </AreaChart>
@@ -630,7 +630,7 @@ export default function GoWhatsAppDashboard({ setSubView, navigateToReport }) {
       {/* Row 4: Daily Volume Chart */}
       <Section title="Message Volume" subtitle="Daily inbound and outbound trends">
         <div style={{ height: 264 }}>
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" minWidth={1}>
             <AreaChart data={dailyVolume}>
               <defs>
                 <linearGradient id="outG" x1="0" y1="0" x2="0" y2="1">
@@ -661,7 +661,7 @@ export default function GoWhatsAppDashboard({ setSubView, navigateToReport }) {
         <Section title="Campaign Performance" subtitle="Delivery and reads metrics comparison">
           <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 20 }}>
             <div style={{ height: 264 }}>
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={1}>
                 <BarChart data={campaignPerformance} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                   <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} />
@@ -704,7 +704,7 @@ export default function GoWhatsAppDashboard({ setSubView, navigateToReport }) {
         {/* Message Types */}
         <Section title="Message Types" subtitle="Content format distributions">
           <div style={{ display: 'flex', alignItems: 'center', height: 200 }}>
-            <ResponsiveContainer width="50%" height="100%">
+            <ResponsiveContainer width="50%" height="100%" minWidth={1}>
               <PieChart>
                 <Pie data={messageTypeData} cx="50%" cy="50%" innerRadius={40} outerRadius={65} dataKey="value">
                   {messageTypeData.map((e, i) => <Cell key={i} fill={e.fill} />)}

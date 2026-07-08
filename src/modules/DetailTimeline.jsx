@@ -795,11 +795,11 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
                 </div>
 
                 <div className="timeline-stream">
-                  {filteredTimeline.slice().reverse().map(node => {
+                  {filteredTimeline.slice().reverse().map((node, index) => {
                     const isCollapsed = collapsedNodeIds.includes(node.id);
                     return (
                       <div
-                        key={node.id}
+                        key={`${node.id}-${index}`}
                         className={`timeline-node node-${node.type} timeline-node-collapsible`}
                         onClick={() => toggleNodeCollapse(node.id)}
                       >
