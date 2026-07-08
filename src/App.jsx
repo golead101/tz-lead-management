@@ -44,9 +44,10 @@ function ShimmerLoader() {
 }
 
 function MainAppContent() {
-  const { activeView, isLoggedIn, activeRole, setActiveView } = useCRM();
+  const { activeView, isLoggedIn, activeRole, setActiveView, branding } = useCRM();
   const [isNavigating, setIsNavigating] = useState(false);
   const [navigatedView, setNavigatedView] = useState(activeView);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Trigger quick shimmer loading state when swapping tabs or when role changes and view needs redirection
   useEffect(() => {
@@ -66,6 +67,7 @@ function MainAppContent() {
     }
 
     setIsNavigating(true);
+    setMobileMenuOpen(false); // Close mobile menu on navigate
     const timer = setTimeout(() => {
       setNavigatedView(activeView);
       setIsNavigating(false);
@@ -111,18 +113,52 @@ function MainAppContent() {
 
   return (
     <div className="app-container">
+      {/* Mobile Top Header */}
+      <div className="mobile-top-header">
+        <div className="mobile-logo-container">
+          {branding?.logoUrl ? (
+            <img src={branding.logoUrl} alt={branding.instituteName || 'Logo'} className="brand-logo-img" style={{ height: '32px' }} />
+          ) : (
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ color: 'var(--sidebar-active-bg, #2F6BFF)' }}>
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            </svg>
+          )}
+          <span className="mobile-brand-name">
+            {branding?.instituteName === 'TechZone Academy' ? (
+              <>TechZone <span>Academy</span></>
+            ) : branding?.instituteName === 'LeadCRM' ? (
+              <>Lead<span>CRM</span></>
+            ) : (
+              branding?.instituteName || 'Leads'
+            )}
+          </span>
+        </div>
+        <button className="mobile-hamburger-btn" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
       {/* Visual Navigation Sidebar */}
-      <Sidebar />
+      <Sidebar mobileMenuOpen={mobileMenuOpen} setMobileMenuOpen={setMobileMenuOpen} />
 
       {/* Core main dashboard panel */}
       <div className="main-wrapper" style={activeView === 'gowhatsapp' ? { padding: 0 } : {}}>
         {/* Responsive Scrolling Canvas */}
-        <main className="content-area" style={activeView === 'gowhatsapp' ? { padding: 0 } : {}}>
-          <div className="fade-in" style={activeView === 'gowhatsapp' ? { height: '100%' } : {}}>
+        <main className="content-area" style={activeView === 'gowhatsapp' ? { padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' } : {}}>
+          <div className="fade-in" style={activeView === 'gowhatsapp' ? { height: '100%', display: 'flex', flexDirection: 'column', flex: 1 } : {}}>
             {renderView()}
           </div>
         </main>
       </div>
+
+      {/* Mobile Sidebar Overlay */}
+      {mobileMenuOpen && (
+        <div className="mobile-sidebar-overlay" onClick={() => setMobileMenuOpen(false)}></div>
+      )}
     </div>
   );
 }

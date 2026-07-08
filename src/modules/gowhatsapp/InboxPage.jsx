@@ -130,9 +130,9 @@ export default function InboxPage() {
   const selectedConvo = conversations.find(c => c.id === selectedLeadId);
   const messages = selectedConvo?.lead?.whatsappMessages || [];
 
-  // Automatically select first contact if none is active and there are contacts
+  // Automatically select first contact if none is active and there are contacts (desktop only)
   useEffect(() => {
-    if (!selectedLeadId && conversations.length > 0) {
+    if (!selectedLeadId && conversations.length > 0 && window.innerWidth > 768) {
       setSelectedLeadId(conversations[0].id);
     }
   }, [selectedLeadId, conversations]);
@@ -183,7 +183,7 @@ export default function InboxPage() {
   });
 
   return (
-    <div className="whatsapp-inbox-container" style={{ height: '100%', overflow: 'hidden' }}>
+    <div className={`whatsapp-inbox-container ${selectedLeadId ? 'mobile-chat-open' : ''}`} style={{ height: '100%', overflow: 'hidden' }}>
       {/* Sidebar (Left) */}
       <div className="whatsapp-sidebar">
         {/* Search */}
@@ -289,9 +289,22 @@ export default function InboxPage() {
         {selectedLeadId ? (
           <>
             {/* Header */}
-            <div className="whatsapp-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{
+            <div className="whatsapp-header chat-active-header">
+              <div className="chat-header-info" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                {/* Mobile Back Button */}
+                <button 
+                  className="mobile-back-btn"
+                  onClick={() => setSelectedLeadId(null)}
+                  style={{
+                    background: 'none', border: 'none', padding: '4px', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#54656f'
+                  }}
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                  </svg>
+                </button>
+                <div className="chat-header-avatar" style={{
                   width: 40, height: 40, borderRadius: '50%', background: '#dfe5e7',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
@@ -299,9 +312,9 @@ export default function InboxPage() {
                     {(selectedConvo?.contactName || selectedConvo?.phone || 'C').charAt(0).toUpperCase()}
                   </span>
                 </div>
-                <div>
-                  <div style={{ fontWeight: 500, fontSize: '15px', color: '#0f172a' }}>{selectedConvo?.contactName || formatPhone(selectedConvo?.phone)}</div>
-                  <div style={{ fontSize: '12px', color: '#667781' }}>{formatPhone(selectedConvo?.phone)}</div>
+                <div className="chat-header-text">
+                  <div className="chat-header-name" style={{ fontWeight: 500, fontSize: '15px', color: '#0f172a' }}>{selectedConvo?.contactName || formatPhone(selectedConvo?.phone)}</div>
+                  <div className="chat-header-phone" style={{ fontSize: '12px', color: '#667781' }}>{formatPhone(selectedConvo?.phone)}</div>
                 </div>
               </div>
             </div>
@@ -331,9 +344,10 @@ export default function InboxPage() {
             </div>
 
             {/* Reply Input Bar */}
-            <div style={{ background: '#f0f2f5', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-              <Paperclip size={22} color="#54656f" style={{ cursor: 'pointer' }} />
+            <div className="chat-input-bar" style={{ background: '#f0f2f5', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <Paperclip className="chat-clip-icon" size={22} color="#54656f" style={{ cursor: 'pointer' }} />
               <input
+                className="chat-input-field"
                 type="text"
                 placeholder="Type a message"
                 value={replyText}
@@ -345,11 +359,12 @@ export default function InboxPage() {
                 }}
               />
               <button
+                className="chat-send-btn"
                 onClick={handleSendReply}
                 disabled={sending}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'grid', placeItems: 'center' }}
               >
-                <Send size={24} color={replyText.trim() ? BRAND_BLUE : '#54656f'} />
+                <Send size={22} color={replyText.trim() ? BRAND_BLUE : '#94a3b8'} />
               </button>
             </div>
           </>

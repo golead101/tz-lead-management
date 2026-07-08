@@ -1,5 +1,5 @@
 .gowhatsapp-scope {
-  height: 100vh;
+  height: 100%;
   overflow: hidden;
   color-scheme: light;
   --color-page: #ffffff;
@@ -379,6 +379,8 @@
   flex-direction: column;
   background: #efeae2; /* WhatsApp classic chat bg */
   position: relative;
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* Bubbles */
@@ -471,4 +473,92 @@
   justify-content: space-between;
   border-bottom: 1px solid #e9edef;
   z-index: 10;
+}
+
+/* Desktop back button default hidden */
+.gowhatsapp-scope .mobile-back-btn {
+  display: none !important;
+}
+
+@media (max-width: 768px) {
+  .gowhatsapp-scope .whatsapp-inbox-container {
+    height: 100% !important;
+    flex-direction: column !important;
+    background: #fff;
+  }
+  
+  /* Show Back button on mobile */
+  .gowhatsapp-scope .mobile-back-btn {
+    display: flex !important;
+  }
+  
+  /* When chat is NOT open */
+  .gowhatsapp-scope .whatsapp-inbox-container:not(.mobile-chat-open) .whatsapp-sidebar {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    border-right: none !important;
+  }
+  
+  .gowhatsapp-scope .whatsapp-inbox-container:not(.mobile-chat-open) .whatsapp-chat-area {
+    display: none !important;
+  }
+  
+  /* When chat IS open */
+  .gowhatsapp-scope .whatsapp-inbox-container.mobile-chat-open .whatsapp-sidebar {
+    display: none !important;
+  }
+  
+  .gowhatsapp-scope .whatsapp-inbox-container.mobile-chat-open .whatsapp-chat-area {
+    width: 100% !important;
+    height: 100% !important;
+    display: flex !important;
+  }
+  
+  /* Make the chat area elements smaller for mobile */
+  .gowhatsapp-scope .chat-active-header {
+    height: 50px !important;
+    padding: 6px 12px !important;
+  }
+  
+  .gowhatsapp-scope .chat-header-avatar {
+    width: 34px !important;
+    height: 34px !important;
+  }
+  
+  .gowhatsapp-scope .chat-header-name {
+    font-size: 14px !important;
+  }
+  
+  .gowhatsapp-scope .chat-header-phone {
+    font-size: 11px !important;
+  }
+  
+  .gowhatsapp-scope .chat-input-bar {
+    padding: 6px 10px !important;
+    gap: 8px !important;
+  }
+  
+  .gowhatsapp-scope .chat-input-field {
+    padding: 8px 12px !important;
+    font-size: 13.5px !important;
+  }
+  
+  .gowhatsapp-scope .chat-clip-icon,
+  .gowhatsapp-scope .chat-send-btn svg {
+    width: 20px !important;
+    height: 20px !important;
+  }
+  
+  .gowhatsapp-scope .message-bubble {
+    font-size: 13px !important;
+    line-height: 17px !important;
+    padding: 5px 8px 6px !important;
+    max-width: 80% !important;
+  }
+  
+  .gowhatsapp-scope .message-time {
+    font-size: 10px !important;
+  }
 }

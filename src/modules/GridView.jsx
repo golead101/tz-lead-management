@@ -1010,10 +1010,10 @@ export default function GridView() {
             <div className="lead-detail-modal-content" style={{ maxWidth: '960px', width: '92%', height: '88vh', maxHeight: '720px', padding: '0px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={(e) => e.stopPropagation()}>
               
               {/* Modal Header */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '24px 28px 16px 28px', borderBottom: '1px solid #f1f5f9' }}>
+              <div className="gv-modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '24px 28px 16px 28px', borderBottom: '1px solid #f1f5f9' }}>
                 <div>
                   <h3 style={{ margin: '0 0 6px 0', fontSize: '24px', fontWeight: '800', color: '#0f172a' }}>{lead.name}</h3>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '13px', color: '#64748b', fontWeight: '500' }}>
+                  <div className="gv-modal-meta" style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '13px', color: '#64748b', fontWeight: '500' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
                       {lead.phone}
@@ -1025,7 +1025,7 @@ export default function GridView() {
                   </div>
                 </div>
                 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div className="gv-modal-actions" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
 
                   {/* Navigation Buttons */}
                   {!isEditing && (
@@ -1113,9 +1113,9 @@ export default function GridView() {
 
 
               {/* Modal Body Columns */}
-              <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+              <div className="gv-modal-body" style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
                 {/* Left Column: Status, Agent, Complete Information */}
-                <div style={{ width: '45%', padding: '24px 28px', borderRight: '1px solid #f1f5f9', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div className="gv-modal-left" style={{ width: '45%', padding: '24px 28px', borderRight: '1px solid #f1f5f9', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
                   {isEditing ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                       <h4 style={{ margin: '0', fontSize: '14px', fontWeight: '750', color: '#0f172a' }}>Edit Lead Information</h4>
@@ -1347,7 +1347,7 @@ export default function GridView() {
 
 
                 {/* Right Column: Activity Timeline */}
-                <div style={{ width: '55%', padding: '24px 28px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                <div className="gv-modal-right" style={{ width: '55%', padding: '24px 28px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                   <h4 style={{ margin: '0 0 12px 0', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#475569', letterSpacing: '0.05em' }}>Activity Timeline</h4>
                   
                   {/* Add Note/Remark Input */}
@@ -1388,7 +1388,7 @@ export default function GridView() {
                   </div>
                   
                   {/* Timeline stream */}
-                  <div style={{ flex: 1, overflowY: 'auto', paddingRight: '4px', display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '0px' }}>
+                  <div className="gv-timeline-stream" style={{ flex: 1, overflowY: 'auto', paddingRight: '4px', display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '0px' }}>
                     {(() => {
                       const timelineNodes = [...(lead.timeline || [])].reverse();
                       if (timelineNodes.length === 0) {

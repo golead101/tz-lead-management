@@ -43,7 +43,7 @@ const GoWhatsAppLayout = ({ children, subView, setSubView }) => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%' }}>
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', width: '100%' }}>
-        <div style={{ flex: 1, padding: subView === 'inbox' ? 0 : '24px', height: '100%', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ flex: 1, padding: subView === 'inbox' ? 0 : '24px', height: '100%', overflowY: subView === 'inbox' ? 'hidden' : 'auto', display: 'flex', flexDirection: 'column' }}>
           {children}
         </div>
       </main>
