@@ -62,25 +62,6 @@ export default function ContactsPage() {
       setLoading(false);
     }
   };
-
-  const importContactsAsCRMLeads = (contactsList, sourceName) => {
-    contactsList.forEach(contact => {
-      let phone = String(contact.phone || contact.Phone || '').trim();
-      if (!phone) return;
-      const cleanPhone = phone.replace(/\D/g, '');
-      const existing = leads.find(l => l.phone && l.phone.replace(/\D/g, '') === cleanPhone);
-      if (!existing) {
-        addLead({
-          name: contact.name || contact.Name || 'Campaign Contact',
-          phone: phone,
-          course: contact.course || contact.Course || '',
-          source: 'WhatsApp Upload',
-          subSource: sourceName
-        });
-      }
-    });
-  };
-
   const handleFileUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -124,8 +105,7 @@ export default function ContactsPage() {
         allContacts[listId] = jsonData.map((c, i) => ({ id: `c-${Date.now()}-${i}`, ...c }));
         whatsappDb.saveContacts(allContacts);
 
-        // Import into active leads
-        importContactsAsCRMLeads(jsonData, listName);
+        // Did not import into active leads by request
 
         setLists(updatedLists);
         alert(`Successfully uploaded "${listName}" with ${jsonData.length} contacts.`);
@@ -172,8 +152,7 @@ export default function ContactsPage() {
       whatsappDb.saveContactLists(updatedLists);
       whatsappDb.saveContacts(allContacts);
 
-      // Import into active leads
-      importContactsAsCRMLeads(validRows, listName);
+      // Did not import into active leads by request
 
       setLists(updatedLists);
       setCreatingManual(false);

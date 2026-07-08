@@ -1563,6 +1563,21 @@ export const CRMProvider = ({ children }) => {
     showToastMsg(`Bulk shifted ${leadIds.length} inquiries to ${nextStage}`);
   };
 
+  // Bulk Delete
+  const bulkDeleteLeads = (leadIds) => {
+    if (isFirebaseEnabled) {
+      const batch = writeBatch(db);
+      leadIds.forEach(id => {
+        batch.delete(doc(db, 'leads', id));
+      });
+      batch.commit().catch(err => {
+        console.error("Firestore bulkDeleteLeads failed, falling back to local update:", err);
+      });
+    }
+    setLeads(prev => prev.filter(l => !leadIds.includes(l.id)));
+    showToastMsg(`Bulk deleted ${leadIds.length} leads successfully`);
+  };
+
   // Custom Field Adder
   const addCustomField = (field) => {
     const newField = {
@@ -1808,6 +1823,7 @@ export const CRMProvider = ({ children }) => {
       sendWhatsAppMsg,
       bulkReassignLeads,
       bulkUpdateStage,
+      bulkDeleteLeads,
       addCustomField,
       addCourse,
       addStage,
