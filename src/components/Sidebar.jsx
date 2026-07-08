@@ -231,10 +231,7 @@ export default function Sidebar({ mobileMenuOpen, setMobileMenuOpen }) {
       <nav className="navigation-menu">
         {menuItems.map(item => {
           // Role-based tab exclusions
-          if (activeRole === 'Counselor' && (item.id === 'settings' || item.id === 'reports' || item.id === 'history' || item.id === 'integrations')) {
-            return null;
-          }
-          if (activeRole === 'Admin' && item.id === 'history') {
+          if (activeRole === 'Counselor' && (item.id === 'settings' || item.id === 'reports' || item.id === 'integrations')) {
             return null;
           }
           if ((activeRole === 'Manager' || activeRole === 'Telecaller') && (item.id === 'settings' || item.id === 'reports' || item.id === 'integrations')) {
@@ -289,7 +286,7 @@ export default function Sidebar({ mobileMenuOpen, setMobileMenuOpen }) {
                       { subTarget: 'history', label: 'Activity History' }
                     ].map(sub => {
                       if (sub.subTarget === 'history') {
-                        if (activeRole === 'Counselor' || activeRole === 'Admin' || activeRole === 'Telecaller') return null;
+                        if (activeRole === 'Telecaller') return null;
                       }
 
                       const isSubActive = activeView === sub.subTarget;
