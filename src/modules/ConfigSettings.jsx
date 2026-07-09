@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useCRM } from '../context/CRMContext';
-import { functions } from '../firebase';
+import { db, functions } from '../firebase';
 import { httpsCallable } from 'firebase/functions';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { QRCodeCanvas } from 'qrcode.react';
 
 export default function ConfigSettings() {
   const {
@@ -23,6 +25,65 @@ export default function ConfigSettings() {
 
   // Switch tabs
   const [activeTab, setActiveTab] = useState('branding');
+
+  // QR Form Settings
+  const [qrQualifications, setQrQualifications] = useState('10th Pass, 12th Pass, Undergraduate, Postgraduate, Other');
+  const [qrTimings, setQrTimings] = useState('Morning (9 AM - 11 AM), Afternoon (2 PM - 4 PM), Evening (6 PM - 8 PM), Weekend Batches');
+  const [qrSources, setQrSources] = useState('Instagram, Facebook, Google Search, Friend/Referral, Walk-in/Poster, Other');
+  const [isSavingQr, setIsSavingQr] = useState(false);
+
+  useEffect(() => {
+    const fetchQrConfig = async () => {
+      try {
+        const docRef = doc(db, 'settings', 'qr_form');
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data.qualifications) setQrQualifications(data.qualifications.join(', '));
+          if (data.timings) setQrTimings(data.timings.join(', '));
+          if (data.sources) setQrSources(data.sources.join(', '));
+        }
+      } catch (err) {
+        console.error("Error fetching QR config:", err);
+      }
+    };
+    if (activeRole === 'Admin') {
+      fetchQrConfig();
+    }
+  }, [activeRole]);
+
+  const handleSaveQrConfig = async (e) => {
+    e.preventDefault();
+    setIsSavingQr(true);
+    try {
+      await setDoc(doc(db, 'settings', 'qr_form'), {
+        qualifications: qrQualifications.split(',').map(s => s.trim()).filter(Boolean),
+        timings: qrTimings.split(',').map(s => s.trim()).filter(Boolean),
+        sources: qrSources.split(',').map(s => s.trim()).filter(Boolean)
+      }, { merge: true });
+      alert('QR Form Configuration Saved!');
+    } catch (err) {
+      console.error("Error saving QR config:", err);
+      alert('Failed to save QR configuration.');
+    } finally {
+      setIsSavingQr(false);
+    }
+  };
+
+  const qrRef = useRef(null);
+  const qrUrl = window.location.origin + '/qr-form';
+
+  const downloadQR = () => {
+    const canvas = qrRef.current.querySelector('canvas');
+    if (!canvas) return;
+    const pngUrl = canvas.toDataURL("image/png").replace("image/png", "image/octet-stream");
+    let downloadLink = document.createElement("a");
+    downloadLink.href = pngUrl;
+    downloadLink.download = "LeadCRM_Enquire_QR.png";
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+  };
 
   // Customizer States
   const [instName, setInstName] = useState(branding.instituteName);
@@ -297,10 +358,110 @@ export default function ConfigSettings() {
         >
           User Management
         </button>
+        <button 
+          className={`settings-tab-btn ${activeTab === 'qrform' ? 'active' : ''}`}
+          onClick={() => setActiveTab('qrform')}
+        >
+          QR Form Settings
+        </button>
       </div>
 
       {/* Tab Panes */}
       <div className="content-panel">
+
+        {/* QR Form Customizer */}
+        {activeTab === 'qrform' && (
+          <div className="settings-pane active sandbox-split">
+            {/* Left Side: Form Options */}
+            <div className="dashboard-panel">
+              <h3 className="panel-title mb-4">QR Enquire Form Dropdowns</h3>
+              <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '24px' }}>
+                Configure the comma-separated options that students will see when they scan the QR code to fill the enquiry form.
+              </p>
+              <form onSubmit={handleSaveQrConfig}>
+                
+                <div className="form-group">
+                  <label className="form-label">Qualifications Options</label>
+                  <textarea 
+                    className="form-control" 
+                    rows="3"
+                    value={qrQualifications}
+                    onChange={(e) => setQrQualifications(e.target.value)}
+                    placeholder="e.g. 10th Pass, 12th Pass, Undergraduate"
+                  />
+                  <small style={{ color: '#64748b', fontSize: '11px' }}>Separate options with commas.</small>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Batch Timing Options</label>
+                  <textarea 
+                    className="form-control" 
+                    rows="3"
+                    value={qrTimings}
+                    onChange={(e) => setQrTimings(e.target.value)}
+                    placeholder="e.g. Morning, Evening, Weekend"
+                  />
+                  <small style={{ color: '#64748b', fontSize: '11px' }}>Separate options with commas.</small>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Where Did You Hear About Us? Options</label>
+                  <textarea 
+                    className="form-control" 
+                    rows="3"
+                    value={qrSources}
+                    onChange={(e) => setQrSources(e.target.value)}
+                    placeholder="e.g. Instagram, Facebook, Friend"
+                  />
+                  <small style={{ color: '#64748b', fontSize: '11px' }}>Separate options with commas.</small>
+                </div>
+
+                <button type="submit" className="primary-btn mt-4" disabled={isSavingQr}>
+                  {isSavingQr ? 'Saving...' : 'Save QR Configuration'}
+                </button>
+              </form>
+            </div>
+
+            {/* Right Side: QR Code Generator */}
+            <div className="dashboard-panel" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+              <h3 className="panel-title mb-2">Your Live QR Code</h3>
+              <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '24px' }}>
+                Scan this to open the Enquiry Form.
+              </p>
+              
+              <div ref={qrRef} style={{ background: '#fff', padding: '16px', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0', display: 'inline-block' }}>
+                <QRCodeCanvas 
+                  value={qrUrl}
+                  size={200}
+                  bgColor={"#ffffff"}
+                  fgColor={"#0f172a"}
+                  level={"H"}
+                  includeMargin={false}
+                />
+              </div>
+
+              <div style={{ marginTop: '24px', width: '100%' }}>
+                <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px', color: '#475569', wordBreak: 'break-all', marginBottom: '16px' }}>
+                  {qrUrl}
+                </div>
+                <button 
+                  type="button" 
+                  onClick={downloadQR}
+                  className="primary-btn" 
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                >
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  Download QR Code
+                </button>
+              </div>
+            </div>
+
+          </div>
+        )}
         
         {/* Visual Branding Customizer */}
         {activeTab === 'branding' && (

@@ -162,8 +162,15 @@ function MainAppContent() {
   );
 }
 
+import QRFormEmbed from './modules/QRFormEmbed';
+
 export default function App() {
   const isLiveForm = window.location.pathname === '/live-form';
+  const isQRForm = window.location.pathname === '/qr-form';
+
+  if (isQRForm) {
+    return <QRFormEmbed />;
+  }
 
   if (isLiveForm) {
     return (
