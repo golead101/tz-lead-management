@@ -88,7 +88,7 @@ export default function ChatbotSettingsPage() {
   }
 
   return (
-    <div style={{ padding: 24, maxWidth: 900, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 24 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, width: '100%', boxSizing: 'border-box' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ padding: 12, background: '#eff6ff', borderRadius: 12, color: BRAND_BLUE, display: 'flex' }}>

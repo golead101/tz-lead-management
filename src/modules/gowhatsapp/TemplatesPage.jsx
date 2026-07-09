@@ -274,7 +274,7 @@ export default function TemplatesPage() {
   };
 
   return (
-    <div style={{ padding: 24, maxWidth: 900, margin: '0 auto' }}>
+    <div style={{ width: '100%', boxSizing: 'border-box' }}>
       {toast && (
         <div style={{
           position: 'fixed', top: 20, right: 20, zIndex: 1000,

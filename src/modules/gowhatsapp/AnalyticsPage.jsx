@@ -406,7 +406,7 @@ export default function AnalyticsPage() {
   const qualityColor = phoneQuality?.quality_rating === 'GREEN' ? C.green : C.orange;
 
   return (
-    <div style={{ padding: '24px', maxWidth: 1400, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 24 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, width: '100%', boxSizing: 'border-box' }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <div>

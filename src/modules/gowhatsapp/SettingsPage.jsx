@@ -53,7 +53,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div style={{ padding: 24, maxWidth: 700, margin: '0 auto' }}>
+    <div style={{ width: '100%', boxSizing: 'border-box' }}>
       <h1 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: 24, color: '#0f172a' }}>
         <Settings size={22} style={{ verticalAlign: 'middle', marginRight: 8 }} />
         WhatsApp API Settings
