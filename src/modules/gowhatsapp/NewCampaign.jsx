@@ -625,7 +625,7 @@ export default function NewCampaign({ setSubView }) {
   }
 
   return (
-    <div style={{ padding: 24, maxWidth: 900, margin: '0 auto' }}>
+    <div style={{ width: '100%', boxSizing: 'border-box' }}>
       <h1 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: 8, color: '#0f172a' }}>New Campaign</h1>
       <p style={{ color: '#64748b', marginBottom: 24 }}>Send personalized bulk messages via WhatsApp</p>
 
