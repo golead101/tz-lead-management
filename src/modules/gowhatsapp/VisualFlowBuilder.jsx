@@ -78,19 +78,37 @@ const CustomNode = ({ data, id }) => {
         <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155', marginBottom: 6 }}>
           {data.responseType === 'Template' ? `Template: ${data.preview}` : `${data.responseType} Auto Reply`}
         </div>
-        <div style={{ fontSize: '0.9rem', color: '#64748b', lineHeight: 1.4, whiteSpace: 'pre-wrap', maxHeight: '100px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {data.responseType !== 'Template' ? data.preview : 'Hello! Thanks for reaching out.'}
-        </div>
+        
+        {data.responseType === 'Document' ? (
+          (() => {
+            const file = data.mediaFiles?.find(f => f.name === data.preview);
+            const isImg = file && file.name.match(/\.(jpeg|jpg|gif|png|webp)$/i);
+            return isImg ? (
+              <img src={file.url} alt={file.name} style={{ width: '100%', height: 'auto', borderRadius: 8, marginTop: 8 }} />
+            ) : (
+              <div style={{ fontSize: '0.9rem', color: '#64748b' }}>{data.preview}</div>
+            );
+          })()
+        ) : (
+          <div style={{ fontSize: '0.9rem', color: '#64748b', lineHeight: 1.4, whiteSpace: 'pre-wrap', maxHeight: '100px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {data.responseType !== 'Template' ? data.preview : 'Hello! Thanks for reaching out.'}
+          </div>
+        )}
       </div>
 
       {/* Branches / Outputs */}
-      {(data.responseType === 'Buttons' && data.buttons && data.buttons.length > 0) && (
+      {(data.responseType === 'Buttons') && (
         <div style={{ padding: '0 16px 16px 16px' }}>
-          <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8', marginBottom: 8, textTransform: 'uppercase' }}>
-            BRANCHES ({data.buttons.length})
+          <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8', marginBottom: 8, textTransform: 'uppercase', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>BRANCHES ({(data.buttons || []).length})</span>
+            {data.onAddBranch && (
+              <button onClick={(e) => { e.stopPropagation(); data.onAddBranch(data.originalData); }} style={{ background: 'none', border: 'none', color: '#10b981', cursor: 'pointer', display: 'flex', padding: 2 }} title="Add Branch Option">
+                <Plus size={14} />
+              </button>
+            )}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, position: 'relative' }}>
-            {data.buttons.map((btn, index) => (
+            {(data.buttons || []).map((btn, index) => (
               <div key={index} style={{ 
                 background: '#f8fafc', padding: '8px 12px', borderRadius: '8px', 
                 fontSize: '0.8rem', fontWeight: 600, color: '#475569',
@@ -157,12 +175,28 @@ const getLayoutedElements = (nodes, edges, direction = 'LR') => {
 
 // ================= INNER CANVAS COMPONENT =================
 
-function FlowCanvas({ customReplies, onEdit, onDelete, onAddRule }) {
+function FlowCanvas({ customReplies, mediaFiles, onEdit, onDelete, onAddRule, onUpdateReply }) {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [activeNode, setActiveNode] = useState(null);
+  const [previewInput, setPreviewInput] = useState('');
   
   const { zoomIn, zoomOut, fitView } = useReactFlow();
+
+  const handleAddBranch = useCallback((replyData) => {
+    if (!onUpdateReply) return;
+    const currentButtons = Array.isArray(replyData.buttons) ? replyData.buttons : [];
+    if (currentButtons.length >= 3) {
+      alert("Maximum 3 buttons allowed by WhatsApp.");
+      return;
+    }
+    const newBtnName = `New Option ${currentButtons.length + 1}`;
+    const updatedReply = {
+      ...replyData,
+      buttons: [...currentButtons, newBtnName]
+    };
+    onUpdateReply(updatedReply);
+  }, [onUpdateReply]);
 
   // Initialize nodes and edges from customReplies
   useEffect(() => {
@@ -179,7 +213,9 @@ function FlowCanvas({ customReplies, onEdit, onDelete, onAddRule }) {
         ...reply, 
         originalData: reply,
         onEdit, 
-        onDelete 
+        onDelete,
+        onAddBranch: handleAddBranch,
+        mediaFiles
       },
       position: { x: 0, y: 0 }, // Handled by dagre
     }));
@@ -228,13 +264,25 @@ function FlowCanvas({ customReplies, onEdit, onDelete, onAddRule }) {
   }, [customReplies, onEdit, onDelete, fitView]);
 
   const onConnect = useCallback((params) => {
+    // Visually add the edge immediately for smooth UX
     setEdges((eds) => addEdge({ 
       ...params, 
       type: 'smoothstep',
       style: { stroke: '#94a3b8', strokeWidth: 2 },
       markerEnd: { type: MarkerType.ArrowClosed, color: '#94a3b8' }
     }, eds));
-  }, [setEdges]);
+
+    // Update the underlying data if we have a valid branch connection
+    if (params.sourceHandle && params.target && onUpdateReply) {
+      const targetNode = customReplies.find(r => r.id === params.target);
+      if (targetNode) {
+        onUpdateReply({
+          ...targetNode,
+          trigger: params.sourceHandle
+        });
+      }
+    }
+  }, [setEdges, customReplies, onUpdateReply]);
 
   const onNodeClick = (_, node) => {
     setActiveNode(node);
@@ -247,6 +295,17 @@ function FlowCanvas({ customReplies, onEdit, onDelete, onAddRule }) {
     setTimeout(() => {
       fitView({ padding: 0.2, duration: 500 });
     }, 50);
+  };
+
+  const simulateMessage = (text) => {
+    if (!text) return;
+    const targetReply = customReplies.find(r => 
+      r.trigger && r.trigger.toLowerCase().includes(text.toLowerCase())
+    );
+    if (targetReply) {
+      setActiveNode({ data: targetReply });
+    }
+    setPreviewInput('');
   };
 
   return (
@@ -328,12 +387,22 @@ function FlowCanvas({ customReplies, onEdit, onDelete, onAddRule }) {
                   </div>
 
                   {/* Bot Response Message */}
-                  <div style={{ background: '#fff', padding: '12px 16px', borderRadius: '0 16px 16px 16px', fontSize: '0.9rem', color: '#334155', alignSelf: 'flex-start', maxWidth: '85%', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
+                  <div style={{ background: '#fff', padding: (activeNode.data.responseType === 'Document' && activeNode.data.preview.match(/\.(jpeg|jpg|gif|png|webp)$/i)) ? '4px' : '12px 16px', borderRadius: '0 16px 16px 16px', fontSize: '0.9rem', color: '#334155', alignSelf: 'flex-start', maxWidth: '85%', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
                     {activeNode.data.responseType === 'Template' ? (
                       <div>
                         <strong>Template: {activeNode.data.preview}</strong><br/>
                         <span style={{color: '#64748b'}}>(Dynamic content would load here)</span>
                       </div>
+                    ) : activeNode.data.responseType === 'Document' ? (
+                      (() => {
+                        const file = mediaFiles?.find(f => f.name === activeNode.data.preview);
+                        const isImg = file && file.name.match(/\.(jpeg|jpg|gif|png|webp)$/i);
+                        return isImg ? (
+                          <img src={file.url} alt={file.name} style={{ width: '100%', borderRadius: '0 12px 12px 12px', display: 'block' }} />
+                        ) : (
+                          <div style={{ whiteSpace: 'pre-wrap' }}>{activeNode.data.preview}</div>
+                        );
+                      })()
                     ) : (
                       <div style={{ whiteSpace: 'pre-wrap' }}>{activeNode.data.preview}</div>
                     )}
@@ -342,7 +411,13 @@ function FlowCanvas({ customReplies, onEdit, onDelete, onAddRule }) {
                     {(activeNode.data.responseType === 'Buttons' && activeNode.data.buttons) && (
                       <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
                         {activeNode.data.buttons.map((btn, i) => (
-                          <div key={i} style={{ padding: '10px', background: '#f1f5f9', color: '#0ea5e9', textAlign: 'center', borderRadius: 8, fontSize: '0.9rem', fontWeight: 600 }}>
+                          <div 
+                            key={i} 
+                            onClick={() => simulateMessage(btn)}
+                            style={{ padding: '10px', background: '#f1f5f9', color: '#0ea5e9', textAlign: 'center', borderRadius: 8, fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer', transition: 'background 0.2s' }}
+                            onMouseOver={(e) => e.target.style.background = '#e2e8f0'}
+                            onMouseOut={(e) => e.target.style.background = '#f1f5f9'}
+                          >
                             {btn}
                           </div>
                         ))}
@@ -355,10 +430,20 @@ function FlowCanvas({ customReplies, onEdit, onDelete, onAddRule }) {
 
             {/* Input Bar */}
             <div style={{ padding: '12px 20px', background: '#f0f2f5', display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ flex: 1, background: '#fff', padding: '10px 16px', borderRadius: 24, fontSize: '0.9rem', color: '#94a3b8' }}>Type a trigger keyword...</div>
-              <div style={{ width: 40, height: 40, background: '#00a884', borderRadius: '50%', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#fff' }}>
+              <input 
+                type="text"
+                value={previewInput}
+                onChange={(e) => setPreviewInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && simulateMessage(previewInput)}
+                placeholder="Type a trigger keyword..."
+                style={{ flex: 1, background: '#fff', padding: '10px 16px', borderRadius: 24, fontSize: '0.9rem', color: '#334155', border: 'none', outline: 'none' }}
+              />
+              <button 
+                onClick={() => simulateMessage(previewInput)}
+                style={{ width: 40, height: 40, background: '#00a884', borderRadius: '50%', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#fff', border: 'none', cursor: 'pointer' }}
+              >
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path></svg>
-              </div>
+              </button>
             </div>
           </div>
         </div>

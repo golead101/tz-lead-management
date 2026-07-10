@@ -73,6 +73,13 @@ export default function ChatbotSettingsPage() {
     }
   };
 
+  const handleUpdateReply = (updatedReply) => {
+    setSettings(prev => ({
+      ...prev,
+      customReplies: prev.customReplies.map(r => r.id === updatedReply.id ? updatedReply : r)
+    }));
+  };
+
   const handleEditReply = (reply) => {
     setEditingId(reply.id);
     setNewReply({
@@ -193,162 +200,8 @@ export default function ChatbotSettingsPage() {
     );
   }
 
-  const cardStyle = {
-    background: '#fff', padding: 24, borderRadius: 16, border: '1px solid #e2e8f0', 
-    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: 16
-  };
-  const inputStyle = {
-    width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #cbd5e1', boxSizing: 'border-box',
-    outline: 'none', fontSize: '0.95rem'
-  };
-  const textareaStyle = {
-    width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #cbd5e1', boxSizing: 'border-box',
-    outline: 'none', fontSize: '0.95rem', resize: 'vertical'
-  };
-
   return (
     <div style={{ padding: 32, maxWidth: 1200, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 24, boxSizing: 'border-box', width: '100%' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ padding: 12, background: '#eff6ff', borderRadius: 12, color: BRAND_BLUE, display: 'flex' }}>
-            <Bot size={24} />
-          </div>
-          <div>
-            <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#0f172a', margin: 0 }}>Chatbot Configurations</h1>
-            <p style={{ color: '#64748b', fontSize: '0.85rem', marginTop: 4, margin: 0 }}>Configure automated responses and menu flows</p>
-          </div>
-        </div>
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            background: BRAND_BLUE, color: '#fff', border: 'none',
-            padding: '10px 20px', borderRadius: 10, fontWeight: 600,
-            cursor: 'pointer', fontSize: '0.9rem',
-            boxShadow: '0 4px 18px rgba(37, 99, 235, 0.2)',
-            opacity: saving ? 0.7 : 1,
-          }}
-        >
-          {saving ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={16} />}
-          Save Configuration
-        </button>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20 }}>
-        {/* Welcome Template Section */}
-        <div style={cardStyle}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, color: '#0f172a' }}>
-            <CheckCircle size={18} color="#16a34a" />
-            Entry Template
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#475569' }}>Initial Template Name</label>
-            <input
-              type="text"
-              value={settings.welcomeTemplate || ''}
-              onChange={(e) => setSettings({ ...settings, welcomeTemplate: e.target.value })}
-              style={inputStyle}
-              placeholder="e.g. welcome_message"
-            />
-            <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: 0 }}>Must match the approved template name in Meta Business Manager</p>
-          </div>
-        </div>
-
-        {/* Counselor Section */}
-        <div style={cardStyle}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, color: '#0f172a' }}>
-            <Phone size={18} color={BRAND_BLUE} />
-            Counselor Contact
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#475569' }}>Counselor Phone Number</label>
-            <input
-              type="text"
-              value={settings.counselorPhone || ''}
-              onChange={(e) => setSettings({ ...settings, counselorPhone: e.target.value })}
-              style={inputStyle}
-              placeholder="+91 XXXXX XXXXX"
-            />
-            <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: 0 }}>Phone number users will reach when calling a counselor</p>
-          </div>
-        </div>
-
-        {/* Courses Section */}
-        <div style={{ ...cardStyle, gridColumn: 'span 2' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, color: '#0f172a' }}>
-            <List size={18} color="#f59e0b" />
-            Programs List
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#475569' }}>Courses Text (Manual Reply)</label>
-            <textarea
-              rows={5}
-              value={settings.coursesText || ''}
-              onChange={(e) => setSettings({ ...settings, coursesText: e.target.value })}
-              style={textareaStyle}
-              placeholder="List your courses here..."
-            />
-          </div>
-        </div>
-
-        {/* Fees Section */}
-        <div style={{ ...cardStyle, gridColumn: 'span 2' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, color: '#0f172a' }}>
-            <div style={{ width: 18, height: 18, borderRadius: 4, background: '#dcfce7', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: '700', color: '#16a34a' }}>$</div>
-            Fee Details
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#475569' }}>Fee Structure Text</label>
-            <textarea
-              rows={5}
-              value={settings.feeDetails || ''}
-              onChange={(e) => setSettings({ ...settings, feeDetails: e.target.value })}
-              style={textareaStyle}
-              placeholder="List your fees here..."
-            />
-          </div>
-        </div>
-
-        {/* Brochure Section */}
-        <div style={{ ...cardStyle, gridColumn: 'span 2' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, color: '#0f172a' }}>
-            <FileText size={18} color="#ef4444" />
-            Brochure PDF
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#475569' }}>Brochure Download URL</label>
-            <input
-              type="text"
-              value={settings.brochureUrl || ''}
-              onChange={(e) => setSettings({ ...settings, brochureUrl: e.target.value })}
-              style={inputStyle}
-              placeholder="https://firebasestorage.googleapis.com/..."
-            />
-            <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: 0 }}>Direct link to your PDF brochure file</p>
-          </div>
-        </div>
-
-        {/* Meta Cost Rate Section */}
-        <div style={{ ...cardStyle, gridColumn: 'span 2' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, color: '#0f172a' }}>
-            <div style={{ width: 18, height: 18, borderRadius: 4, background: '#dcfce7', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: '700', color: '#16a34a' }}>₹</div>
-            Meta Cost Rate (INR)
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#475569' }}>Per Conversation Cost</label>
-            <input
-              type="number"
-              step="0.01"
-              value={settings.metaCostRate || ''}
-              onChange={(e) => setSettings({ ...settings, metaCostRate: e.target.value })}
-              style={inputStyle}
-              placeholder="0.80"
-            />
-            <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: 0 }}>This rate is used to estimate billing on the dashboard.</p>
-          </div>
-        </div>
-      </div>
 
       {toast && (
         <div style={{
@@ -451,8 +304,10 @@ export default function ChatbotSettingsPage() {
           {viewMode === 'flow' ? (
             <VisualFlowBuilder 
               customReplies={settings.customReplies} 
+              mediaFiles={settings.mediaFiles}
               onEdit={handleEditReply}
               onDelete={handleDeleteReply}
+              onUpdateReply={handleUpdateReply}
               onAddRule={() => { setEditingId(null); setNewReply({ trigger: '', responseType: 'Text', preview: '', buttons: '' }); setShowAddModal(true); }}
             />
           ) : (
@@ -536,28 +391,37 @@ export default function ChatbotSettingsPage() {
           </button>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {settings.mediaFiles.map(file => (
-            <div key={file.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <FileText size={20} color="#ef4444" />
-                <div>
-                  <div style={{ fontWeight: 600, color: '#1e293b', fontSize: '0.95rem' }}>{file.name}</div>
-                  <div style={{ color: '#64748b', fontSize: '0.8rem', marginTop: 2 }}>{file.size} • Uploaded {file.date}</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 24 }}>
+          {settings.mediaFiles.map(file => {
+            const isImg = file.name.match(/\.(jpeg|jpg|gif|png|webp)$/i);
+            return (
+              <div key={file.id} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ height: 160, background: '#f1f5f9', display: 'flex', justifyContent: 'center', alignItems: 'center', borderBottom: '1px solid #e2e8f0' }}>
+                  {isImg ? (
+                    <img src={file.url} alt={file.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <FileText size={48} color="#94a3b8" />
+                  )}
+                </div>
+                <div style={{ padding: '16px 20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 16 }}>
+                    <div style={{ background: '#eff6ff', padding: 8, borderRadius: 8, color: BRAND_BLUE }}><FileText size={16} /></div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, color: '#1e293b', fontSize: '0.95rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={file.name}>{file.name}</div>
+                      <div style={{ color: '#94a3b8', fontSize: '0.8rem', marginTop: 4 }}>{isImg ? 'Image File' : 'Document File'}</div>
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'center', borderTop: '1px solid #f1f5f9', paddingTop: 16 }}>
+                    <button onClick={() => handleDeleteMedia(file.id, file.storagePath)} style={{ width: '100%', background: '#fff', border: '1px solid #e2e8f0', padding: '10px', borderRadius: 24, color: '#64748b', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, transition: 'background 0.2s' }} onMouseOver={(e) => e.target.style.background = '#f8fafc'} onMouseOut={(e) => e.target.style.background = '#fff'}>
+                      <Trash2 size={16} /> Delete File
+                    </button>
+                  </div>
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={() => copyToClipboard(file.url || '')} style={{ background: '#fff', border: '1px solid #cbd5e1', padding: '6px 12px', borderRadius: 8, color: '#475569', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <LinkIcon size={14} /> Copy Link
-                </button>
-                <button onClick={() => handleDeleteMedia(file.id, file.storagePath)} style={{ background: '#fff', border: '1px solid #cbd5e1', padding: '6px 12px', borderRadius: 8, color: '#ef4444', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer' }}>
-                  Delete
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
           {settings.mediaFiles.length === 0 && (
-            <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', background: '#f8fafc', borderRadius: 12, border: '1px dashed #cbd5e1' }}>No media files uploaded yet.</div>
+            <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', background: '#f8fafc', borderRadius: 16, border: '1px dashed #cbd5e1', gridColumn: '1 / -1' }}>No media files uploaded yet.</div>
           )}
         </div>
       </div>
