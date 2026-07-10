@@ -21,11 +21,56 @@ const SEED_CONTACTS = {};
 const SEED_RECIPIENTS = {};
 
 const SEED_CHATBOT = {
-  welcomeTemplate: '',
-  coursesText: '',
-  feeDetails: '',
-  counselorPhone: '',
-  brochureUrl: ''
+  customReplies: [
+    {
+      id: 'r1',
+      trigger: 'Courses Offered',
+      responseType: 'Buttons',
+      preview: 'We currently offer courses in 2 learning tracks. Which track would you like to explore?',
+      buttons: ['Regular Track', 'Fast Track', 'Back To Menu']
+    },
+    {
+      id: 'r2',
+      trigger: 'regulartrack_pte',
+      responseType: 'Text',
+      preview: 'PTE Duration 6months'
+    },
+    {
+      id: 'r3',
+      trigger: 'fasttrack_ielts',
+      responseType: 'Text',
+      preview: 'Fee 9,00,000'
+    },
+    {
+      id: 'r4',
+      trigger: 'fasttrack_gre',
+      responseType: 'Buttons',
+      preview: 'Fast track GRE fee 60,000/- only with duration 2 months only.',
+      buttons: ['Enroll Now', 'Talk to Counselor']
+    },
+    {
+      id: 'r5',
+      trigger: 'GRE Brochure',
+      responseType: 'Document',
+      preview: 'Hello! Thanks for Downloading'
+    },
+    {
+      id: 'r6',
+      trigger: 'Back To Menu',
+      responseType: 'Template',
+      preview: '[Template: welcome_template]'
+    },
+    {
+      id: 'r7',
+      trigger: 'Talk to Counselor',
+      responseType: 'Text',
+      preview: 'Please contact 9705454789'
+    }
+  ],
+  mediaFiles: [
+    { id: 'm1', name: 'GRE_Brochure_2026.pdf', size: '2.4 MB', date: 'Oct 12, 2026' }
+  ],
+  metaCostRate: '0.80'
 };
 
 // API status is always fetched live from Meta — no hardcoded defaults
@@ -114,8 +159,20 @@ export function initWhatsappDb() {
     // Clean up dummy counselor phone if it is set to the default dummy value
     try {
       const settings = JSON.parse(localStorage.getItem('gowha_chatbot') || '{}');
+      let updated = false;
       if (settings.counselorPhone === '+91 98765 43210') {
         settings.counselorPhone = '';
+        updated = true;
+      }
+      if (!settings.customReplies || settings.customReplies.length === 0) {
+        settings.customReplies = SEED_CHATBOT.customReplies;
+        updated = true;
+      }
+      if (!settings.mediaFiles || settings.mediaFiles.length === 0) {
+        settings.mediaFiles = SEED_CHATBOT.mediaFiles;
+        updated = true;
+      }
+      if (updated) {
         localStorage.setItem('gowha_chatbot', JSON.stringify(settings));
       }
     } catch (e) {

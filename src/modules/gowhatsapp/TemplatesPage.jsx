@@ -468,6 +468,45 @@ export default function TemplatesPage() {
                   <label style={{ display: 'block', fontWeight: 600, fontSize: '0.85rem', marginBottom: 6, color: '#0f172a' }}>Footer (optional)</label>
                   <input type="text" value={tplFooter} onChange={e => setTplFooter(e.target.value)} placeholder="e.g. Reply STOP to opt out" style={inputStyle} />
                 </div>
+                
+                {/* BUTTONS SECTION */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <label style={{ fontWeight: 600, fontSize: '0.85rem', color: '#0f172a' }}>Buttons (optional)</label>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{tplButtons.length}/10 buttons</span>
+                  </div>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: tplButtons.length > 0 ? 12 : 0 }}>
+                    {tplButtons.map((btn, index) => (
+                      <div key={index} style={{ padding: 12, border: '1px solid #e2e8f0', borderRadius: 8, background: '#f8fafc', position: 'relative' }}>
+                        <button onClick={() => removeButton(index)} style={{ position: 'absolute', top: 8, right: 8, background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 4 }}><Trash2 size={16}/></button>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: 8, textTransform: 'uppercase' }}>{btn.type.replace('_', ' ')}</div>
+                        <input type="text" value={btn.text} onChange={e => updateButton(index, { text: e.target.value })} placeholder="Button Text (e.g. Visit Website)" style={{...inputStyle, marginBottom: btn.type !== 'QUICK_REPLY' ? 8 : 0}} />
+                        {btn.type === 'URL' && <input type="text" value={btn.url} onChange={e => updateButton(index, { url: e.target.value })} placeholder="https://example.com" style={inputStyle} />}
+                        {btn.type === 'PHONE_NUMBER' && <input type="text" value={btn.phoneNumber} onChange={e => updateButton(index, { phoneNumber: e.target.value })} placeholder="+1234567890" style={inputStyle} />}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{ position: 'relative' }}>
+                    <button onClick={() => setShowButtonMenu(!showButtonMenu)} disabled={tplButtons.length >= 10} style={{ width: '100%', padding: '10px', background: '#fff', border: '1px dashed #cbd5e1', borderRadius: 8, color: '#475569', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                      <Plus size={18} /> Add Button
+                    </button>
+                    {showButtonMenu && (
+                      <div style={{ position: 'absolute', bottom: '100%', left: 0, right: 0, marginBottom: 4, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 10px 25px rgba(0,0,0,0.1)', zIndex: 10, padding: 8 }}>
+                        {BUTTON_TYPES.map(bt => (
+                          <div key={bt.value} onClick={() => addButton(bt.value)} style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', borderRadius: 6, borderBottom: '1px solid #f1f5f9' }}>
+                            <bt.icon size={16} color={BRAND_BLUE} />
+                            <div>
+                              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0f172a' }}>{bt.label}</div>
+                              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{bt.desc}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {/* Preview Side */}
@@ -484,6 +523,15 @@ export default function TemplatesPage() {
                       {tplBody ? getPreviewBody() : <span style={{ color: '#94a3b8' }}>Template body preview...</span>}
                       {tplFooter && <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: 6 }}>{tplFooter}</div>}
                     </div>
+                    {tplButtons.length > 0 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8, maxWidth: '90%' }}>
+                        {tplButtons.map((btn, i) => (
+                          <div key={i} style={{ background: '#fff', padding: '8px 12px', borderRadius: 8, textAlign: 'center', fontSize: '0.9rem', color: '#0284c7', fontWeight: 500, boxShadow: '0 1px 1px rgba(0,0,0,0.05)' }}>
+                            {btn.text || 'Button Text'}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 

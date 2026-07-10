@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@xyflow/react": "^12.11.2",
+    "dagre": "^0.8.5",
     "firebase": "^12.14.0",
     "lucide-react": "^1.18.0",
     "qrcode.react": "^4.2.0",
@@ -17,6 +19,7 @@
     "react-dom": "^19.2.6",
     "react-is": "^19.2.7",
     "recharts": "^3.8.1",
+    "uuid": "^14.0.1",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
