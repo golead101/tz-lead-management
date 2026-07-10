@@ -8,6 +8,9 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      workbox: {
+        maximumFileSizeToCacheInBytes: 5000000 // 5 MiB
+      },
       includeAssets: ['favicon.svg', 'icons.svg', 'image-removebg-preview.png'],
       manifest: {
         name: 'TechZone Lead Management',
