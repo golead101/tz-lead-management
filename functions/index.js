@@ -1415,7 +1415,7 @@ exports.createWhatsAppTemplate = functions.https.onRequest((req, res) => {
       const apiVersion = creds.apiVersion || 'v20.0';
       const url = `https://graph.facebook.com/${apiVersion}/${creds.businessAccountId}/message_templates`;
 
-      const payload = { name, category, language, components };
+      const payload = { name, category, language, components, allow_category_change: true };
       console.log('[createWhatsAppTemplate] Submitting to Meta:', JSON.stringify(payload));
 
       const response = await axios.post(url, payload, {

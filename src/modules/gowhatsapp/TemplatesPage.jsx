@@ -250,7 +250,7 @@ export default function TemplatesPage() {
     if (tplButtons.length >= 10) return;
     const newBtn = { type, text: '' };
     if (type === 'URL') newBtn.url = '';
-    if (type === 'PHONE_NUMBER') newBtn.phoneNumber = '';
+    if (type === 'PHONE_NUMBER') newBtn.phone_number = '';
     setTplButtons(prev => [...prev, newBtn]);
     setShowButtonMenu(false);
   };
@@ -483,7 +483,7 @@ export default function TemplatesPage() {
                         <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: 8, textTransform: 'uppercase' }}>{btn.type.replace('_', ' ')}</div>
                         <input type="text" value={btn.text} onChange={e => updateButton(index, { text: e.target.value })} placeholder="Button Text (e.g. Visit Website)" style={{...inputStyle, marginBottom: btn.type !== 'QUICK_REPLY' ? 8 : 0}} />
                         {btn.type === 'URL' && <input type="text" value={btn.url} onChange={e => updateButton(index, { url: e.target.value })} placeholder="https://example.com" style={inputStyle} />}
-                        {btn.type === 'PHONE_NUMBER' && <input type="text" value={btn.phoneNumber} onChange={e => updateButton(index, { phoneNumber: e.target.value })} placeholder="+1234567890" style={inputStyle} />}
+                        {btn.type === 'PHONE_NUMBER' && <input type="text" value={btn.phone_number} onChange={e => updateButton(index, { phone_number: e.target.value })} placeholder="+1234567890" style={inputStyle} />}
                       </div>
                     ))}
                   </div>
