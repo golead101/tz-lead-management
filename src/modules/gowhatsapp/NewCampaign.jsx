@@ -159,24 +159,27 @@ export default function NewCampaign({ setSubView }) {
   // Filters for CRM Leads
   const [campaignCourseFilter, setCampaignCourseFilter] = useState('');
   const [campaignStageFilter, setCampaignStageFilter] = useState('');
+  const [campaignSourceFilter, setCampaignSourceFilter] = useState('');
 
   const getFilteredLeads = () => {
     return leads.filter(lead => {
       const matchCourse = campaignCourseFilter ? lead.course === campaignCourseFilter : true;
       const matchStage = campaignStageFilter ? lead.stage === campaignStageFilter : true;
-      return matchCourse && matchStage;
+      const matchSource = campaignSourceFilter ? lead.source === campaignSourceFilter : true;
+      return matchCourse && matchStage && matchSource;
     });
   };
 
   const uniqueCourses = [...new Set(leads.map(l => l.course).filter(Boolean))];
   const uniqueStages = [...new Set(leads.map(l => l.stage).filter(Boolean))];
+  const uniqueSources = [...new Set(leads.map(l => l.source).filter(Boolean))];
 
   useEffect(() => {
     if (selectedListId === 'crm-leads-all') {
       const filtered = getFilteredLeads();
       setPreviewContacts(filtered.slice(0, 3));
     }
-  }, [selectedListId, campaignCourseFilter, campaignStageFilter, leads]);
+  }, [selectedListId, campaignCourseFilter, campaignStageFilter, campaignSourceFilter, leads]);
 
   useEffect(() => {
     loadExistingLists();
@@ -553,7 +556,10 @@ export default function NewCampaign({ setSubView }) {
 
     try {
       const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'leads-management-tz';
-      const url = `https://us-central1-${projectId}.cloudfunctions.net/sendBulkWhatsAppCampaign`;
+      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const url = isLocal 
+        ? `http://127.0.0.1:5001/${projectId}/us-central1/sendBulkWhatsAppCampaign`
+        : `https://us-central1-${projectId}.cloudfunctions.net/sendBulkWhatsAppCampaign`;
 
       const res = await fetch(url, {
         method: 'POST',
@@ -767,6 +773,14 @@ export default function NewCampaign({ setSubView }) {
                 >
                   <option value="">All Stages</option>
                   {uniqueStages.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+                <select
+                  value={campaignSourceFilter}
+                  onChange={e => setCampaignSourceFilter(e.target.value)}
+                  style={{ flex: 1, padding: '8px 12px', borderRadius: 6, border: '1px solid #cbd5e1', outline: 'none' }}
+                >
+                  <option value="">All Sources</option>
+                  {uniqueSources.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
               <div style={{ marginTop: 12, fontSize: '0.85rem', color: '#64748b' }}>

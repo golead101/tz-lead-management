@@ -1529,7 +1529,7 @@ exports.deleteWhatsAppTemplate = functions.https.onRequest((req, res) => {
  * Dispatches an outbound WhatsApp bulk campaign via Meta's Graph API.
  * Handles rate limits, creates leads if necessary, and writes to firestore safely on the backend.
  */
-exports.sendBulkWhatsAppCampaign = functions.https.onRequest((req, res) => {
+exports.sendBulkWhatsAppCampaign = functions.runWith({ timeoutSeconds: 540, memory: '1GB' }).https.onRequest((req, res) => {
   return cors(req, res, async () => {
     if (req.method !== 'POST') {
       return res.status(405).json({ error: 'Method not allowed' });
