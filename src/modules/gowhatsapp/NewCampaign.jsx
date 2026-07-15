@@ -556,7 +556,7 @@ export default function NewCampaign({ setSubView }) {
 
     try {
       const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'leads-management-tz';
-      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const isLocal = false; // Forced to false to use deployed function instead of local emulator
       const url = isLocal 
         ? `http://127.0.0.1:5001/${projectId}/us-central1/sendBulkWhatsAppCampaign`
         : `https://us-central1-${projectId}.cloudfunctions.net/sendBulkWhatsAppCampaign`;

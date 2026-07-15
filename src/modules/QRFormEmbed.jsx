@@ -38,7 +38,7 @@ export default function QRFormEmbed() {
           setFormConfig(prev => ({ 
             ...prev, 
             ...data,
-            courses: activeCourses.length > 0 ? activeCourses : prev.courses 
+            courses: data.courses && data.courses.length > 0 ? data.courses : (activeCourses.length > 0 ? activeCourses : prev.courses) 
           }));
         } else if (activeCourses.length > 0) {
           setFormConfig(prev => ({ ...prev, courses: activeCourses }));

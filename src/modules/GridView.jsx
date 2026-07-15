@@ -255,7 +255,7 @@ export default function GridView() {
       }
     });
 
-    let nameIdx = 0, emailIdx = 1, phoneIdx = 2, courseIdx = 3, sourceIdx = 4;
+    let nameIdx = 0, emailIdx = 1, phoneIdx = 2, courseIdx = 3, sourceIdx = 4, campaignIdx = 5;
     let hasHeader = false;
 
     if (lines.length > 0) {
@@ -269,6 +269,7 @@ export default function GridView() {
         phoneIdx = headers.findIndex(h => h.includes('phone') || h.includes('contact') || h.includes('mobile'));
         courseIdx = headers.findIndex(h => h.includes('course') || h.includes('program'));
         sourceIdx = headers.findIndex(h => h.includes('source'));
+        campaignIdx = headers.findIndex(h => h.includes('campaign'));
       }
     }
 
@@ -278,7 +279,7 @@ export default function GridView() {
       const parts = line.split(',').map(p => p.trim());
       if (parts.length < 2) return;
       
-      let name = '', email = '', phone = '', course = '', source = '';
+      let name = '', email = '', phone = '', course = '', source = '', campaign = '';
       
       if (hasHeader) {
          name = nameIdx !== -1 && nameIdx < parts.length ? parts[nameIdx] : '';
@@ -286,12 +287,14 @@ export default function GridView() {
          phone = phoneIdx !== -1 && phoneIdx < parts.length ? parts[phoneIdx] : '';
          course = courseIdx !== -1 && courseIdx < parts.length ? parts[courseIdx] : '';
          source = sourceIdx !== -1 && sourceIdx < parts.length ? parts[sourceIdx] : '';
+         campaign = campaignIdx !== -1 && campaignIdx < parts.length ? parts[campaignIdx] : '';
       } else {
          name = parts[0];
          email = parts[1];
          phone = parts[2];
          course = parts[3];
          source = parts[4];
+         campaign = parts.length > 5 ? parts[5] : '';
       }
       
       if (!name && !email && !phone) return; // Skip completely empty rows
@@ -312,6 +315,7 @@ export default function GridView() {
           phone: phone || '',
           course: course || courses[0]?.name,
           source: source || 'CSV Import',
+          campaign: campaign || '',
           counselor: activeUser,
           stage: 'New Lead'
         });
@@ -862,11 +866,18 @@ export default function GridView() {
 
                       {/* Source */}
                       <td>
-                        <span className="gv-source-text">
-                          {lead.source === 'Website Form' || lead.source === 'Website Form Widget' || lead.source === 'Website' 
-                            ? 'Website Leads' 
-                            : (lead.source === 'Walk-in' && lead.subSource ? `Walk-in (${lead.subSource})` : lead.source)}
-                        </span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                          <span className="gv-source-text">
+                            {lead.source === 'Website Form' || lead.source === 'Website Form Widget' || lead.source === 'Website' 
+                              ? 'Website Leads' 
+                              : (lead.source === 'Walk-in' && lead.subSource ? `Walk-in (${lead.subSource})` : lead.source)}
+                          </span>
+                          {(lead.campaign || lead.campaignName) && (
+                            <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                              {lead.campaign || lead.campaignName}
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Owner */}
@@ -967,7 +978,7 @@ export default function GridView() {
 
             <div className="modal-body">
               <div style={{ background: 'rgba(37, 99, 235, 0.04)', border: '1px solid rgba(37, 99, 235, 0.12)', padding: '12px 16px', borderRadius: 'var(--radius-sm)', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-                <strong style={{ color: '#2563eb' }}>Format:</strong> Each row should follow — <code style={{ background: 'rgba(0,0,0,0.04)', padding: '1px 6px', borderRadius: '4px', fontSize: '11px' }}>Name, Email, Phone, Course, Source</code>
+                <strong style={{ color: '#2563eb' }}>Format:</strong> Each row should follow — <code style={{ background: 'rgba(0,0,0,0.04)', padding: '1px 6px', borderRadius: '4px', fontSize: '11px' }}>Name, Phone, Source, Campaign Name</code> (Optional: Email, Course)
               </div>
 
               <div className="form-group" style={{ marginBottom: '16px' }}>
@@ -985,7 +996,7 @@ export default function GridView() {
                 <textarea
                   className="form-control"
                   style={{ minHeight: '160px', fontFamily: 'monospace', fontSize: '12px', lineHeight: '1.6' }}
-                  placeholder={"Aakash Nair, aakash@nair.com, +91 9555512345, Full-Stack Web Development, Referral\nKavita Sen, kavita.sen@outlook.com, +91 9888898888, Data Science & AI, Meta Ads"}
+                  placeholder={"Name, Phone, Source, Campaign Name\nAakash Nair, +91 9555512345, Referral, Agentic AI demo campaign\nKavita Sen, +91 9888898888, Meta Ads, Summer Promo"}
                   value={csvText}
                   onChange={(e) => setCsvText(e.target.value)}
                 />

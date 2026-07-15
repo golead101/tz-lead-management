@@ -5,6 +5,107 @@ import { httpsCallable } from 'firebase/functions';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { QRCodeCanvas } from 'qrcode.react';
 
+const TagInput = ({ value, onChange, placeholder, label }) => {
+  const [inputValue, setInputValue] = useState('');
+  
+  const tags = value ? value.split(',').map(t => t.trim()).filter(Boolean) : [];
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      const newTag = inputValue.trim();
+      if (newTag && !tags.includes(newTag)) {
+        onChange([...tags, newTag].join(', '));
+      }
+      setInputValue('');
+    } else if (e.key === 'Backspace' && !inputValue && tags.length > 0) {
+      e.preventDefault();
+      const newTags = [...tags];
+      newTags.pop();
+      onChange(newTags.join(', '));
+    }
+  };
+
+  const removeTag = (tagToRemove) => {
+    onChange(tags.filter(t => t !== tagToRemove).join(', '));
+  };
+
+  return (
+    <div className="form-group mb-4">
+      <label className="form-label">{label}</label>
+      <div 
+        className="form-control" 
+        style={{ 
+          display: 'flex', 
+          flexWrap: 'wrap', 
+          gap: '8px', 
+          minHeight: '42px', 
+          height: 'auto', 
+          alignItems: 'center',
+          padding: '8px 12px'
+        }}
+      >
+        {tags.map((tag, idx) => (
+          <span 
+            key={idx} 
+            style={{
+              background: 'var(--bg-secondary, #f1f5f9)',
+              color: 'var(--text-primary, #1e293b)',
+              padding: '4px 10px',
+              borderRadius: '6px',
+              fontSize: '13px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              border: '1px solid var(--border-color, #e2e8f0)'
+            }}
+          >
+            {tag}
+            <button 
+              type="button" 
+              onClick={() => removeTag(tag)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#64748b',
+                cursor: 'pointer',
+                padding: '0',
+                fontSize: '14px',
+                lineHeight: '1',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              &times;
+            </button>
+          </span>
+        ))}
+        <input 
+          type="text" 
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={tags.length === 0 ? placeholder : "Type and press Enter..."}
+          style={{
+            border: 'none',
+            background: 'transparent',
+            outline: 'none',
+            flex: 1,
+            minWidth: '120px',
+            fontSize: '14px',
+            color: 'inherit'
+          }}
+        />
+      </div>
+      <small style={{ color: '#64748b', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+        Press Enter or comma to add an option.
+      </small>
+    </div>
+  );
+};
+
+
 export default function ConfigSettings() {
   const {
     courses,
@@ -28,6 +129,7 @@ export default function ConfigSettings() {
 
   // QR Form Settings
   const [qrQualifications, setQrQualifications] = useState('10th Pass, 12th Pass, Undergraduate, Postgraduate, Other');
+  const [qrCourses, setQrCourses] = useState('Full-Stack Web Development, Data Science, UI/UX Design');
   const [qrTimings, setQrTimings] = useState('Morning (9 AM - 11 AM), Afternoon (2 PM - 4 PM), Evening (6 PM - 8 PM), Weekend Batches');
   const [qrSources, setQrSources] = useState('Instagram, Facebook, Google Search, Friend/Referral, Walk-in/Poster, Other');
   const [isSavingQr, setIsSavingQr] = useState(false);
@@ -40,6 +142,7 @@ export default function ConfigSettings() {
         if (docSnap.exists()) {
           const data = docSnap.data();
           if (data.qualifications) setQrQualifications(data.qualifications.join(', '));
+          if (data.courses) setQrCourses(data.courses.join(', '));
           if (data.timings) setQrTimings(data.timings.join(', '));
           if (data.sources) setQrSources(data.sources.join(', '));
         }
@@ -58,6 +161,7 @@ export default function ConfigSettings() {
     try {
       await setDoc(doc(db, 'settings', 'qr_form'), {
         qualifications: qrQualifications.split(',').map(s => s.trim()).filter(Boolean),
+        courses: qrCourses.split(',').map(s => s.trim()).filter(Boolean),
         timings: qrTimings.split(',').map(s => s.trim()).filter(Boolean),
         sources: qrSources.split(',').map(s => s.trim()).filter(Boolean)
       }, { merge: true });
@@ -380,41 +484,33 @@ export default function ConfigSettings() {
               </p>
               <form onSubmit={handleSaveQrConfig}>
                 
-                <div className="form-group">
-                  <label className="form-label">Qualifications Options</label>
-                  <textarea 
-                    className="form-control" 
-                    rows="3"
-                    value={qrQualifications}
-                    onChange={(e) => setQrQualifications(e.target.value)}
-                    placeholder="e.g. 10th Pass, 12th Pass, Undergraduate"
-                  />
-                  <small style={{ color: '#64748b', fontSize: '11px' }}>Separate options with commas.</small>
-                </div>
+                <TagInput
+                  label="Qualifications Options"
+                  value={qrQualifications}
+                  onChange={setQrQualifications}
+                  placeholder="e.g. 10th Pass, 12th Pass, Undergraduate"
+                />
 
-                <div className="form-group">
-                  <label className="form-label">Batch Timing Options</label>
-                  <textarea 
-                    className="form-control" 
-                    rows="3"
-                    value={qrTimings}
-                    onChange={(e) => setQrTimings(e.target.value)}
-                    placeholder="e.g. Morning, Evening, Weekend"
-                  />
-                  <small style={{ color: '#64748b', fontSize: '11px' }}>Separate options with commas.</small>
-                </div>
+                <TagInput
+                  label="Courses Options"
+                  value={qrCourses}
+                  onChange={setQrCourses}
+                  placeholder="e.g. Full-Stack Web Development, Data Science"
+                />
 
-                <div className="form-group">
-                  <label className="form-label">Where Did You Hear About Us? Options</label>
-                  <textarea 
-                    className="form-control" 
-                    rows="3"
-                    value={qrSources}
-                    onChange={(e) => setQrSources(e.target.value)}
-                    placeholder="e.g. Instagram, Facebook, Friend"
-                  />
-                  <small style={{ color: '#64748b', fontSize: '11px' }}>Separate options with commas.</small>
-                </div>
+                <TagInput
+                  label="Batch Timing Options"
+                  value={qrTimings}
+                  onChange={setQrTimings}
+                  placeholder="e.g. Morning, Evening, Weekend"
+                />
+
+                <TagInput
+                  label="Where Did You Hear About Us? Options"
+                  value={qrSources}
+                  onChange={setQrSources}
+                  placeholder="e.g. Instagram, Facebook, Friend"
+                />
 
                 <button type="submit" className="primary-btn mt-4" disabled={isSavingQr}>
                   {isSavingQr ? 'Saving...' : 'Save QR Configuration'}
