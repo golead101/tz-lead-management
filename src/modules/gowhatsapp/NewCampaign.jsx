@@ -160,26 +160,39 @@ export default function NewCampaign({ setSubView }) {
   const [campaignCourseFilter, setCampaignCourseFilter] = useState('');
   const [campaignStageFilter, setCampaignStageFilter] = useState('');
   const [campaignSourceFilter, setCampaignSourceFilter] = useState('');
+  const [campaignNameFilter, setCampaignNameFilter] = useState('');
+
+  const getBaseLeads = () => {
+    if (!selectedListId || selectedListId === 'crm-leads-all') {
+      return leads;
+    }
+    return whatsappDb.getContacts()[selectedListId] || [];
+  };
 
   const getFilteredLeads = () => {
-    return leads.filter(lead => {
+    return getBaseLeads().filter(lead => {
       const matchCourse = campaignCourseFilter ? lead.course === campaignCourseFilter : true;
       const matchStage = campaignStageFilter ? lead.stage === campaignStageFilter : true;
       const matchSource = campaignSourceFilter ? lead.source === campaignSourceFilter : true;
-      return matchCourse && matchStage && matchSource;
+      const matchCampaign = campaignNameFilter && campaignSourceFilter.toLowerCase().includes('meta') 
+        ? (lead.campaign === campaignNameFilter || lead.campaignName === campaignNameFilter) 
+        : true;
+      return matchCourse && matchStage && matchSource && matchCampaign;
     });
   };
 
-  const uniqueCourses = [...new Set(leads.map(l => l.course).filter(Boolean))];
-  const uniqueStages = [...new Set(leads.map(l => l.stage).filter(Boolean))];
-  const uniqueSources = [...new Set(leads.map(l => l.source).filter(Boolean))];
+  const baseLeads = getBaseLeads();
+  const uniqueCourses = [...new Set(baseLeads.map(l => l.course).filter(Boolean))];
+  const uniqueStages = [...new Set(baseLeads.map(l => l.stage).filter(Boolean))];
+  const uniqueSources = [...new Set(baseLeads.map(l => l.source).filter(Boolean))];
+  const uniqueCampaigns = [...new Set(baseLeads.filter(l => (l.source || '').toLowerCase().includes('meta')).map(l => l.campaign || l.campaignName).filter(Boolean))];
 
   useEffect(() => {
-    if (selectedListId === 'crm-leads-all') {
+    if (selectedListId) {
       const filtered = getFilteredLeads();
       setPreviewContacts(filtered.slice(0, 3));
     }
-  }, [selectedListId, campaignCourseFilter, campaignStageFilter, campaignSourceFilter, leads]);
+  }, [selectedListId, campaignCourseFilter, campaignStageFilter, campaignSourceFilter, campaignNameFilter, leads]);
 
   useEffect(() => {
     loadExistingLists();
@@ -331,17 +344,25 @@ export default function NewCampaign({ setSubView }) {
   };
 
   const handleSelectExistingList = (listId) => {
+    if (selectedListId === listId) {
+      setSelectedListId('');
+      setPreviewContacts([]);
+      setColumns([]);
+      return;
+    }
     setSelectedListId(listId);
     setUploadedContacts([]);
     setPhoneColumn('');
+    
+    // Reset filters when changing lists
+    setCampaignCourseFilter('');
+    setCampaignStageFilter('');
+    setCampaignSourceFilter('');
+    setCampaignNameFilter('');
+    
     if (listId === 'crm-leads-all') {
-      const filtered = getFilteredLeads();
-      setPreviewContacts(filtered.slice(0, 3));
       setColumns(['name', 'phone', 'course', 'course_fee', 'stage', 'counselor']);
     } else {
-      const allContacts = whatsappDb.getContacts();
-      const listContacts = allContacts[listId] || [];
-      setPreviewContacts(listContacts.slice(0, 3));
       const targetList = existingLists.find(l => l.id === listId);
       setColumns(targetList ? targetList.columns : []);
     }
@@ -732,7 +753,9 @@ export default function NewCampaign({ setSubView }) {
                 <div style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {existingLists.map(list => (
+                {existingLists
+                  .filter(list => !selectedListId || selectedListId === list.id)
+                  .map(list => (
                   <div
                     key={list.id}
                     onClick={() => handleSelectExistingList(list.id)}
@@ -754,9 +777,9 @@ export default function NewCampaign({ setSubView }) {
             </>
           )}
 
-          {selectedListId === 'crm-leads-all' && (
+          {selectedListId && (
             <div style={{ background: '#f8fafc', padding: 16, borderRadius: 10, marginTop: 16, border: '1px solid #e2e8f0' }}>
-              <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#334155', marginBottom: 12 }}>Filter CRM Leads</div>
+              <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#334155', marginBottom: 12 }}>Filter {selectedListId === 'crm-leads-all' ? 'CRM Leads' : 'List Contacts'}</div>
               <div style={{ display: 'flex', gap: 12 }}>
                 <select
                   value={campaignCourseFilter}
@@ -776,12 +799,27 @@ export default function NewCampaign({ setSubView }) {
                 </select>
                 <select
                   value={campaignSourceFilter}
-                  onChange={e => setCampaignSourceFilter(e.target.value)}
+                  onChange={e => {
+                    setCampaignSourceFilter(e.target.value);
+                    if (!e.target.value.toLowerCase().includes('meta')) {
+                      setCampaignNameFilter('');
+                    }
+                  }}
                   style={{ flex: 1, padding: '8px 12px', borderRadius: 6, border: '1px solid #cbd5e1', outline: 'none' }}
                 >
                   <option value="">All Sources</option>
                   {uniqueSources.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
+                {campaignSourceFilter.toLowerCase().includes('meta') && (
+                  <select
+                    value={campaignNameFilter}
+                    onChange={e => setCampaignNameFilter(e.target.value)}
+                    style={{ flex: 1, padding: '8px 12px', borderRadius: 6, border: '1px solid #cbd5e1', outline: 'none' }}
+                  >
+                    <option value="">All Campaigns</option>
+                    {uniqueCampaigns.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                )}
               </div>
               <div style={{ marginTop: 12, fontSize: '0.85rem', color: '#64748b' }}>
                 <span style={{ fontWeight: 600, color: BRAND_BLUE }}>{getFilteredLeads().length}</span> leads match your filters.

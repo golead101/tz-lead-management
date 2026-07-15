@@ -37,6 +37,7 @@ export default function GridView() {
   const [selectedStage, setSelectedStage] = useState('All');
   const [selectedCounselor, setSelectedCounselor] = useState('All');
   const [selectedSource, setSelectedSource] = useState('All');
+  const [selectedCampaign, setSelectedCampaign] = useState('All');
   const [selectedTemperature, setSelectedTemperature] = useState('All');
 
   const [dateRangeFilter, setDateRangeFilter] = useState('All Time');
@@ -89,6 +90,10 @@ export default function GridView() {
       const srcLower = (lead.source || '').toLowerCase();
       if (selectedSource === 'meta') {
         if (!srcLower.includes('meta')) return false;
+        if (selectedCampaign !== 'All') {
+          const leadCampaign = lead.campaign || lead.campaignName || '';
+          if (leadCampaign !== selectedCampaign) return false;
+        }
       } else if (selectedSource === 'google') {
         if (!srcLower.includes('google')) return false;
       } else if (selectedSource === 'whatsapp') {
@@ -398,6 +403,7 @@ export default function GridView() {
   const [editStage, setEditStage] = useState('');
   const [editSource, setEditSource] = useState('');
   const [editSubSource, setEditSubSource] = useState('');
+  const [editCampaign, setEditCampaign] = useState('');
   const [editFollowupDate, setEditFollowupDate] = useState('');
 
   const handleEditStart = (lead) => {
@@ -409,6 +415,7 @@ export default function GridView() {
     setEditStage(lead.stage || 'New Lead');
     setEditSource(lead.source || 'Walk-in');
     setEditSubSource(lead.subSource || '');
+    setEditCampaign(lead.campaign || lead.campaignName || '');
     setEditFollowupDate(lead.followupDate || '');
     setIsEditing(true);
   };
@@ -427,6 +434,7 @@ export default function GridView() {
       stage: editStage,
       source: editSource,
       subSource: editSubSource,
+      campaign: editCampaign,
       followupDate: editStage === 'Follow-up' ? editFollowupDate : null
     });
     setIsEditing(false);
@@ -443,7 +451,13 @@ export default function GridView() {
   // Quick stats
   const totalAll = leads.filter(l => activeRole !== 'Counselor' || l.counselor === activeUser).length;
   const convertedCount = filteredLeads.filter(l => l.stage === 'Converted').length;
-  const activeFiltersCount = [selectedCourse, selectedStage, selectedCounselor, selectedSource, dateRangeFilter].filter(f => f !== 'All' && f !== 'All Time').length;
+  const activeFiltersCount = [selectedCourse, selectedStage, selectedCounselor, selectedSource, selectedCampaign, dateRangeFilter].filter(f => f !== 'All' && f !== 'All Time').length;
+
+  const uniqueMetaCampaigns = [...new Set(
+    leads.filter(l => (l.source || '').toLowerCase().includes('meta'))
+         .map(l => l.campaign || l.campaignName)
+         .filter(Boolean)
+  )];
 
   // Get relative time string
   const getRelativeTime = (dateStr) => {
@@ -496,6 +510,7 @@ export default function GridView() {
           </div>
         </div>
         <div className="gv-header-actions">
+
           <button className="gv-btn-outline" onClick={() => setImportOpen(true)}>
             <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" stroke="currentColor" strokeWidth="2" fill="none"/></svg>
             Import CSV
@@ -527,7 +542,7 @@ export default function GridView() {
             <span style={{ color: 'var(--primary)', fontWeight: 600 }}>{activeFiltersCount} filter{activeFiltersCount > 1 ? 's' : ''} active</span>
             <button
               className="gv-clear-filters"
-              onClick={() => { setSelectedCourse('All'); setSelectedStage('All'); setSelectedCounselor('All'); setSelectedSource('All'); setDateRangeFilter('All Time'); setCustomStartDate(''); setCustomEndDate(''); setGridSearch(''); setCurrentPage(1); }}
+              onClick={() => { setSelectedCourse('All'); setSelectedStage('All'); setSelectedCounselor('All'); setSelectedSource('All'); setSelectedCampaign('All'); setDateRangeFilter('All Time'); setCustomStartDate(''); setCustomEndDate(''); setGridSearch(''); setCurrentPage(1); }}
             >Clear</button>
           </div>
         )}
@@ -613,7 +628,11 @@ export default function GridView() {
           </label>
           <select
             value={selectedSource}
-            onChange={(e) => { setSelectedSource(e.target.value); setCurrentPage(1); }}
+            onChange={(e) => { 
+              setSelectedSource(e.target.value); 
+              setCurrentPage(1); 
+              if (e.target.value !== 'meta') setSelectedCampaign('All');
+            }}
             className="gv-filter-select"
           >
             <option value="All">All Sources</option>
@@ -625,6 +644,25 @@ export default function GridView() {
             <option value="walkin">Walk-in</option>
           </select>
         </div>
+
+        {selectedSource === 'meta' && (
+          <div className="gv-filter-group">
+            <label className="gv-filter-label">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" strokeLinecap="round"/><circle cx="12" cy="12" r="4"/></svg>
+              Campaign
+            </label>
+            <select
+              value={selectedCampaign}
+              onChange={(e) => { setSelectedCampaign(e.target.value); setCurrentPage(1); }}
+              className="gv-filter-select"
+            >
+              <option value="All">All Campaigns</option>
+              {uniqueMetaCampaigns.map((c, index) => (
+                <option key={`${c}-${index}`} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <div className="gv-filter-group" style={{ position: 'relative' }}>
           <label className="gv-filter-label">
@@ -1302,6 +1340,20 @@ export default function GridView() {
                             value={editSubSource}
                             onChange={(e) => setEditSubSource(e.target.value)}
                             placeholder="Sub Source"
+                            style={{ padding: '8px 12px', fontSize: '13px' }}
+                          />
+                        </div>
+                      )}
+
+                      {editSource.toLowerCase().includes('meta') && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#475569' }}>Campaign Name</label>
+                          <input
+                            type="text"
+                            className="form-control"
+                            value={editCampaign}
+                            onChange={(e) => setEditCampaign(e.target.value)}
+                            placeholder="e.g. Agentic AI demo campaign"
                             style={{ padding: '8px 12px', fontSize: '13px' }}
                           />
                         </div>
