@@ -269,11 +269,11 @@ export default function GridView() {
         hasHeader = true;
         const headers = lines[0].split(',').map(p => p.trim().toLowerCase());
         
-        nameIdx = headers.findIndex(h => h.includes('name'));
+        nameIdx = headers.findIndex(h => h.includes('name') && !h.includes('campaign'));
         emailIdx = headers.findIndex(h => h.includes('email'));
         phoneIdx = headers.findIndex(h => h.includes('phone') || h.includes('contact') || h.includes('mobile'));
         courseIdx = headers.findIndex(h => h.includes('course') || h.includes('program'));
-        sourceIdx = headers.findIndex(h => h.includes('source'));
+        sourceIdx = headers.findIndex(h => h.includes('source') || h.includes('platform'));
         campaignIdx = headers.findIndex(h => h.includes('campaign'));
       }
     }
@@ -496,6 +496,36 @@ export default function GridView() {
     }
     return dateRangeFilter;
   };
+  const handleExportCSV = () => {
+    if (filteredLeads.length === 0) {
+      showToastMsg('No leads to export.');
+      return;
+    }
+
+    const exportData = filteredLeads.map(lead => ({
+      Name: lead.name || '',
+      Phone: lead.phone || '',
+      Email: lead.email || '',
+      Course: lead.course || '',
+      Source: lead.source || '',
+      Stage: lead.stage || '',
+      Counselor: lead.counselor || '',
+      Temperature: lead.temperature || '',
+      'Created Date': lead.createdDate ? new Date(lead.createdDate).toLocaleString() : ''
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const csvOutput = XLSX.utils.sheet_to_csv(ws);
+    const blob = new Blob([csvOutput], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'leads_export.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToastMsg('Leads exported successfully.');
+  };
 
   return (
     <div className="fade-in">
@@ -510,9 +540,12 @@ export default function GridView() {
           </div>
         </div>
         <div className="gv-header-actions">
-
-          <button className="gv-btn-outline" onClick={() => setImportOpen(true)}>
+          <button className="gv-btn-outline" onClick={handleExportCSV}>
             <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" stroke="currentColor" strokeWidth="2" fill="none"/></svg>
+            Export CSV
+          </button>
+          <button className="gv-btn-outline" onClick={() => setImportOpen(true)}>
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M12 15v-12M7 8l5-5 5 5" stroke="currentColor" strokeWidth="2" fill="none"/></svg>
             Import CSV
           </button>
           <button className="gv-btn-primary" onClick={() => { setSelectedLeadId(null); setShowDetailModal(true); }}>
@@ -814,25 +847,20 @@ export default function GridView() {
                     <span className="gv-checkmark" />
                   </label>
                 </th>
-                <th className="gv-th-sortable" onClick={() => handleSort('name')}>
+                <th>
                   <span>Name & Contact</span>
-                  <span className="gv-sort-icon">{getSortIcon('name')}</span>
                 </th>
-                <th className="gv-th-sortable" onClick={() => handleSort('stage')}>
-                  <span>status</span>
-                  <span className="gv-sort-icon">{getSortIcon('stage')}</span>
+                <th>
+                  <span>STATUS</span>
                 </th>
-                <th className="gv-th-sortable" onClick={() => handleSort('source')}>
-                  <span>source</span>
-                  <span className="gv-sort-icon">{getSortIcon('source')}</span>
+                <th>
+                  <span>SOURCE</span>
                 </th>
-                <th className="gv-th-sortable" onClick={() => handleSort('counselor')}>
-                  <span>Assigned To</span>
-                  <span className="gv-sort-icon">{getSortIcon('counselor')}</span>
+                <th>
+                  <span>ASSIGNED TO</span>
                 </th>
-                <th className="gv-th-sortable" onClick={() => handleSort('createdDate')}>
-                  <span>Date</span>
-                  <span className="gv-sort-icon">{getSortIcon('createdDate')}</span>
+                <th>
+                  <span>DATE</span>
                 </th>
               </tr>
             </thead>
