@@ -491,13 +491,12 @@ export default function ConfigSettings() {
                   placeholder="e.g. 10th Pass, 12th Pass, Undergraduate"
                 />
 
-                <TagInput
-                  label="Courses Options"
-                  value={qrCourses}
-                  onChange={setQrCourses}
-                  placeholder="e.g. Full-Stack Web Development, Data Science"
-                />
-
+                <div className="form-group mb-4">
+                  <label className="form-label">Courses Options</label>
+                  <div style={{ fontSize: '13px', color: 'var(--text-muted, #64748b)', padding: '10px 12px', background: 'var(--bg-secondary, #f1f5f9)', borderRadius: '6px', border: '1px solid var(--border-color, #e2e8f0)' }}>
+                    Courses are automatically synced from your active Program Directory.
+                  </div>
+                </div>
                 <TagInput
                   label="Batch Timing Options"
                   value={qrTimings}
