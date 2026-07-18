@@ -175,7 +175,7 @@ export default function ConfigSettings() {
   };
 
   const qrRef = useRef(null);
-  const qrUrl = window.location.origin + '/qr-form';
+  const qrUrl = window.location.origin + '/qr-form?v=' + (courses ? courses.length : '1');
 
   const downloadQR = () => {
     const canvas = qrRef.current.querySelector('canvas');

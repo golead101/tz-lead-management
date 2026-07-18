@@ -79,7 +79,7 @@ service cloud.firestore {
     // /settings collection
     // ─────────────────────────────────────────────
     match /settings/{documentId} {
-      allow read: if documentId == 'live_form';
+      allow read: if documentId == 'live_form' || documentId == 'qr_form';
       allow read: if isStaff() && (documentId == 'whatsapp_chatbot' || documentId == 'whatsapp_api');
       allow read, write: if isAdmin();
     }
@@ -115,7 +115,7 @@ service cloud.firestore {
     // Config Collections (courses, stages, fields)
     // ─────────────────────────────────────────────
     match /courses/{courseId} {
-      allow read: if isStaff();
+      allow read: if true;
       allow write: if isAdmin();
     }
     match /pipelineStages/{stageId} {
