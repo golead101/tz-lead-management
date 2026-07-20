@@ -6,6 +6,11 @@ export default function FollowUps() {
   const { leads, selectedLeadId, setSelectedLeadId, setActiveView, showDetailModal, setShowDetailModal, logCall, pipelineStages } = useCRM();
   const [activeTab, setActiveTab] = useState('overdue'); // Default to overdue as in the mockup
 
+  // New filtering state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterStage, setFilterStage] = useState('');
+  const [filterSource, setFilterSource] = useState('');
+
   const [modalStep, setModalStep] = useState(1); // 1 = simple contact view, 2 = call outcome form
   const [callStatus, setCallStatus] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -49,7 +54,19 @@ export default function FollowUps() {
   };
 
   // Filter leads that have followupDate set OR stage is Follow-up
-  const followUpLeads = leads.filter(lead => lead.followupDate || lead.stage === 'Follow-up');
+  let followUpLeads = leads.filter(lead => lead.followupDate || lead.stage === 'Follow-up');
+
+  // Apply search and dropdown filters
+  if (searchQuery.trim()) {
+    const q = searchQuery.toLowerCase();
+    followUpLeads = followUpLeads.filter(l => l.name?.toLowerCase().includes(q) || l.phone?.includes(q));
+  }
+  if (filterStage) {
+    followUpLeads = followUpLeads.filter(l => l.stage === filterStage);
+  }
+  if (filterSource) {
+    followUpLeads = followUpLeads.filter(l => l.source === filterSource);
+  }
 
   // Group into overdue and upcoming
   const now = new Date();
@@ -118,6 +135,36 @@ export default function FollowUps() {
         >
           Overdue <span className="badge badge-red">{overdueLeads.length}</span>
         </button>
+      </div>
+
+      <div className="followups-filters" style={{ display: 'flex', gap: '12px', padding: '0 24px 16px 24px', flexWrap: 'wrap' }}>
+        <input 
+          type="text" 
+          placeholder="Search name or phone..." 
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', minWidth: '220px', fontSize: '13px', outline: 'none' }}
+        />
+        <select 
+          value={filterStage} 
+          onChange={(e) => setFilterStage(e.target.value)}
+          style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', minWidth: '160px', fontSize: '13px', outline: 'none', backgroundColor: '#fff' }}
+        >
+          <option value="">All Stages</option>
+          {pipelineStages.map(stage => (
+            <option key={stage.id} value={stage.name}>{stage.name}</option>
+          ))}
+        </select>
+        <select 
+          value={filterSource} 
+          onChange={(e) => setFilterSource(e.target.value)}
+          style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', minWidth: '160px', fontSize: '13px', outline: 'none', backgroundColor: '#fff' }}
+        >
+          <option value="">All Sources</option>
+          {Array.from(new Set(leads.map(l => l.source).filter(Boolean))).map(source => (
+            <option key={source} value={source}>{source}</option>
+          ))}
+        </select>
       </div>
 
       <div className="followups-list-container">
