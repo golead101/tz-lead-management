@@ -379,6 +379,7 @@ export default function GridView() {
       notes: callNotes,
       scheduleFollowup: scheduleFollowup,
       followupDate: followupDate,
+      followupReason: callNotes,
       updateStage: scheduleFollowup ? 'Follow-up' : ''
     });
     setCallNotes('');

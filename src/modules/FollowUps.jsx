@@ -33,7 +33,7 @@ export default function FollowUps() {
       updateStage: callUpdateStage,
       scheduleFollowup: isFollowupSched,
       followupDate: isFollowupSched ? callFollowupDate : '',
-      followupReason: isFollowupSched ? (callFollowupReason || 'Scheduled callback') : ''
+      followupReason: isFollowupSched ? (callNotes || 'Scheduled callback') : ''
     });
 
     // Reset Form & Close
@@ -44,7 +44,6 @@ export default function FollowUps() {
     setCallUpdateStage('');
     setCallSchedFollowup(false);
     setCallFollowupDate('');
-    setCallFollowupReason('');
     setSelectedLeadId(null);
     setShowDetailModal(false);
   };
@@ -61,6 +60,7 @@ export default function FollowUps() {
 
   // Format date nicely: e.g. "Wednesday, May 13 at 9:00 AM"
   const formatFollowupDate = (dateString) => {
+    if (!dateString) return 'Time not specified';
     try {
       const date = new Date(dateString);
       const options = { weekday: 'long', month: 'short', day: 'numeric' };
@@ -82,7 +82,6 @@ export default function FollowUps() {
     setCallUpdateStage('');
     setCallSchedFollowup(false);
     setCallFollowupDate('');
-    setCallFollowupReason('');
     setShowDetailModal(true);
   };
 
@@ -177,7 +176,9 @@ export default function FollowUps() {
                           <circle cx="12" cy="12" r="10" />
                           <polyline points="12 6 12 12 16 14" />
                         </svg>
-                        <span style={{ fontSize: '13px', color: '#2563eb', fontWeight: '600' }}>{formatFollowupDate(lead.followupDate)}</span>
+                        <span style={{ fontSize: '13px', color: '#2563eb', fontWeight: '600' }}>
+                          {lead.followupDate ? formatFollowupDate(lead.followupDate) : 'Time not set'}
+                        </span>
                       </div>
                     </div>
 
@@ -531,9 +532,9 @@ export default function FollowUps() {
                           Schedule Follow-up
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <label style={{ fontSize: '12px', fontWeight: '600', color: '#64748b' }}>Follow-up Date</label>
+                          <label style={{ fontSize: '12px', fontWeight: '600', color: '#64748b' }}>Follow-up Date & Time</label>
                           <input 
-                            type="date" 
+                            type="datetime-local" 
                             value={callFollowupDate}
                             onChange={(e) => setCallFollowupDate(e.target.value)}
                             style={{ 
@@ -544,7 +545,7 @@ export default function FollowUps() {
                               background: '#fff', 
                               color: '#1e293b', 
                               fontSize: '14px', 
-                              outline: 'none' 
+                              outline: 'none'
                             }}
                           />
                         </div>

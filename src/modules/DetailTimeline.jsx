@@ -223,7 +223,7 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
       updateStage: callUpdateStage,
       scheduleFollowup: isFollowupSched,
       followupDate: isFollowupSched ? callFollowupDate : '',
-      followupReason: isFollowupSched ? (callFollowupReason || 'Scheduled callback') : ''
+      followupReason: isFollowupSched ? (callNotes || 'Scheduled callback') : ''
     });
 
     // Reset Form
@@ -234,7 +234,6 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
     setCallUpdateStage('');
     setCallSchedFollowup(false);
     setCallFollowupDate('');
-    setCallFollowupReason('');
     setCallModalOpen(false);
   };
 
@@ -1056,9 +1055,9 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
                     Schedule Follow-up
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '12px', fontWeight: '600', color: '#64748b' }}>Follow-up Date</label>
+                    <label style={{ fontSize: '12px', fontWeight: '600', color: '#64748b' }}>Follow-up Date & Time</label>
                     <input 
-                      type="date" 
+                      type="datetime-local" 
                       value={callFollowupDate}
                       onChange={(e) => setCallFollowupDate(e.target.value)}
                       style={{ 
@@ -1069,7 +1068,7 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
                         background: '#fff', 
                         color: '#1e293b', 
                         fontSize: '14px', 
-                        outline: 'none' 
+                        outline: 'none'
                       }}
                     />
                   </div>
