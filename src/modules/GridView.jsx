@@ -380,7 +380,7 @@ export default function GridView() {
       scheduleFollowup: scheduleFollowup,
       followupDate: followupDate,
       followupReason: callNotes,
-      updateStage: scheduleFollowup ? 'Follow-up' : ''
+      updateStage: ''
     });
     setCallNotes('');
     setScheduleFollowup(false);

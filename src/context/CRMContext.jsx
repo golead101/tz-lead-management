@@ -969,14 +969,14 @@ export const CRMProvider = ({ children }) => {
           id: `log-call-${Date.now()}`,
           type: 'call',
           title: `Call Logged: ${callDetails.status}`,
-          content: `Call Outcome: ${callDetails.status}${callDetails.notes ? `\nNotes: ${callDetails.notes}` : ''}${callDetails.scheduleFollowup && callDetails.followupDate ? `\nFollow-up: Scheduled for ${new Date(callDetails.followupDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}`,
+          content: `Call Outcome: ${callDetails.status}${callDetails.notes ? `\nNotes: ${callDetails.notes}` : ''}${callDetails.scheduleFollowup && callDetails.followupDate ? `\nFollow-up: Scheduled for ${new Date(callDetails.followupDate).toLocaleString()} - Reason: ${callDetails.followupReason || callDetails.notes || 'Scheduled callback'}` : ''}`,
           timestamp: new Date().toISOString(),
           user: activeUser
         };
         const nextTimeline = [...(lead.timeline || []), callLog];
         let nextStage = lead.stage;
-        let nextFollowupDate = null;
-        let nextFollowupReason = null;
+        let nextFollowupDate = lead.followupDate || null;
+        let nextFollowupReason = lead.followupReason || null;
         let whatsappHistory = [...(lead.whatsappMessages || [])];
 
         // Determine if outcome maps to a pipeline stage shift
@@ -1066,14 +1066,7 @@ export const CRMProvider = ({ children }) => {
         if (callDetails.scheduleFollowup && callDetails.followupDate) {
           nextFollowupDate = new Date(callDetails.scheduleFollowup && callDetails.followupDate).toISOString();
           nextFollowupReason = callDetails.followupReason || 'Scheduled callback';
-          nextTimeline.push({
-            id: `log-sched-${Date.now()}`,
-            type: 'followup',
-            title: 'Follow-up Scheduled',
-            content: `Scheduled for ${new Date(callDetails.followupDate).toLocaleString()} - Reason: ${nextFollowupReason}`,
-            timestamp: new Date().toISOString(),
-            user: activeUser
-          });
+          // Removed the duplicate nextTimeline.push here to avoid double entries
         }
 
         updatedLead = {
