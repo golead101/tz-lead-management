@@ -109,20 +109,38 @@ export default function TemplatesPage() {
     }
   };
 
-  const handleMediaUploadMock = (file) => {
+  const handleMediaUpload = async (file) => {
     setUploadingMedia(true);
-    setTimeout(() => {
-      setMediaHandle(`mock-handle-${Date.now()}`);
-      setMediaFile(file);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const url = `https://us-central1-${PROJECT_ID}.cloudfunctions.net/uploadMetaTemplateMedia`;
+      const res = await fetch(url, {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      
+      if (res.ok && data.success) {
+        setMediaHandle(data.handle);
+        setMediaFile(file);
+        setToast({ type: 'success', message: `Sample file "${file.name}" uploaded securely to Meta.` });
+      } else {
+        throw new Error(data.error || 'Failed to upload media to Meta');
+      }
+    } catch (err) {
+      console.error('[Upload Media Error]', err);
+      setToast({ type: 'error', message: err.message || 'Media upload failed' });
+    } finally {
       setUploadingMedia(false);
-      setToast({ type: 'success', message: `Sample file "${file.name}" uploaded successfully.` });
-    }, 1000);
+    }
   };
 
   const handleFileSelect = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    handleMediaUploadMock(file);
+    handleMediaUpload(file);
   };
 
   const clearMedia = () => {
@@ -159,7 +177,20 @@ export default function TemplatesPage() {
         ...(bodyExamples.length > 0 ? { example: { body_text: [bodyExamples] } } : {})
       },
       tplFooter ? { type: 'FOOTER', text: tplFooter } : null,
-      tplButtons.length > 0 ? { type: 'BUTTONS', buttons: tplButtons } : null
+      tplButtons.length > 0 ? { 
+        type: 'BUTTONS', 
+        buttons: tplButtons.map(btn => {
+          if (btn.type === 'PHONE_NUMBER' && btn.phone_number) {
+            let num = btn.phone_number.replace(/[^0-9+]/g, '');
+            if (!num.startsWith('+')) {
+              if (num.length === 10) num = '+91' + num;
+              else num = '+' + num;
+            }
+            return { ...btn, phone_number: num };
+          }
+          return btn;
+        })
+      } : null
     ].filter(Boolean);
 
     try {

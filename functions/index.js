@@ -3,6 +3,7 @@ const admin = require('firebase-admin');
 const axios = require('axios');
 const cors = require('cors')({ origin: true });
 const cryptoHelper = require('./crypto');
+const Busboy = require('busboy');
 
 // Initialize Firebase Admin
 try {
@@ -947,7 +948,8 @@ async function getDecryptedWhatsAppCredentials() {
     apiVersion: whatsapp.apiVersion || 'v20.0',
     webhookVerifyToken: whatsapp.webhookVerifyToken || '',
     enabled: whatsapp.enabled || false,
-    status: whatsapp.status || 'Setup Required'
+    status: whatsapp.status || 'Setup Required',
+    appId: data.meta?.appId || ''
   };
 }
 
@@ -1822,3 +1824,83 @@ exports.onLeadCreated = functions.firestore
     }
     return null;
   });
+
+/**
+ * uploadMetaTemplateMedia
+ * Uploads a file to Meta's Resumable Upload API for Template creation.
+ */
+exports.uploadMetaTemplateMedia = functions.https.onRequest((req, res) => {
+  return cors(req, res, async () => {
+    if (req.method !== 'POST') {
+      return res.status(405).json({ error: 'Method not allowed' });
+    }
+
+    try {
+      const creds = await getDecryptedWhatsAppCredentials();
+      if (!creds.accessToken || !creds.appId) {
+        return res.status(400).json({ success: false, error: 'Meta integration missing App ID or Access Token.' });
+      }
+
+      const busboy = Busboy({ headers: req.headers });
+      let fileBuffer = null;
+      let mimeType = '';
+      let fileName = '';
+
+      busboy.on('file', (fieldname, file, info) => {
+        fileName = info.filename;
+        mimeType = info.mimeType;
+        const chunks = [];
+        file.on('data', (data) => chunks.push(data));
+        file.on('end', () => {
+          fileBuffer = Buffer.concat(chunks);
+        });
+      });
+
+      busboy.on('finish', async () => {
+        if (!fileBuffer) {
+          return res.status(400).json({ success: false, error: 'No file uploaded.' });
+        }
+
+        try {
+          // 1. Create Upload Session
+          const sessionUrl = `https://graph.facebook.com/v20.0/${creds.appId}/uploads?file_length=${fileBuffer.length}&file_type=${mimeType}`;
+          const sessionRes = await axios.post(sessionUrl, {}, {
+            headers: {
+              'Authorization': `OAuth ${creds.accessToken}`
+            }
+          });
+
+          const uploadId = sessionRes.data.id;
+          if (!uploadId) {
+            throw new Error('Meta did not return an upload session ID');
+          }
+
+          // 2. Upload file data
+          const uploadUrl = `https://graph.facebook.com/v20.0/${uploadId}`;
+          const uploadRes = await axios.post(uploadUrl, fileBuffer, {
+            headers: {
+              'Authorization': `OAuth ${creds.accessToken}`,
+              'file_offset': '0',
+              'Content-Type': 'application/octet-stream'
+            }
+          });
+
+          const handle = uploadRes.data.h;
+          if (!handle) {
+            throw new Error('Meta did not return a media handle');
+          }
+
+          return res.status(200).json({ success: true, handle });
+        } catch (error) {
+          console.error('[uploadMetaTemplateMedia] Error:', error.response?.data || error.message);
+          return res.status(500).json({ success: false, error: 'Failed to upload media to Meta' });
+        }
+      });
+
+      busboy.end(req.rawBody);
+    } catch (e) {
+      console.error('[uploadMetaTemplateMedia] Initialization Error:', e);
+      return res.status(500).json({ success: false, error: e.message });
+    }
+  });
+});
