@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   MessageCircle, Send, Search, Check, CheckCheck, Clock,
-  AlertCircle, Paperclip
+  AlertCircle, Paperclip, FileText
 } from 'lucide-react';
 import { whatsappDb } from './whatsappDb';
 import { useCRM } from '../../context/CRMContext';
@@ -73,13 +73,34 @@ function StatusIcon({ status, size = 14 }) {
 }
 
 export default function InboxPage() {
-  const { leads, sendWhatsAppMsg, updateLead, activeRole, activeUser } = useCRM();
+  const { leads, sendWhatsAppMsg, updateLead, activeRole, activeUser, showToastMsg } = useCRM();
   const [selectedLeadId, setSelectedLeadId] = useState(null);
   const [replyText, setReplyText] = useState('');
   const [sending, setSending] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [inboxFilter, setInboxFilter] = useState('all');
   const messagesEndRef = useRef(null);
+  
+  const [showStorageModal, setShowStorageModal] = useState(false);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [attachedFile, setAttachedFile] = useState(null);
+  const [attachedTemplate, setAttachedTemplate] = useState(null);
+  const [metaTemplates, setMetaTemplates] = useState([]);
+
+  useEffect(() => {
+    setMetaTemplates(whatsappDb.getTemplates());
+  }, []);
+  
+  const mockStorageFiles = [
+    { id: 1, name: 'AI_Course_Brochure.pdf', type: 'document', size: '2.4 MB' },
+    { id: 2, name: 'Campus_Tour.mp4', type: 'video', size: '14.1 MB' },
+    { id: 3, name: 'Promo_Offer_Poster.jpg', type: 'image', size: '1.1 MB' },
+    { id: 4, name: 'Fee_Structure_2026.pdf', type: 'document', size: '0.8 MB' }
+  ];
+
+  const handleAttachClick = () => {
+    setShowStorageModal(true);
+  };
 
   // Dynamically compute conversations from CRM leads
   const conversations = React.useMemo(() => {
@@ -159,12 +180,53 @@ export default function InboxPage() {
   };
 
   const handleSendReply = () => {
-    if (!replyText.trim() || !selectedLeadId || sending) return;
+    if ((!replyText.trim() && !attachedFile && !attachedTemplate) || !selectedLeadId || sending) return;
     setSending(true);
-    const text = replyText.trim();
-    setReplyText('');
+    let text = replyText.trim();
+    let templateData = null;
+    
+    if (attachedFile) {
+      text = text ? `${text}\n[Attached: ${attachedFile.name}]` : `[Attached: ${attachedFile.name}]`;
+    }
+    if (attachedTemplate) {
+      const bodyText = attachedTemplate.components?.find(c => c.type === 'BODY')?.text || '';
+      text = text ? `${text}\n\n${bodyText}` : bodyText;
+      
+      const apiComponents = [];
+      const origComponents = attachedTemplate.components || [];
+      
+      origComponents.forEach(comp => {
+        if (comp.type === 'HEADER' && comp.format === 'IMAGE') {
+          apiComponents.push({ type: 'header', parameters: [{ type: 'image', image: { link: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=600&q=80' } }] });
+        } else if (comp.type === 'HEADER' && comp.format === 'DOCUMENT') {
+          apiComponents.push({ type: 'header', parameters: [{ type: 'document', document: { link: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf' } }] });
+        } else if (comp.type === 'HEADER' && comp.format === 'VIDEO') {
+          apiComponents.push({ type: 'header', parameters: [{ type: 'video', video: { link: 'https://www.w3schools.com/html/mov_bbb.mp4' } }] });
+        } else if (comp.type === 'BODY' && comp.example?.body_text?.[0]) {
+          const paramsCount = comp.example.body_text[0].length;
+          const parameters = [];
+          for (let i = 0; i < paramsCount; i++) {
+             parameters.push({ type: 'text', text: comp.example.body_text[0][i] || 'Demo User' });
+          }
+          apiComponents.push({ type: 'body', parameters });
+        }
+      });
 
-    sendWhatsAppMsg(selectedLeadId, text);
+      templateData = {
+        name: attachedTemplate.name,
+        language: { code: attachedTemplate.language || 'en' }
+      };
+      
+      if (apiComponents.length > 0) {
+        templateData.components = apiComponents;
+      }
+    }
+    
+    setReplyText('');
+    setAttachedFile(null);
+    setAttachedTemplate(null);
+
+    sendWhatsAppMsg(selectedLeadId, text, templateData);
     setSending(false);
   };
 
@@ -343,9 +405,50 @@ export default function InboxPage() {
               <div ref={messagesEndRef} />
             </div>
 
+            {/* Attached File Preview */}
+            {attachedFile && (
+              <div style={{ background: '#f0f2f5', padding: '10px 16px 0 16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#e2e8f0', padding: '8px 12px', borderRadius: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '18px' }}>{attachedFile.type === 'video' ? '🎥' : attachedFile.type === 'image' ? '🖼️' : '📄'}</span>
+                    <span style={{ fontSize: '13px', fontWeight: '500', color: '#334155' }}>{attachedFile.name}</span>
+                  </div>
+                  <button onClick={() => setAttachedFile(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', fontSize: '16px' }}>×</button>
+                </div>
+              </div>
+            )}
+
+            {/* Attached Template Preview */}
+            {attachedTemplate && (
+              <div style={{ background: '#f0f2f5', padding: attachedFile ? '4px 16px 0 16px' : '10px 16px 0 16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#e2e8f0', padding: '8px 12px', borderRadius: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ display: 'flex', alignItems: 'center' }}><FileText size={18} color="#54656f" /></span>
+                    <span style={{ fontSize: '13px', fontWeight: '500', color: '#334155' }}>Template: {attachedTemplate.name}</span>
+                  </div>
+                  <button onClick={() => setAttachedTemplate(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', fontSize: '16px' }}>×</button>
+                </div>
+              </div>
+            )}
+
             {/* Reply Input Bar */}
             <div className="chat-input-bar" style={{ background: '#f0f2f5', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-              <Paperclip className="chat-clip-icon" size={22} color="#54656f" style={{ cursor: 'pointer' }} />
+              <Paperclip 
+                className="chat-clip-icon" 
+                size={22} 
+                color="#54656f" 
+                style={{ cursor: 'pointer' }} 
+                onClick={handleAttachClick}
+                title="Attach file"
+              />
+              <FileText 
+                className="chat-clip-icon" 
+                size={22} 
+                color="#54656f" 
+                style={{ cursor: 'pointer' }} 
+                onClick={() => setShowTemplateModal(true)}
+                title="Use template"
+              />
               <input
                 className="chat-input-field"
                 type="text"
@@ -378,6 +481,75 @@ export default function InboxPage() {
           </div>
         )}
       </div>
+
+      {/* Firebase Storage Modal */}
+      {showStorageModal && (
+        <div className="storage-modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'grid', placeItems: 'center' }} onClick={() => setShowStorageModal(false)}>
+          <div className="storage-modal-content" style={{ background: '#fff', padding: '24px', borderRadius: '16px', width: '90%', maxWidth: '440px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold', color: '#0f172a' }}>Select from Storage</h3>
+              <button onClick={() => setShowStorageModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', color: '#64748b' }}>×</button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {mockStorageFiles.map(file => (
+                <div 
+                  key={file.id} 
+                  onClick={() => {
+                    setAttachedFile(file);
+                    if (showToastMsg) showToastMsg(`Attached "${file.name}" to conversation!`);
+                    setShowStorageModal(false);
+                  }} 
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', border: '1px solid #e2e8f0', borderRadius: '10px', cursor: 'pointer', transition: 'background-color 0.2s' }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <span style={{ fontSize: '22px' }}>{file.type === 'video' ? '🎥' : file.type === 'image' ? '🖼️' : '📄'}</span>
+                    <span style={{ fontWeight: '500', color: '#334155', fontSize: '14px' }}>{file.name}</span>
+                  </div>
+                  <span style={{ color: '#94a3b8', fontSize: '12px' }}>{file.size}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* WhatsApp Templates Modal */}
+      {showTemplateModal && (
+        <div className="storage-modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'grid', placeItems: 'center' }} onClick={() => setShowTemplateModal(false)}>
+          <div className="storage-modal-content" style={{ background: '#fff', padding: '24px', borderRadius: '16px', width: '90%', maxWidth: '440px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold', color: '#0f172a' }}>Select WhatsApp Template</h3>
+              <button onClick={() => setShowTemplateModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', color: '#64748b' }}>×</button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '60vh', overflowY: 'auto', paddingRight: '8px' }}>
+              {metaTemplates.length === 0 && (
+                <div style={{ padding: '16px', color: '#64748b', fontSize: '14px', textAlign: 'center' }}>
+                  No templates found. Make sure you sync them from Meta in the WhatsApp templates section.
+                </div>
+              )}
+              {metaTemplates.map(template => {
+                const bodyText = template.components?.find(c => c.type === 'BODY')?.text || '';
+                return (
+                  <div 
+                    key={template.name} 
+                    onClick={() => {
+                      setAttachedTemplate(template);
+                      setShowTemplateModal(false);
+                    }} 
+                    style={{ padding: '12px 16px', border: '1px solid #e2e8f0', borderRadius: '10px', cursor: 'pointer', transition: 'background-color 0.2s' }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
+                    <div style={{ fontWeight: '600', color: '#0f172a', fontSize: '14px' }}>{template.name}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

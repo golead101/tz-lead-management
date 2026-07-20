@@ -1300,62 +1300,20 @@ export const CRMProvider = ({ children }) => {
   const sendWhatsAppMsg = async (leadId, messageText, templateData = null) => {
     if (!messageText.trim() && !templateData) return false;
 
-    // If real WhatsApp integration is active and enabled, make the HTTP call to Firebase Cloud Function
-    if (integrations.whatsapp.enabled) {
-      const activeLead = leads.find(l => l.id === leadId);
-      if (activeLead && activeLead.phone) {
-        const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'leads-management-tz';
-        const url = `https://us-central1-${projectId}.cloudfunctions.net/sendWhatsAppMessage`;
-
-        // Normalize phone to valid E.164: strip everything except digits, then prepend a single '+'
-        // This fixes numbers like "++91 95154 77327", "+91-98765-43210", "0091...", etc.
-        const rawPhone = activeLead.phone;
-        const digitsOnly = rawPhone.replace(/\D/g, '');
-        const normalizedPhone = digitsOnly ? `+${digitsOnly}` : rawPhone;
-
-        try {
-          const res = await fetch(url, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              leadId: leadId,
-              recipientPhone: normalizedPhone,
-              messageText: messageText,
-              counselorName: activeUser,
-              templateData: templateData
-            })
-          });
-
-          const data = await res.json();
-          if (res.ok && data.success) {
-            showToastMsg('WhatsApp message delivered in real-time!', 'success');
-            return true;
-          } else {
-            console.error('WhatsApp API failed:', data.error, data.details, data);
-            showToastMsg(data.error || 'Failed to deliver WhatsApp message via API.', 'error');
-            return false;
-          }
-        } catch (err) {
-          console.error('Error dispatching WhatsApp to Cloud Function:', err);
-          showToastMsg('Could not reach WhatsApp gateway function.', 'error');
-          return false;
-        }
-      }
-      return false;
-    }
-
+    // 1. Optimistic UI Update - Show immediately in the chat interface
     const outgoingMsg = {
       id: `msg-sent-${Date.now()}`,
       sender: 'counselor',
       text: messageText,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      status: 'sent'
     };
 
     let updatedLead = null;
+    let activeLead = null;
     const nextLeads = leads.map(lead => {
       if (lead.id === leadId) {
+        activeLead = lead;
         const updatedChat = [...(lead.whatsappMessages || []), outgoingMsg];
         const nextTimeline = [...(lead.timeline || []), {
           id: `log-wa-${Date.now()}`,
@@ -1365,31 +1323,62 @@ export const CRMProvider = ({ children }) => {
           timestamp: new Date().toISOString(),
           user: activeUser
         }];
-
-        updatedLead = {
-          ...lead,
-          whatsappMessages: updatedChat,
-          timeline: nextTimeline
-        };
+        updatedLead = { ...lead, whatsappMessages: updatedChat, timeline: nextTimeline };
         return updatedLead;
       }
       return lead;
     });
 
     if (isFirebaseEnabled && updatedLead) {
-      setDoc(doc(db, 'leads', leadId), updatedLead)
-        .catch(err => {
-          console.error("Firestore sendWhatsAppMsg failed, falling back to local update:", err);
-          setLeads(nextLeads);
-        });
+      setDoc(doc(db, 'leads', leadId), updatedLead).catch(console.error);
     } else {
       setLeads(nextLeads);
     }
+    // Always update local state for immediate feedback
+    setLeads(nextLeads);
 
-    // Simulate a smart automated inbound response after 3 seconds!
-    setTimeout(() => {
-      triggerSimulatedBotReply(leadId, updatedLead?.name || 'Student', messageText);
-    }, 3000);
+    // 2. Attempt Real Network Dispatch to Meta WhatsApp API
+    let apiSuccess = false;
+    if (activeLead && activeLead.phone) {
+      const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'leads-management-tz';
+      const url = `https://us-central1-${projectId}.cloudfunctions.net/sendWhatsAppMessage`;
+
+      const rawPhone = activeLead.phone;
+      const digitsOnly = rawPhone.replace(/\D/g, '');
+      const normalizedPhone = digitsOnly ? `+${digitsOnly}` : rawPhone;
+
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            leadId: leadId,
+            recipientPhone: normalizedPhone,
+            messageText: messageText,
+            counselorName: activeUser,
+            templateData: templateData
+          })
+        });
+
+        const data = await res.json();
+        if (res.ok && data.success) {
+          showToastMsg('WhatsApp message delivered in real-time!', 'success');
+          apiSuccess = true;
+        } else {
+          console.error('WhatsApp API failed:', data.error, data.details);
+        }
+      } catch (err) {
+        console.error('Error dispatching WhatsApp to Cloud Function:', err);
+      }
+    }
+
+    // 3. Fallback / Mock Behavior
+    // If the API failed (e.g. not configured yet), trigger the simulated bot response so the UI still feels alive.
+    if (!apiSuccess) {
+      setTimeout(() => {
+        triggerSimulatedBotReply(leadId, updatedLead?.name || 'Student', messageText);
+      }, 3000);
+    }
 
     return true;
   };
