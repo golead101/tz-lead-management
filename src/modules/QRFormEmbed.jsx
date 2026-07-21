@@ -1,6 +1,61 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { db } from '../firebase';
 import { collection, addDoc, doc, getDoc, getDocs } from 'firebase/firestore';
+
+const CustomSelect = ({ name, options, value, onChange, placeholder, required }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleSelect = (opt) => {
+    onChange({ target: { name, value: opt } });
+    setIsOpen(false);
+  };
+
+  return (
+    <div className="custom-dropdown" ref={dropdownRef}>
+      <div 
+        className={`form-select ${isOpen ? 'open' : ''}`} 
+        onClick={() => setIsOpen(!isOpen)}
+        style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+      >
+        {value || <span style={{ color: '#94a3b8' }}>{placeholder}</span>}
+      </div>
+      {isOpen && (
+        <div className="dropdown-options">
+          {options?.map((opt, i) => (
+            <div 
+              key={i} 
+              className="dropdown-option" 
+              onClick={() => handleSelect(opt)}
+            >
+              {opt}
+            </div>
+          ))}
+        </div>
+      )}
+      <select 
+        name={name} 
+        required={required} 
+        value={value || ''} 
+        onChange={onChange}
+        style={{ opacity: 0, position: 'absolute', left: 0, top: 0, height: '100%', width: '100%', pointerEvents: 'none' }}
+      >
+        <option value="" disabled>{placeholder}</option>
+        {options?.map((opt, i) => <option key={i} value={opt}>{opt}</option>)}
+      </select>
+    </div>
+  );
+};
 
 export default function QRFormEmbed() {
   const [formConfig, setFormConfig] = useState({
@@ -20,10 +75,10 @@ export default function QRFormEmbed() {
   useEffect(() => {
     document.body.style.margin = '0';
     document.body.style.fontFamily = 'Inter, sans-serif';
-    document.body.style.background = 'linear-gradient(-45deg, #09090b, #111827, #0f172a, #030712)';
+    document.body.style.background = 'linear-gradient(-45deg, #f8fafc, #e2e8f0, #f1f5f9, #cbd5e1)';
     document.body.style.backgroundSize = '400% 400%';
     document.body.style.animation = 'gradientBG 15s ease infinite';
-    document.body.style.color = '#fff';
+    document.body.style.color = '#0f172a';
     
     const fetchConfig = async () => {
       try {
@@ -113,10 +168,10 @@ export default function QRFormEmbed() {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', padding: '20px' }}>
         <style>{`@keyframes gradientBG { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }`}</style>
-        <div style={{ background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(16px)', padding: '40px 30px', borderRadius: '24px', textAlign: 'center', width: '100%', maxWidth: '420px', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 20px 40px rgba(0,0,0,0.4)' }}>
+        <div style={{ background: 'rgba(255, 255, 255, 0.8)', backdropFilter: 'blur(16px)', padding: '40px 30px', borderRadius: '24px', textAlign: 'center', width: '100%', maxWidth: '420px', border: '1px solid rgba(0,0,0,0.1)', boxShadow: '0 20px 40px rgba(0,0,0,0.1)' }}>
           <div style={{ background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white', width: '80px', height: '80px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '40px', margin: '0 auto 24px', boxShadow: '0 0 20px rgba(16,185,129,0.4)' }}>✓</div>
-          <h2 style={{ fontSize: '24px', fontWeight: '800', color: '#f8fafc', margin: '0 0 12px' }}>Registration Complete!</h2>
-          <p style={{ color: '#94a3b8', fontSize: '15px', lineHeight: '1.6' }}>Thank you for reaching out. Our counselors will contact you shortly.</p>
+          <h2 style={{ fontSize: '24px', fontWeight: '800', color: '#0f172a', margin: '0 0 12px' }}>Registration Complete!</h2>
+          <p style={{ color: '#475569', fontSize: '15px', lineHeight: '1.6' }}>Thank you for reaching out. Our counselors will contact you shortly.</p>
         </div>
       </div>
     );
@@ -127,24 +182,24 @@ export default function QRFormEmbed() {
       
       <style>{`
         body {
-          background-color: #0d1b2a;
-          background-image: radial-gradient(circle at 50% 0%, #1a365d 0%, #0d1b2a 70%);
-          color: #fff;
+          background-color: #f8fafc;
+          background-image: radial-gradient(circle at 50% 0%, #e2e8f0 0%, #f8fafc 70%);
+          color: #0f172a;
         }
 
         .qr-form-container {
-          background: rgba(13, 27, 42, 0.6);
-          backdrop-filter: blur(16px);
-          -webkit-backdrop-filter: blur(16px);
-          border: 1px solid rgba(0, 210, 255, 0.15);
-          border-top: 1px solid rgba(0, 210, 255, 0.3);
-          border-radius: 16px;
-          padding: 16px 20px;
+          background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 27, 75, 0.98));
+          backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-top: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 20px;
+          padding: 32px 40px;
           width: 100%;
-          max-width: 460px;
-          box-shadow: 0 24px 48px rgba(0,0,0,0.4), 0 0 20px rgba(0, 210, 255, 0.05);
-          align-self: center;
-          margin: 10px 0;
+          max-width: 850px;
+          box-shadow: 0 24px 48px rgba(0,0,0,0.4), 0 1px 3px rgba(255,255,255,0.05);
+          align-self: flex-start;
+          margin: 6vh 0 10vh 0;
           position: relative;
           overflow: hidden;
         }
@@ -153,194 +208,261 @@ export default function QRFormEmbed() {
           content: '';
           position: absolute;
           top: -50%; left: -50%; width: 200%; height: 200%;
-          background: radial-gradient(circle at top right, rgba(0, 210, 255, 0.08), transparent 40%),
-                      radial-gradient(circle at bottom left, rgba(2, 108, 182, 0.08), transparent 40%);
+          background: radial-gradient(circle at top right, rgba(99, 102, 241, 0.1), transparent 40%),
+                      radial-gradient(circle at bottom left, rgba(236, 72, 153, 0.1), transparent 40%);
           z-index: -1;
           pointer-events: none;
         }
 
-        .qr-form-title {
-          font-size: 20px;
-          font-weight: 700;
-          color: #ffffff;
-          margin: 0 0 4px;
+        .qr-form-header {
           text-align: center;
-          letter-spacing: 0.5px;
-          text-transform: uppercase;
+          margin-bottom: 24px;
+        }
+
+        .qr-form-title {
+          font-size: 26px;
+          font-weight: 800;
+          color: #ffffff;
+          margin: 0 0 6px;
+          letter-spacing: -0.5px;
         }
         
         .qr-form-title span {
-          color: #00d2ff;
+          color: #818cf8;
+          background: linear-gradient(135deg, #818cf8, #c084fc);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
         }
 
         .qr-form-subtitle {
-          font-size: 13px;
-          color: #94a3b8;
-          margin: 0 0 12px;
-          text-align: center;
-        }
-        .form-group {
-          margin-bottom: 10px;
-        }
-        .form-label {
-          display: block;
-          font-size: 12px;
-          font-weight: 500;
+          font-size: 15px;
           color: #cbd5e1;
-          margin-bottom: 4px;
+          margin: 0;
         }
+        
+        .form-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 20px;
+        }
+        
+        .form-group {
+          display: flex;
+          flex-direction: column;
+        }
+        
+        .form-group.full-width {
+          grid-column: 1 / -1;
+        }
+
+        .form-label {
+          font-size: 13px;
+          font-weight: 600;
+          color: #e2e8f0;
+          margin-bottom: 6px;
+        }
+        
         .form-input, .form-select, .form-textarea {
           width: 100%;
-          padding: 8px 12px;
-          border-radius: 6px;
-          border: 1px solid rgba(255,255,255,0.1);
-          background: rgba(255, 255, 255, 0.03);
-          font-size: 13px;
-          color: #f8fafc;
+          padding: 10px 14px;
+          border-radius: 10px;
+          border: 1px solid #cbd5e1;
+          background: #ffffff;
+          font-size: 14px;
+          color: #0f172a;
           outline: none;
-          transition: all 0.3s ease;
+          transition: all 0.2s ease;
           box-sizing: border-box;
           font-family: inherit;
+          box-shadow: inset 0 1px 2px rgba(0,0,0,0.02);
         }
+        
         .form-input::placeholder, .form-textarea::placeholder {
-          color: #64748b;
+          color: #94a3b8;
         }
+        
         .form-input:focus, .form-select:focus, .form-textarea:focus {
-          border-color: #00d2ff;
-          box-shadow: 0 0 0 2px rgba(0, 210, 255, 0.2);
-          background: rgba(255, 255, 255, 0.06);
+          border-color: #6366f1;
+          box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+          background: #ffffff;
         }
+        
         .form-select {
           appearance: none;
-          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394a3b8'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
           background-repeat: no-repeat;
           background-position: right 14px center;
           background-size: 14px;
-          padding-right: 32px;
+          padding-right: 36px;
         }
+        
         .form-select option {
-          background-color: #0d1b2a;
-          color: #f8fafc;
+          background-color: #ffffff;
+          color: #0f172a;
         }
+        
         .form-textarea {
           resize: vertical;
-          min-height: 40px;
+          min-height: 50px;
         }
+        
+        .custom-dropdown {
+          position: relative;
+          width: 100%;
+        }
+        .dropdown-options {
+          position: absolute;
+          top: calc(100% + 4px);
+          left: 0;
+          width: 100%;
+          max-height: 250px;
+          overflow-y: auto;
+          background: #ffffff;
+          border: 1px solid #cbd5e1;
+          border-radius: 10px;
+          box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+          z-index: 50;
+        }
+        .dropdown-option {
+          padding: 10px 14px;
+          font-size: 14px;
+          color: #0f172a;
+          cursor: pointer;
+          transition: background 0.2s;
+        }
+        .dropdown-option:hover {
+          background: #f1f5f9;
+        }
+        
         .submit-btn {
           width: 100%;
-          padding: 10px;
-          background: #00d2ff;
-          background: linear-gradient(90deg, #026cb6 0%, #00d2ff 100%);
+          padding: 14px;
+          background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
           color: white;
           border: none;
-          border-radius: 6px;
-          font-size: 13.5px;
-          font-weight: 600;
+          border-radius: 10px;
+          font-size: 15px;
+          font-weight: 700;
           cursor: pointer;
           transition: all 0.3s ease;
-          margin-top: 8px;
-          box-shadow: 0 4px 12px rgba(0, 210, 255, 0.3);
-          text-transform: uppercase;
+          margin-top: 10px;
+          box-shadow: 0 8px 20px rgba(99, 102, 241, 0.3);
           letter-spacing: 0.5px;
         }
+        
         .submit-btn:hover {
           transform: translateY(-2px);
-          box-shadow: 0 6px 16px rgba(0, 210, 255, 0.4);
-          filter: brightness(1.1);
+          box-shadow: 0 12px 24px rgba(99, 102, 241, 0.4);
         }
+        
         .submit-btn:active {
           transform: translateY(1px);
         }
+        
         .submit-btn:disabled {
-          opacity: 0.5;
+          opacity: 0.7;
           cursor: not-allowed;
           transform: none;
+        }
+        
+        @media (max-width: 640px) {
+          .form-grid {
+            grid-template-columns: 1fr;
+          }
         }
       `}</style>
 
       <div className="qr-form-container">
-        <h2 className="qr-form-title">Student <span>Registration</span></h2>
-        <p className="qr-form-subtitle">{formConfig.subtitle}</p>
+        <div className="qr-form-header">
+          <h2 className="qr-form-title">Student <span>Registration</span></h2>
+          <p className="qr-form-subtitle">{formConfig.subtitle}</p>
+        </div>
 
         <form onSubmit={handleSubmit}>
           
-          <div className="form-group">
-            <label className="form-label">Enter Your Name <span style={{color: '#ef4444'}}>*</span></label>
-            <input 
-              type="text" 
-              name="name" 
-              required 
-              className="form-input" 
-              placeholder="e.g. Rahul Kumar"
-              onChange={handleChange}
-            />
-          </div>
+          <div className="form-grid">
+            <div className="form-group">
+              <label className="form-label">Enter Your Name <span style={{color: '#ef4444'}}>*</span></label>
+              <input 
+                type="text" 
+                name="name" 
+                required 
+                className="form-input" 
+                placeholder="e.g. Rahul Kumar"
+                onChange={handleChange}
+              />
+            </div>
 
-          <div className="form-group">
-            <label className="form-label">Mobile Number <span style={{color: '#ef4444'}}>*</span></label>
-            <input 
-              type="tel" 
-              name="phone" 
-              required 
-              className="form-input" 
-              placeholder="10-digit mobile number"
-              onChange={handleChange}
-            />
-          </div>
+            <div className="form-group">
+              <label className="form-label">Mobile Number <span style={{color: '#ef4444'}}>*</span></label>
+              <input 
+                type="tel" 
+                name="phone" 
+                required 
+                className="form-input" 
+                placeholder="10-digit mobile number"
+                onChange={handleChange}
+              />
+            </div>
 
-          <div className="form-group">
-            <label className="form-label">Select Your Qualification <span style={{color: '#ef4444'}}>*</span></label>
-            <select name="qualification" required className="form-select" onChange={handleChange} defaultValue="">
-              <option value="" disabled>Choose qualification...</option>
-              {formConfig.qualifications?.map((opt, i) => (
-                <option key={i} value={opt}>{opt}</option>
-              ))}
-            </select>
-          </div>
+            <div className="form-group">
+              <label className="form-label">Select Your Qualification <span style={{color: '#ef4444'}}>*</span></label>
+              <select name="qualification" required className="form-select" onChange={handleChange} defaultValue="">
+                <option value="" disabled>Choose qualification...</option>
+                {formConfig.qualifications?.map((opt, i) => (
+                  <option key={i} value={opt}>{opt}</option>
+                ))}
+              </select>
+            </div>
 
-          <div className="form-group">
-            <label className="form-label">Enter Your Address</label>
-            <textarea 
-              name="location" 
-              className="form-textarea" 
-              placeholder="Your full address/city..."
-              onChange={handleChange}
-            ></textarea>
-          </div>
+            <div className="form-group">
+              <label className="form-label">Preferred Course <span style={{color: '#ef4444'}}>*</span></label>
+              <CustomSelect 
+                name="course" 
+                required 
+                placeholder="Select a course..." 
+                options={formConfig.courses} 
+                value={formValues.course} 
+                onChange={handleChange} 
+              />
+            </div>
+            
+            <div className="form-group full-width">
+              <label className="form-label">Enter Your Address</label>
+              <textarea 
+                name="location" 
+                className="form-textarea" 
+                placeholder="Your full address/city..."
+                onChange={handleChange}
+              ></textarea>
+            </div>
 
-          <div className="form-group">
-            <label className="form-label">Preferred Course <span style={{color: '#ef4444'}}>*</span></label>
-            <select name="course" required className="form-select" onChange={handleChange} defaultValue="">
-              <option value="" disabled>Select a course...</option>
-              {formConfig.courses?.map((opt, i) => (
-                <option key={i} value={opt}>{opt}</option>
-              ))}
-            </select>
-          </div>
+            <div className="form-group">
+              <label className="form-label">Preferred Batch Timing <span style={{color: '#ef4444'}}>*</span></label>
+              <select name="batchTiming" required className="form-select" onChange={handleChange} defaultValue="">
+                <option value="" disabled>Select timing...</option>
+                {formConfig.timings?.map((opt, i) => (
+                  <option key={i} value={opt}>{opt}</option>
+                ))}
+              </select>
+            </div>
 
-          <div className="form-group">
-            <label className="form-label">Preferred Batch Timing <span style={{color: '#ef4444'}}>*</span></label>
-            <select name="batchTiming" required className="form-select" onChange={handleChange} defaultValue="">
-              <option value="" disabled>Select timing...</option>
-              {formConfig.timings?.map((opt, i) => (
-                <option key={i} value={opt}>{opt}</option>
-              ))}
-            </select>
-          </div>
+            <div className="form-group">
+              <label className="form-label">Where Did You Hear About Us?</label>
+              <select name="hearAboutUs" className="form-select" onChange={handleChange} defaultValue="">
+                <option value="" disabled>Select option...</option>
+                {formConfig.sources?.map((opt, i) => (
+                  <option key={i} value={opt}>{opt}</option>
+                ))}
+              </select>
+            </div>
 
-          <div className="form-group">
-            <label className="form-label">Where Did You Hear About Us?</label>
-            <select name="hearAboutUs" className="form-select" onChange={handleChange} defaultValue="">
-              <option value="" disabled>Select option...</option>
-              {formConfig.sources?.map((opt, i) => (
-                <option key={i} value={opt}>{opt}</option>
-              ))}
-            </select>
+            <div className="form-group full-width">
+              <button type="submit" className="submit-btn" disabled={isSubmitting}>
+                {isSubmitting ? 'Submitting Details...' : 'Submit Inquiry'}
+              </button>
+            </div>
           </div>
-
-          <button type="submit" className="submit-btn" disabled={isSubmitting}>
-            {isSubmitting ? 'Submitting Details...' : 'Submit Inquiry'}
-          </button>
 
         </form>
       </div>
