@@ -104,12 +104,7 @@ export default function InboxPage() {
 
   // Dynamically compute conversations from CRM leads
   const conversations = React.useMemo(() => {
-    const contactLeads = leads.filter(lead => {
-      if (activeRole === 'Counselor') {
-        return lead.counselor === activeUser;
-      }
-      return true;
-    });
+    const contactLeads = leads; // Show all existing chats regardless of assigned counselor
 
     const mapped = contactLeads.map(lead => {
       const msgs = lead.whatsappMessages || [];
