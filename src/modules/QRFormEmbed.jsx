@@ -68,6 +68,7 @@ export default function QRFormEmbed() {
   });
 
   const [formValues, setFormValues] = useState({});
+  const [currentStep, setCurrentStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -144,6 +145,33 @@ export default function QRFormEmbed() {
     try {
       await addDoc(collection(db, 'leads'), data);
       setIsSuccess(true);
+      
+      if ('speechSynthesis' in window) {
+        const msg = new SpeechSynthesisUtterance('Your enquiry has been submitted.');
+        
+        const setVoiceAndSpeak = () => {
+          const voices = window.speechSynthesis.getVoices();
+          // Try to find a female voice by name (Zira on Windows, Samantha on Mac, Google UK Female, etc.)
+          const femaleVoice = voices.find(v => 
+            /female|zira|samantha|victoria/i.test(v.name)
+          );
+          
+          if (femaleVoice) {
+            msg.voice = femaleVoice;
+          }
+          
+          msg.pitch = 1.4; // Higher pitch to sound younger
+          msg.rate = 1.0;
+          
+          window.speechSynthesis.speak(msg);
+        };
+
+        if (window.speechSynthesis.getVoices().length === 0) {
+          window.speechSynthesis.addEventListener('voiceschanged', setVoiceAndSpeak, { once: true });
+        } else {
+          setVoiceAndSpeak();
+        }
+      }
     } catch (err) {
       console.error('Error submitting form: ', err);
       alert('Failed to submit form. Please try again.');
@@ -201,7 +229,6 @@ export default function QRFormEmbed() {
           align-self: flex-start;
           margin: 6vh 0 10vh 0;
           position: relative;
-          overflow: hidden;
         }
         
         .qr-form-container::before {
@@ -370,6 +397,15 @@ export default function QRFormEmbed() {
             grid-template-columns: 1fr;
           }
         }
+        
+        .slide-animation {
+          animation: slideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        
+        @keyframes slideIn {
+          from { opacity: 0; transform: translateX(20px); }
+          to { opacity: 1; transform: translateX(0); }
+        }
       `}</style>
 
       <div className="qr-form-container">
@@ -378,90 +414,142 @@ export default function QRFormEmbed() {
           <p className="qr-form-subtitle">{formConfig.subtitle}</p>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={(e) => { 
+          e.preventDefault(); 
+          if (currentStep < 6) { 
+            setCurrentStep(prev => prev + 1); 
+          } else { 
+            handleSubmit(e); 
+          } 
+        }}>
           
-          <div className="form-grid">
-            <div className="form-group">
-              <label className="form-label">Enter Your Name <span style={{color: '#ef4444'}}>*</span></label>
-              <input 
-                type="text" 
-                name="name" 
-                required 
-                className="form-input" 
-                placeholder="e.g. Rahul Kumar"
-                onChange={handleChange}
-              />
-            </div>
+          <div className="form-grid" style={{ display: 'block' }}>
+            {currentStep === 0 && (
+              <div className="form-group slide-animation" style={{ position: 'relative', zIndex: 10 }}>
+                <label className="form-label">Enter Your Name <span style={{color: '#ef4444'}}>*</span></label>
+                <input 
+                  type="text" 
+                  name="name" 
+                  required 
+                  className="form-input" 
+                  placeholder="e.g. Rahul Kumar"
+                  value={formValues.name || ''}
+                  onChange={handleChange}
+                  autoFocus
+                />
+              </div>
+            )}
 
-            <div className="form-group">
-              <label className="form-label">Mobile Number <span style={{color: '#ef4444'}}>*</span></label>
-              <input 
-                type="tel" 
-                name="phone" 
-                required 
-                className="form-input" 
-                placeholder="10-digit mobile number"
-                onChange={handleChange}
-              />
-            </div>
+            {currentStep === 1 && (
+              <div className="form-group slide-animation" style={{ position: 'relative', zIndex: 10 }}>
+                <label className="form-label">Mobile Number <span style={{color: '#ef4444'}}>*</span></label>
+                <input 
+                  type="tel" 
+                  name="phone" 
+                  required 
+                  className="form-input" 
+                  placeholder="10-digit mobile number"
+                  value={formValues.phone || ''}
+                  onChange={handleChange}
+                  autoFocus
+                />
+              </div>
+            )}
 
-            <div className="form-group">
-              <label className="form-label">Select Your Qualification <span style={{color: '#ef4444'}}>*</span></label>
-              <select name="qualification" required className="form-select" onChange={handleChange} defaultValue="">
-                <option value="" disabled>Choose qualification...</option>
-                {formConfig.qualifications?.map((opt, i) => (
-                  <option key={i} value={opt}>{opt}</option>
-                ))}
-              </select>
-            </div>
+            {currentStep === 2 && (
+              <div className="form-group slide-animation" style={{ position: 'relative', zIndex: 10 }}>
+                <label className="form-label">Select Your Qualification <span style={{color: '#ef4444'}}>*</span></label>
+                <select name="qualification" required className="form-select" onChange={handleChange} value={formValues.qualification || ''}>
+                  <option value="" disabled>Choose qualification...</option>
+                  {formConfig.qualifications?.map((opt, i) => (
+                    <option key={i} value={opt}>{opt}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
-            <div className="form-group">
-              <label className="form-label">Preferred Course <span style={{color: '#ef4444'}}>*</span></label>
-              <CustomSelect 
-                name="course" 
-                required 
-                placeholder="Select a course..." 
-                options={formConfig.courses} 
-                value={formValues.course} 
-                onChange={handleChange} 
-              />
+            {currentStep === 3 && (
+              <div className="form-group slide-animation" style={{ position: 'relative', zIndex: 10 }}>
+                <label className="form-label">Preferred Course <span style={{color: '#ef4444'}}>*</span></label>
+                <CustomSelect 
+                  name="course" 
+                  required 
+                  placeholder="Select a course..." 
+                  options={formConfig.courses} 
+                  value={formValues.course} 
+                  onChange={handleChange} 
+                />
+              </div>
+            )}
+            
+            {currentStep === 4 && (
+              <div className="form-group full-width slide-animation" style={{ position: 'relative', zIndex: 10 }}>
+                <label className="form-label">Enter Your Address</label>
+                <textarea 
+                  name="location" 
+                  className="form-textarea" 
+                  placeholder="Your full address/city..."
+                  value={formValues.location || ''}
+                  onChange={handleChange}
+                  autoFocus
+                ></textarea>
+              </div>
+            )}
+
+            {currentStep === 5 && (
+              <div className="form-group slide-animation" style={{ position: 'relative', zIndex: 10 }}>
+                <label className="form-label">Preferred Batch Timing <span style={{color: '#ef4444'}}>*</span></label>
+                <select name="batchTiming" required className="form-select" onChange={handleChange} value={formValues.batchTiming || ''}>
+                  <option value="" disabled>Select timing...</option>
+                  {formConfig.timings?.map((opt, i) => (
+                    <option key={i} value={opt}>{opt}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {currentStep === 6 && (
+              <div className="form-group slide-animation" style={{ position: 'relative', zIndex: 10 }}>
+                <label className="form-label">Where Did You Hear About Us?</label>
+                <select name="hearAboutUs" className="form-select" onChange={handleChange} value={formValues.hearAboutUs || ''}>
+                  <option value="" disabled>Select option...</option>
+                  {formConfig.sources?.map((opt, i) => (
+                    <option key={i} value={opt}>{opt}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="form-group full-width" style={{ flexDirection: 'row', gap: '10px', marginTop: '30px', zIndex: 1, position: 'relative' }}>
+              {currentStep > 0 && (
+                <button 
+                  type="button" 
+                  className="submit-btn" 
+                  style={{ background: 'rgba(255,255,255,0.1)', color: '#ffffff', border: '1px solid rgba(255,255,255,0.2)', boxShadow: 'none' }} 
+                  onClick={() => setCurrentStep(prev => Math.max(prev - 1, 0))}
+                >
+                  Back
+                </button>
+              )}
+              {currentStep < 6 ? (
+                <button type="submit" className="submit-btn">
+                  Next
+                </button>
+              ) : (
+                <button type="submit" className="submit-btn" disabled={isSubmitting}>
+                  {isSubmitting ? 'Submitting Details...' : 'Submit Inquiry'}
+                </button>
+              )}
             </div>
             
-            <div className="form-group full-width">
-              <label className="form-label">Enter Your Address</label>
-              <textarea 
-                name="location" 
-                className="form-textarea" 
-                placeholder="Your full address/city..."
-                onChange={handleChange}
-              ></textarea>
+            <div style={{ textAlign: 'center', marginTop: '24px', color: '#94a3b8', fontSize: '13px', fontWeight: '500' }}>
+              Step {currentStep + 1} of 7
+            </div>
+            
+            <div className="slide-animation" style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', marginTop: '12px', overflow: 'hidden' }}>
+              <div style={{ width: `${((currentStep + 1) / 7) * 100}%`, height: '100%', background: 'linear-gradient(90deg, #6366f1, #a855f7)', borderRadius: '3px', transition: 'width 0.4s cubic-bezier(0.16, 1, 0.3, 1)' }}></div>
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Preferred Batch Timing <span style={{color: '#ef4444'}}>*</span></label>
-              <select name="batchTiming" required className="form-select" onChange={handleChange} defaultValue="">
-                <option value="" disabled>Select timing...</option>
-                {formConfig.timings?.map((opt, i) => (
-                  <option key={i} value={opt}>{opt}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Where Did You Hear About Us?</label>
-              <select name="hearAboutUs" className="form-select" onChange={handleChange} defaultValue="">
-                <option value="" disabled>Select option...</option>
-                {formConfig.sources?.map((opt, i) => (
-                  <option key={i} value={opt}>{opt}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="form-group full-width">
-              <button type="submit" className="submit-btn" disabled={isSubmitting}>
-                {isSubmitting ? 'Submitting Details...' : 'Submit Inquiry'}
-              </button>
-            </div>
           </div>
 
         </form>
