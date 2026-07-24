@@ -1538,7 +1538,7 @@ exports.sendBulkWhatsAppCampaign = functions.runWith({ timeoutSeconds: 540, memo
     }
 
     try {
-      const { targetContacts, campaignName, messageType, selectedTemplate, templateLanguage, messageText, counselorName } = req.body;
+      const { targetContacts, campaignName, messageType, selectedTemplate, templateLanguage, messageText, counselorName, existingCampaignId } = req.body;
       
       if (!targetContacts || !Array.isArray(targetContacts) || targetContacts.length === 0) {
         return res.status(400).json({ error: 'targetContacts array is required.' });
@@ -1553,7 +1553,7 @@ exports.sendBulkWhatsAppCampaign = functions.runWith({ timeoutSeconds: 540, memo
         return res.status(400).json({ error: 'WhatsApp integration credentials are not fully configured.' });
       }
 
-      const campaignId = `camp-${Date.now()}`;
+      const campaignId = existingCampaignId || `camp-${Date.now()}`;
       let sentCount = 0;
       let failedCount = 0;
       const deliveryResults = [];
@@ -1903,4 +1903,70 @@ exports.uploadMetaTemplateMedia = functions.https.onRequest((req, res) => {
       return res.status(500).json({ success: false, error: e.message });
     }
   });
+});
+
+/**
+ * processScheduledCampaigns
+ * Runs every 5 minutes to dispatch scheduled WhatsApp campaigns.
+ */
+exports.processScheduledCampaigns = functions.pubsub.schedule('every 5 minutes').onRun(async (context) => {
+  try {
+    const now = new Date().toISOString();
+    const campaignsRef = db.collection('whatsapp_campaigns');
+    const scheduledQuery = await campaignsRef
+      .where('status', '==', 'scheduled')
+      .where('scheduledFor', '<=', now)
+      .get();
+
+    if (scheduledQuery.empty) {
+      console.log('[processScheduledCampaigns] No scheduled campaigns due.');
+      return null;
+    }
+
+    const projectId = process.env.GCLOUD_PROJECT || (process.env.FIREBASE_CONFIG ? JSON.parse(process.env.FIREBASE_CONFIG).projectId : 'leads-management-tz');
+    const region = 'us-central1';
+    
+    const baseUrl = process.env.FUNCTIONS_EMULATOR === 'true' 
+      ? `http://127.0.0.1:5001/${projectId}/${region}/sendBulkWhatsAppCampaign`
+      : `https://${region}-${projectId}.cloudfunctions.net/sendBulkWhatsAppCampaign`;
+
+    for (const docSnapshot of scheduledQuery.docs) {
+      const camp = docSnapshot.data();
+      const campaignId = docSnapshot.id;
+      console.log(`[processScheduledCampaigns] Processing campaign: ${campaignId}`);
+      
+      await campaignsRef.doc(campaignId).update({ status: 'processing' });
+
+      const recipientsDoc = await db.collection('whatsapp_recipients').doc(campaignId).get();
+      let recipientsList = [];
+      if (recipientsDoc.exists) {
+        recipientsList = recipientsDoc.data().recipients || [];
+      }
+
+      if (recipientsList.length === 0) {
+        await campaignsRef.doc(campaignId).update({ status: 'completed', sent: 0, failed: 0 });
+        continue;
+      }
+
+      console.log(`[processScheduledCampaigns] Dispatching ${recipientsList.length} messages for ${campaignId}`);
+      try {
+        await axios.post(baseUrl, {
+          targetContacts: recipientsList,
+          campaignName: camp.name,
+          messageType: camp.type,
+          selectedTemplate: camp.templateName,
+          templateLanguage: camp.languageCode,
+          messageText: camp.message,
+          counselorName: 'System Auto-Sender',
+          existingCampaignId: campaignId
+        });
+      } catch (err) {
+        console.error(`[processScheduledCampaigns] Failed to dispatch campaign ${campaignId}:`, err.message);
+        await campaignsRef.doc(campaignId).update({ status: 'failed' });
+      }
+    }
+  } catch (error) {
+    console.error('[processScheduledCampaigns] Fatal Error:', error);
+  }
+  return null;
 });

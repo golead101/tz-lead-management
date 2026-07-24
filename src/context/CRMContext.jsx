@@ -1329,11 +1329,9 @@ export const CRMProvider = ({ children }) => {
       return lead;
     });
 
-    if (isFirebaseEnabled && updatedLead) {
-      setDoc(doc(db, 'leads', leadId), updatedLead).catch(console.error);
-    } else {
-      setLeads(nextLeads);
-    }
+    // We only update local state here. The actual Firestore write happens in the sendWhatsAppMessage Cloud Function!
+    // This prevents the message from being duplicated in the UI when the Cloud Function also appends it.
+    // Always update local state for immediate feedback
     // Always update local state for immediate feedback
     setLeads(nextLeads);
 
