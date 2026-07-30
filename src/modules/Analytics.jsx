@@ -2,6 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useCRM } from '../context/CRMContext';
 import { db } from '../firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
+import { 
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, 
+  PieChart, Pie, Legend
+} from 'recharts';
+import { Target, TrendingUp, AlertCircle, Users, Activity } from 'lucide-react';
 
 export default function Analytics() {
   const { leads, activeRole, activeUser, counselors } = useCRM();
@@ -131,6 +136,59 @@ export default function Analytics() {
   const rankLabel = (i) => i === 0 ? 'Top Performer' : i === 1 ? 'Second Place' : i === 2 ? 'Third Place' : null;
   const rankLabelColor = (i) => i === 0 ? '#fbbf24' : i === 1 ? '#9ca3af' : '#d97706';
 
+  // --- New Analytical Metrics Calculations ---
+  // 1. Funnel
+  const funnelNew = visibleLeads.length;
+  const funnelDemo = visibleLeads.filter(l => ['Demo Scheduled', 'Demo Attended', 'Converted'].includes(l.stage)).length;
+  const funnelConverted = visibleLeads.filter(l => l.stage === 'Converted').length;
+
+  // 2. Velocity (Time to Conversion)
+  const convertedLeadsWithDates = visibleLeads.filter(l => l.stage === 'Converted' && (l.createdAt || l.date));
+  let avgDaysToConvert = 0;
+  if (convertedLeadsWithDates.length > 0) {
+    const totalDays = convertedLeadsWithDates.reduce((acc, lead) => {
+      const start = new Date(lead.createdAt || lead.date).getTime();
+      const end = lead.convertedAt ? new Date(lead.convertedAt).getTime() : new Date().getTime(); 
+      const diff = (end - start) / (1000 * 60 * 60 * 24);
+      return acc + (isNaN(diff) ? 0 : diff);
+    }, 0);
+    avgDaysToConvert = Math.max(1, Math.round(totalDays / convertedLeadsWithDates.length));
+  }
+
+  // 3. Stage Drop-off (Lost/Not Interested)
+  const lostLeads = visibleLeads.filter(l => ['Not Interested', 'Closed'].includes(l.stage));
+  const lostCount = lostLeads.length;
+  const dropOffRate = totalLeads > 0 ? Math.round((lostCount / totalLeads) * 100) : 0;
+  
+  // 4. Source Conversion
+  const sourceStats = {};
+  visibleLeads.forEach(l => {
+    const src = l.source || 'Unknown';
+    if (!sourceStats[src]) sourceStats[src] = { total: 0, converted: 0 };
+    sourceStats[src].total++;
+    if (l.stage === 'Converted') sourceStats[src].converted++;
+  });
+  const sourceConversionArr = Object.entries(sourceStats).map(([src, stats]) => ({
+    source: src,
+    total: stats.total,
+    converted: stats.converted,
+    rate: stats.total > 0 ? Math.round((stats.converted / stats.total) * 100) : 0
+  })).sort((a,b) => b.rate - a.rate).slice(0, 5); // top 5
+
+  // 5. Counselor Effectiveness by Stage (e.g. New -> Demo)
+  const counselorArray = counselors || [];
+  const counselorStageEffectiveness = counselorArray.map(c => {
+    const name = (c && c.name) || (c && c.email) || c || 'Unknown';
+    const cLeads = visibleLeads.filter(l => l.counselor === name);
+    const total = cLeads.length;
+    const demos = cLeads.filter(l => ['Demo Scheduled', 'Demo Attended', 'Converted'].includes(l.stage)).length;
+    return {
+      name,
+      demoRate: total > 0 ? Math.round((demos / total) * 100) : 0,
+      total
+    };
+  }).filter(c => c.total > 0).sort((a,b) => b.demoRate - a.demoRate).slice(0, 5);
+
   return (
     <div className="fade-in">
       <div className="welcome-header" style={{ marginBottom: '20px' }}>
@@ -164,7 +222,123 @@ export default function Analytics() {
       </div>
 
       {/* ==================================================================
-          CHARTS ROW 1: TELECALLER RANKING & COUNSELOR RANKING
+          NEW ANALYTICS (Funnel, Velocity, Sources, Effectiveness)
+          ================================================================== */}
+      <div className="analytics-grid" style={{ marginBottom: '24px' }}>
+        
+        {/* 1. Sales Funnel (Interactive Vertical Bar) */}
+        <div className="chart-card" style={{ transition: 'transform 0.2s', padding: '24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+            <div style={{ background: 'rgba(59, 130, 246, 0.1)', padding: '8px', borderRadius: '8px' }}><Target size={18} color="#3b82f6" /></div>
+            <div>
+              <h3 className="panel-title" style={{ margin: 0 }}>Sales Funnel</h3>
+              <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: 0 }}>Lead progression stages</p>
+            </div>
+          </div>
+          <div style={{ height: '220px', width: '100%' }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={[
+                { name: 'New Leads', value: funnelNew, fill: 'url(#colorNew)' },
+                { name: 'Demo Reached', value: funnelDemo, fill: 'url(#colorDemo)' },
+                { name: 'Converted', value: funnelConverted, fill: 'url(#colorConv)' }
+              ]} layout="vertical" margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
+                <defs>
+                  <linearGradient id="colorNew" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stopColor="#60a5fa" /><stop offset="100%" stopColor="#3b82f6" /></linearGradient>
+                  <linearGradient id="colorDemo" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stopColor="#a78bfa" /><stop offset="100%" stopColor="#8b5cf6" /></linearGradient>
+                  <linearGradient id="colorConv" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stopColor="#34d399" /><stop offset="100%" stopColor="#10b981" /></linearGradient>
+                </defs>
+                <XAxis type="number" hide />
+                <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 12, fontWeight: 600, fill: '#475569' }} width={90} />
+                <Tooltip cursor={{ fill: 'rgba(0,0,0,0.02)' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
+                <Bar dataKey="value" radius={[0, 6, 6, 0]} barSize={24} animationDuration={1500} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* 2 & 3. Velocity and Drop-off */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div className="chart-card" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', border: 'none', position: 'relative', overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', top: -20, right: -20, opacity: 0.05 }}><TrendingUp size={120} /></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', zIndex: 1 }}>
+              <div style={{ background: 'rgba(15, 23, 42, 0.05)', padding: '6px', borderRadius: '6px' }}><Activity size={16} color="#0f172a" /></div>
+              <h3 className="panel-title" style={{ margin: 0 }}>Velocity</h3>
+            </div>
+            <div style={{ fontSize: '52px', fontWeight: '800', color: '#0f172a', lineHeight: '1', zIndex: 1, textShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>{avgDaysToConvert}<span style={{ fontSize: '20px', color: '#64748b' }}>d</span></div>
+            <p style={{ fontSize: '12px', color: '#64748b', textAlign: 'center', marginTop: '8px', fontWeight: '500', zIndex: 1 }}>Avg. days to convert</p>
+          </div>
+          
+          <div className="chart-card" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px', border: '1px solid rgba(239, 68, 68, 0.1)', background: '#fffcfc' }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                <AlertCircle size={16} color="#ef4444" />
+                <h3 className="panel-title" style={{ margin: 0, color: '#ef4444' }}>Drop-off</h3>
+              </div>
+              <div style={{ fontSize: '28px', fontWeight: '800', color: '#ef4444', lineHeight: '1' }}>{dropOffRate}%</div>
+              <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>{lostCount} Leads Lost</div>
+            </div>
+            <div style={{ width: '100px', height: '100px' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={[
+                      { name: 'Active', value: totalLeads - lostCount },
+                      { name: 'Lost', value: lostCount }
+                    ]} cx="50%" cy="50%" innerRadius={25} outerRadius={40} dataKey="value" stroke="none">
+                    <Cell key="cell-0" fill="#e2e8f0" />
+                    <Cell key="cell-1" fill="#ef4444" />
+                  </Pie>
+                  <Tooltip cursor={false} contentStyle={{ fontSize: '12px', borderRadius: '6px', border: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+
+        {/* 4 & 5. Source & Effectiveness */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div className="chart-card" style={{ flex: 1, padding: '24px' }}>
+             <h3 className="panel-title" style={{ marginBottom: '12px' }}>Conversion by Source</h3>
+             <div style={{ height: '120px', width: '100%' }}>
+               <ResponsiveContainer width="100%" height="100%">
+                 <BarChart data={sourceConversionArr} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                   <XAxis dataKey="source" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
+                   <YAxis hide />
+                   <Tooltip cursor={{ fill: 'rgba(16, 185, 129, 0.05)' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} formatter={(value) => [`${value}%`, 'Conversion Rate']} />
+                   <Bar dataKey="rate" radius={[4, 4, 0, 0]} barSize={16}>
+                     {sourceConversionArr.map((entry, index) => (
+                       <Cell key={`cell-${index}`} fill={index === 0 ? '#10b981' : '#6ee7b7'} />
+                     ))}
+                   </Bar>
+                 </BarChart>
+               </ResponsiveContainer>
+             </div>
+          </div>
+
+          <div className="chart-card" style={{ flex: 1, padding: '24px' }}>
+             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+               <Users size={16} color="#8b5cf6" />
+               <h3 className="panel-title" style={{ margin: 0 }}>Demo Scheduling Power</h3>
+             </div>
+             <div style={{ height: '120px', width: '100%' }}>
+               <ResponsiveContainer width="100%" height="100%">
+                 <BarChart data={counselorStageEffectiveness} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
+                   <YAxis hide />
+                   <Tooltip cursor={{ fill: 'rgba(139, 92, 246, 0.05)' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} formatter={(value) => [`${value}%`, 'Demo Rate']} />
+                   <Bar dataKey="demoRate" radius={[4, 4, 0, 0]} barSize={16}>
+                     {counselorStageEffectiveness.map((entry, index) => (
+                       <Cell key={`cell-${index}`} fill={index === 0 ? '#8b5cf6' : '#c4b5fd'} />
+                     ))}
+                   </Bar>
+                 </BarChart>
+               </ResponsiveContainer>
+             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ==================================================================
+          CHARTS ROW 2: TELECALLER RANKING & COUNSELOR RANKING
           ================================================================== */}
       <div className="analytics-grid">
         {/* Telecaller Performance Ranking */}

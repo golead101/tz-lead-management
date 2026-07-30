@@ -54,12 +54,11 @@ export default function Topbar() {
   const handleRoleChange = (e) => {
     const newRole = e.target.value;
     setActiveRole(newRole);
-    if (newRole === 'Counselor') {
-      setActiveUser(counselors[0]?.name || 'Maha');
-    } else if (newRole === 'Manager' || newRole === 'Telecaller') {
-      setActiveUser('Irfan');
+    const matchedUser = counselors.find(c => c.role === newRole);
+    if (matchedUser) {
+      setActiveUser(matchedUser.name);
     } else {
-      setActiveUser('Stefan Salvatore');
+      setActiveUser(counselors[0]?.name || '');
     }
   };
 
@@ -88,52 +87,65 @@ export default function Topbar() {
   return (
     <header className="topbar">
       {/* Search Input bar */}
-      <div className="search-container">
-        <svg viewBox="0 0 24 24" className="search-icon">
-          <circle cx="11" cy="11" r="8" />
-          <path d="M21 21l-4.35-4.35" />
-        </svg>
-        <input 
-          type="text" 
-          placeholder="Search leads by name, email, phone..." 
-          className="search-input"
-          value={searchVal}
-          onChange={(e) => setSearchVal(e.target.value)}
-        />
+      <div className="search-wrapper">
+        <div className="search-container">
+          <svg viewBox="0 0 24 24" className="search-icon">
+            <circle cx="11" cy="11" r="8" />
+            <path d="M21 21l-4.35-4.35" />
+          </svg>
+          <input 
+            type="text" 
+            placeholder="Search tasks, users, reports..." 
+            className="search-input"
+            value={searchVal}
+            onChange={(e) => setSearchVal(e.target.value)}
+            onClick={() => setCmdOpen(true)}
+          />
+          <div className="search-shortcut">
+            <span>Ctrl</span>
+            <span>K</span>
+          </div>
+        </div>
       </div>
 
       {/* Dynamic Actions */}
       <div className="topbar-actions">
 
-        {/* Simulated Session Control */}
-        <div className="role-switcher-container">
-          <span className="role-switcher-label">Role:</span>
-          <select 
-            value={activeRole} 
-            onChange={handleRoleChange}
-            className="role-select"
-          >
-            <option value="Admin">Admin</option>
-            <option value="Telecaller">Telecaller</option>
-            <option value="Counselor">Counselor</option>
-          </select>
-        </div>
-
-        {activeRole === 'Counselor' && (
-          <div className="role-switcher-container">
-            <span className="role-switcher-label">Agent:</span>
-            <select 
-              value={activeUser} 
-              onChange={handleUserChange}
-              className="role-select"
-            >
-              {counselors.map(c => (
-                <option key={c.id} value={c.name}>{c.name}</option>
-              ))}
-            </select>
+        <div className="profile-group">
+          {activeRole === 'Counselor' && (
+            <div className="role-switcher-container" style={{ background: 'transparent', border: '1px solid #e5e7eb' }}>
+              <select 
+                value={activeUser} 
+                onChange={handleUserChange}
+                className="role-select"
+                style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
+              >
+                {counselors.map(c => (
+                  <option key={c.id} value={c.name}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          
+          <button className="notification-bell-btn" onClick={() => setNotifOpen(!notifOpen)}>
+            <svg viewBox="0 0 24 24" className="bell-icon">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+            </svg>
+            {unreadCount > 0 && <span className="notif-badge"></span>}
+          </button>
+          
+          <div className="user-profile-dropdown">
+            <div className="avatar-circle" style={{ width: '32px', height: '32px', fontSize: '13px', background: 'linear-gradient(135deg, #f87171 0%, #ef4444 100%)' }}>
+              {activeUser ? activeUser.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'U'}
+              <div className="status-dot"></div>
+            </div>
+            <div className="user-info">
+              <span className="user-name">{activeUser || 'User'}</span>
+              <span className="user-role">{activeRole || 'Role'}</span>
+            </div>
           </div>
-        )}
-
+        </div>
 
       </div>
 

@@ -128,9 +128,9 @@ export default function CampaignReport({ campaignId, setSubView }) {
 
   // Funnel data
   const funnelSteps = [
-    { name: 'Sent', value: campaign.sent, color: '#3b82f6', icon: Send },
-    { name: 'Delivered', value: campaign.delivered, color: BRAND_BLUE, icon: CheckCheck },
-    { name: 'Read', value: campaign.read, color: '#8b5cf6', icon: Eye },
+    { name: 'Sent', value: campaign.sent || 0, color: '#3b82f6', icon: Send },
+    { name: 'Delivered', value: campaign.delivered || 0, color: BRAND_BLUE, icon: CheckCheck },
+    { name: 'Read', value: campaign.read || 0, color: '#8b5cf6', icon: Eye },
   ];
 
   // Error breakdown
@@ -271,12 +271,12 @@ export default function CampaignReport({ campaignId, setSubView }) {
       {/* Stats Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10, marginBottom: 24 }}>
         {[
-          { label: 'Total', value: campaign.totalRecipients, icon: Send, color: '#3b82f6', bg: '#eff6ff' },
-          { label: 'Sent', value: campaign.sent, icon: CheckCircle, color: '#16a34a', bg: '#f0fdf4' },
-          { label: 'Delivered', value: campaign.delivered, icon: CheckCheck, color: BRAND_BLUE, bg: `${BRAND_BLUE}10` },
-          { label: 'Read', value: campaign.read, icon: Eye, color: '#8b5cf6', bg: '#f3e8ff' },
-          { label: 'Replied', value: campaign.replied ?? 0, icon: MessageSquare, color: '#c2410c', bg: '#fff7ed' },
-          { label: 'Failed', value: campaign.failed, icon: XCircle, color: '#ef4444', bg: '#fef2f2' },
+          { label: 'Total', value: campaign.totalRecipients || 0, icon: Send, color: '#3b82f6', bg: '#eff6ff' },
+          { label: 'Sent', value: campaign.sent || 0, icon: CheckCircle, color: '#16a34a', bg: '#f0fdf4' },
+          { label: 'Delivered', value: campaign.delivered || 0, icon: CheckCheck, color: BRAND_BLUE, bg: `${BRAND_BLUE}10` },
+          { label: 'Read', value: campaign.read || 0, icon: Eye, color: '#8b5cf6', bg: '#f3e8ff' },
+          { label: 'Replied', value: campaign.replied || 0, icon: MessageSquare, color: '#c2410c', bg: '#fff7ed' },
+          { label: 'Failed', value: campaign.failed || 0, icon: XCircle, color: '#ef4444', bg: '#fef2f2' },
           { label: 'Success', value: `${successRate}%`, icon: Clock, color: BRAND_BLUE, bg: `${BRAND_BLUE}08` },
         ].map(({ label, value, icon: Icon, color, bg }) => (
           <div key={label} style={{
@@ -456,7 +456,9 @@ export default function CampaignReport({ campaignId, setSubView }) {
                       </span>
                     </td>
                     <td style={{ padding: '10px 16px', color: r.error ? '#ef4444' : '#94a3b8' }}>
-                      {r.error ? r.error : (r.messageId ? `ID: ${r.messageId.substring(0, 16)}...` : '-')}
+                      {r.status === 'scheduled' && campaign.scheduledFor 
+                        ? new Date(campaign.scheduledFor).toLocaleString() 
+                        : (r.error ? r.error : (r.messageId ? `ID: ${r.messageId.substring(0, 16)}...` : '-'))}
                     </td>
                   </tr>
                 ))}

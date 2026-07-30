@@ -142,6 +142,7 @@ export default function NewCampaign({ setSubView }) {
   // Preview / Send
   const [previewContacts, setPreviewContacts] = useState([]);
   const [sending, setSending] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState('');
   const [result, setResult] = useState(null);
 
   const { leads, courses, addLead, addBulkLeads, sendWhatsAppMsg, prefilledCampaignLeads, setPrefilledCampaignLeads } = useCRM();
@@ -486,6 +487,127 @@ export default function NewCampaign({ setSubView }) {
       return getTemplatePreview(contact);
     }
   };
+  const getTemplateDataForContact = (contact) => {
+    if (messageType !== 'template') return null;
+    const vars = getTemplateVariables();
+    const parameters = [];
+    for (const varNum of vars) {
+      let val = '';
+      const mode = variableMode[varNum] || 'column';
+      if (mode === 'manual' && manualVariables[varNum]) {
+        val = manualVariables[varNum];
+      } else if (mode === 'column' && variableMapping[varNum]) {
+        const colName = variableMapping[varNum];
+        if (colName === 'course_fee') {
+          const matchedCourse = courses?.find(c => c.name === contact.course);
+          val = matchedCourse?.fee || 'N/A';
+        } else if (contact[colName] !== undefined) {
+          val = String(contact[colName]);
+        }
+      }
+      parameters.push({
+        type: 'text',
+        text: val || ' ' // Meta API rejects empty string, fallback to space
+      });
+    }
+    const components = [];
+    const headerType = getTemplateHeaderType();
+    if (headerType && ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(headerType) && headerMediaUrl) {
+      components.push({
+        type: 'header',
+        parameters: [
+          {
+            type: headerType.toLowerCase(),
+            [headerType.toLowerCase()]: {
+              link: headerMediaUrl
+            }
+          }
+        ]
+      });
+    }
+
+    if (parameters.length > 0) {
+      components.push({
+        type: 'body',
+        parameters: parameters
+      });
+    }
+    return {
+      name: selectedTemplate,
+      language: { code: templateLanguage || 'en_US' },
+      components: components
+    };
+  };
+
+  const handleScheduleCampaign = async () => {
+    if (!selectedListId && uploadedContacts.length === 0) {
+      alert('Please select or upload a contact list first');
+      return;
+    }
+    if (messageType === 'text' && !messageText.trim()) {
+      alert('Please enter a message');
+      return;
+    }
+    if (messageType === 'template' && !selectedTemplate) {
+      alert('Please select a template');
+      return;
+    }
+    if (!scheduleDate) {
+      alert('Please select a schedule date and time');
+      return;
+    }
+
+    let targetContacts = [];
+    if (selectedListId === 'crm-leads-all') {
+      targetContacts = getFilteredLeads();
+    } else if (selectedListId) {
+      const allContacts = whatsappDb.getContacts();
+      targetContacts = allContacts[selectedListId] || [];
+    } else {
+      targetContacts = uploadedContacts;
+    }
+
+    const newCampaign = {
+      id: `camp-${Date.now()}`,
+      name: campaignName || 'Scheduled Campaign',
+      totalRecipients: targetContacts.length,
+      sent: 0,
+      failed: 0,
+      status: 'scheduled',
+      createdAt: new Date().toISOString(),
+      scheduledFor: scheduleDate,
+      contactListId: selectedListId,
+      type: messageType,
+      message: messageText,
+      templateName: selectedTemplate,
+      languageCode: templateLanguage
+    };
+
+    try {
+      const currentCampaigns = whatsappDb.getCampaigns();
+      await whatsappDb.saveCampaigns([newCampaign, ...currentCampaigns]);
+
+      const preparedContacts = targetContacts.map(contact => ({
+        ...contact,
+        _messageToDeliver: getMessageForContact(contact),
+        _templateData: getTemplateDataForContact(contact)
+      }));
+
+      const currentRecipients = whatsappDb.getRecipients();
+      currentRecipients[newCampaign.id] = preparedContacts.map(c => ({
+        ...c,
+        status: 'scheduled',
+        error: null
+      }));
+      whatsappDb.saveRecipients(currentRecipients);
+
+      alert("Campaign scheduled successfully!");
+      setSubView('campaigns');
+    } catch (err) {
+      console.error("Failed to schedule campaign:", err);
+      alert("Error scheduling campaign");
+    }
+  };
 
   const handleSendCampaign = async () => {
     if (!selectedListId && uploadedContacts.length === 0) {
@@ -516,57 +638,6 @@ export default function NewCampaign({ setSubView }) {
     let sentCount = 0;
     let failedCount = 0;
 
-    const getTemplateDataForContact = (contact) => {
-      if (messageType !== 'template') return null;
-      const vars = getTemplateVariables();
-      const parameters = [];
-      for (const varNum of vars) {
-        let val = '';
-        const mode = variableMode[varNum] || 'column';
-        if (mode === 'manual' && manualVariables[varNum]) {
-          val = manualVariables[varNum];
-        } else if (mode === 'column' && variableMapping[varNum]) {
-          const colName = variableMapping[varNum];
-          if (colName === 'course_fee') {
-            const matchedCourse = courses?.find(c => c.name === contact.course);
-            val = matchedCourse?.fee || 'N/A';
-          } else if (contact[colName] !== undefined) {
-            val = String(contact[colName]);
-          }
-        }
-        parameters.push({
-          type: 'text',
-          text: val || ' ' // Meta API rejects empty string, fallback to space
-        });
-      }
-      const components = [];
-      const headerType = getTemplateHeaderType();
-      if (headerType && ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(headerType) && headerMediaUrl) {
-        components.push({
-          type: 'header',
-          parameters: [
-            {
-              type: headerType.toLowerCase(),
-              [headerType.toLowerCase()]: {
-                link: headerMediaUrl
-              }
-            }
-          ]
-        });
-      }
-
-      if (parameters.length > 0) {
-        components.push({
-          type: 'body',
-          parameters: parameters
-        });
-      }
-      return {
-        name: selectedTemplate,
-        language: { code: templateLanguage || 'en_US' },
-        components: components
-      };
-    };
 
     // Prepare contacts with the dynamic message body and template payload attached
     const preparedContacts = targetContacts.map(contact => ({
@@ -1263,20 +1334,42 @@ export default function NewCampaign({ setSubView }) {
             </div>
           )}
 
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <button onClick={() => setStep(2)} style={{ padding: '10px 24px', borderRadius: 10, background: '#f1f5f9', color: '#475569', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Back</button>
-            <button
-              onClick={handleSendCampaign}
-              disabled={sending}
-              style={{
-                padding: '10px 28px', borderRadius: 10, fontWeight: 700,
-                background: BRAND_BLUE, color: '#fff', border: 'none', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: 8, opacity: sending ? 0.7 : 1
-              }}
-            >
-              {sending ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : null}
-              {sending ? 'Sending Campaign...' : 'Confirm & Send Bulk Messages'}
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <input 
+                type="datetime-local" 
+                value={scheduleDate}
+                onChange={(e) => setScheduleDate(e.target.value)}
+                style={{ padding: '9px 12px', borderRadius: 8, border: '1px solid #cbd5e1', color: '#334155', outline: 'none' }} 
+              />
+              <button
+                style={{
+                  padding: '10px 20px', borderRadius: 10, fontWeight: 600,
+                  background: scheduleDate ? '#f1f5f9' : '#f8fafc', 
+                  color: scheduleDate ? BRAND_BLUE : '#94a3b8', 
+                  border: `1px solid ${scheduleDate ? BRAND_BLUE : '#cbd5e1'}`, 
+                  cursor: scheduleDate ? 'pointer' : 'not-allowed',
+                  display: 'flex', alignItems: 'center', gap: 8
+                }}
+                disabled={!scheduleDate || sending}
+                onClick={handleScheduleCampaign}
+              >
+                Schedule Campaign
+              </button>
+              <button
+                onClick={handleSendCampaign}
+                disabled={sending}
+                style={{
+                  padding: '10px 28px', borderRadius: 10, fontWeight: 700,
+                  background: BRAND_BLUE, color: '#fff', border: 'none', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 8, opacity: sending ? 0.7 : 1
+                }}
+              >
+                {sending ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : null}
+                {sending ? 'Sending Campaign...' : 'Confirm & Send Bulk Messages'}
+              </button>
+            </div>
           </div>
         </div>
       )}

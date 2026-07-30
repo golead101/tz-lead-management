@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CRMProvider, useCRM } from './context/CRMContext';
 import Sidebar from './components/Sidebar';
+import Topbar from './components/Topbar';
 import LoginScreen from './components/LoginScreen';
 
 // Page Modules
@@ -8,6 +9,7 @@ import Dashboard from './modules/Dashboard';
 import GridView from './modules/GridView';
 import DetailTimeline from './modules/DetailTimeline';
 import Analytics from './modules/Analytics';
+import BasicReports from './modules/BasicReports';
 import GoWhatsApp from './modules/gowhatsapp/GoWhatsApp';
 import Sandbox from './modules/Sandbox';
 import ConfigSettings from './modules/ConfigSettings';
@@ -97,6 +99,8 @@ function MainAppContent() {
         return <GoWhatsApp />;
       case 'analytics':
         return <Analytics />;
+      case 'basic-reports':
+        return <BasicReports />;
       case 'sandbox':
         return <Sandbox />;
       case 'integrations':
@@ -146,6 +150,7 @@ function MainAppContent() {
 
       {/* Core main dashboard panel */}
       <div className="main-wrapper" style={activeView === 'gowhatsapp' ? { padding: 0 } : {}}>
+        {activeView !== 'gowhatsapp' && <Topbar />}
         {/* Responsive Scrolling Canvas */}
         <main className="content-area" style={activeView === 'gowhatsapp' ? { padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' } : {}}>
           <div className="fade-in" style={activeView === 'gowhatsapp' ? { height: '100%', display: 'flex', flexDirection: 'column', flex: 1 } : {}}>

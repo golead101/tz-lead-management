@@ -219,11 +219,7 @@ export const CRMProvider = ({ children }) => {
 
   const [activeUser, setActiveUser] = useState(() => {
     const local = localStorage.getItem('crm_active_user');
-    const parsed = local ? JSON.parse(local) : 'Maha';
-    if (parsed === 'Elena Gilbert' || parsed === 'Damon Salvatore') {
-      return 'Maha';
-    }
-    return parsed;
+    return local ? JSON.parse(local) : '';
   });
 
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
@@ -288,11 +284,8 @@ export const CRMProvider = ({ children }) => {
     return () => unsubscribe();
   }, []);
 
-  // Simulated Alert Notifications
-  const [notifications, setNotifications] = useState([
-    { id: 'notif-1', title: 'New Lead Assigned', content: 'Aarav Sharma has been assigned to you.', timestamp: new Date().toISOString(), read: false },
-    { id: 'notif-2', title: 'Overdue Follow-up Alert', content: 'Ananya Sen follow-up was due 1 hour ago!', timestamp: new Date(Date.now() - 60*60*1000).toISOString(), read: false }
-  ]);
+  // Real-time Alert Notifications
+  const [notifications, setNotifications] = useState([]);
 
   // SPA Router State
   const [activeView, setActiveView] = useState(() => {

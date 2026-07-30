@@ -52,6 +52,20 @@ export default function Sidebar({ mobileMenuOpen, setMobileMenuOpen }) {
     }
   };
 
+  // Local state to track Reports menu expansion
+  const [isReportsExpanded, setIsReportsExpanded] = useState(() => {
+    return ['analytics', 'basic-reports'].includes(activeView) || sessionStorage.getItem('reports_expanded') === 'true';
+  });
+
+  const toggleReportsExpand = () => {
+    const nextState = !isReportsExpanded;
+    setIsReportsExpanded(nextState);
+    sessionStorage.setItem('reports_expanded', nextState ? 'true' : 'false');
+    if (nextState && !['analytics', 'basic-reports'].includes(activeView)) {
+      setActiveView('analytics');
+    }
+  };
+
   // Define navigation tabs to match the mockup screenshot exactly
   const menuItems = [
     {
@@ -158,7 +172,7 @@ export default function Sidebar({ mobileMenuOpen, setMobileMenuOpen }) {
     if (item.id === 'leads') return activeView === 'grid' || activeView === 'detail';
     if (item.id === 'followups') return activeView === 'followups';
     if (item.id === 'integrations') return activeView === 'integrations';
-    if (item.id === 'reports') return activeView === 'analytics';
+    if (item.id === 'reports') return activeView === 'analytics' || activeView === 'basic-reports';
     if (item.id === 'automation') return activeView === 'whatsapp';
     if (item.id === 'history') return activeView === 'history';
     if (item.id === 'settings') return activeView === 'settings';
@@ -389,6 +403,75 @@ export default function Sidebar({ mobileMenuOpen, setMobileMenuOpen }) {
                           }}
                         >
                           <IconComponent size={14} />
+                          {sub.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          }
+
+          if (item.id === 'reports') {
+            const isActive = ['analytics', 'basic-reports'].includes(activeView);
+            return (
+              <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <button
+                  className={`nav-item ${isActive ? 'active' : ''}`}
+                  onClick={toggleReportsExpand}
+                  title={item.label}
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    {item.icon}
+                    <span>{item.label}</span>
+                  </div>
+                  {!isCompact && (
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="14"
+                      height="14"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      style={{
+                        transition: 'transform 0.2s ease',
+                        transform: isReportsExpanded ? 'rotate(0deg)' : 'rotate(-90deg)'
+                      }}
+                    >
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  )}
+                </button>
+
+                {isReportsExpanded && !isCompact && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '14px', borderLeft: '1px dashed rgba(255, 255, 255, 0.15)', marginLeft: '24px', marginTop: '2px', marginBottom: '6px' }}>
+                    {[
+                      { subTarget: 'analytics', label: 'Performance Analytics' },
+                      { subTarget: 'basic-reports', label: 'Basic Reports' }
+                    ].map(sub => {
+                      const isSubActive = activeView === sub.subTarget;
+                      return (
+                        <button
+                          key={sub.subTarget}
+                          className="nav-sub-item"
+                          onClick={() => setActiveView(sub.subTarget)}
+                          style={{
+                            padding: '8px 12px',
+                            fontSize: '13px',
+                            opacity: isSubActive ? 1 : 0.65,
+                            background: isSubActive ? 'var(--sidebar-active-bg, #2F6BFF)' : 'transparent',
+                            color: '#ffffff',
+                            fontWeight: isSubActive ? '600' : '500',
+                            borderRadius: '8px',
+                            textAlign: 'left',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                            display: 'block',
+                            width: '100%'
+                          }}
+                        >
                           {sub.label}
                         </button>
                       );
