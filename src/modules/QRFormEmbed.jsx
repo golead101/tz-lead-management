@@ -122,7 +122,8 @@ export default function QRFormEmbed() {
     data.stage = 'New Lead';
     data.createdDate = new Date().toISOString();
     data.lastContacted = new Date().toISOString();
-    data.source = data.source || 'QR Code Walk-in'; 
+    data.source = 'Walk-in'; 
+    data.subSource = data.hearAboutUs || 'QR Code';
     data.temperature = 'Warm';
     data.timeline = [{
       id: 'log-' + Date.now(),
@@ -137,10 +138,6 @@ export default function QRFormEmbed() {
       qualification: data.qualification || '',
       batchTiming: data.batchTiming || ''
     };
-    
-    if (data.hearAboutUs) {
-      data.subSource = data.hearAboutUs;
-    }
 
     try {
       await addDoc(collection(db, 'leads'), data);

@@ -495,7 +495,7 @@ export default function GridView() {
       const endStr = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
       return `${startStr} - ${endStr}`;
     }
-    return dateRangeFilter;
+    return dateRangeFilter === 'All Time' ? 'ALL' : dateRangeFilter;
   };
   const handleExportCSV = () => {
     if (filteredLeads.length === 0) {
@@ -594,7 +594,7 @@ export default function GridView() {
             onChange={(e) => { setSelectedCourse(e.target.value); setCurrentPage(1); }}
             className="gv-filter-select"
           >
-            <option value="All">All Programs</option>
+            <option value="All">ALL</option>
             {courses.map((c, index) => (
               <option key={`${c.id}-${index}`} value={c.name}>{c.code} — {c.name}</option>
             ))}
@@ -611,7 +611,7 @@ export default function GridView() {
             onChange={(e) => { setSelectedStage(e.target.value); setCurrentPage(1); }}
             className="gv-filter-select"
           >
-            <option value="All">All Stages</option>
+            <option value="All">ALL</option>
             {pipelineStages.map(s => (
               <option key={s.id} value={s.name}>{s.name}</option>
             ))}
@@ -627,7 +627,7 @@ export default function GridView() {
             onChange={(e) => { setSelectedTemperature(e.target.value); setCurrentPage(1); }}
             className="gv-filter-select"
           >
-            <option value="All">All Leads</option>
+            <option value="All">ALL</option>
             <option value="Hot">🔥 Hot Leads</option>
             <option value="Warm">☀️ Warm Leads</option>
             <option value="Cold">❄️ Cold Leads</option>
@@ -645,7 +645,7 @@ export default function GridView() {
               onChange={(e) => { setSelectedCounselor(e.target.value); setCurrentPage(1); }}
               className="gv-filter-select"
             >
-              <option key="all" value="All">All Counselors</option>
+              <option key="all" value="All">ALL</option>
               {counselors.map((c, index) => (
                 <option key={`${c.id}-${index}`} value={c.name}>
                   {c.name} {c.status === 'Deactivated' ? '(Deactivated)' : ''}
@@ -669,7 +669,7 @@ export default function GridView() {
             }}
             className="gv-filter-select"
           >
-            <option value="All">All Sources</option>
+            <option value="All">ALL</option>
             <option value="meta">Meta</option>
             <option value="google">Google</option>
             <option value="whatsapp">WhatsApp</option>
@@ -690,7 +690,7 @@ export default function GridView() {
               onChange={(e) => { setSelectedCampaign(e.target.value); setCurrentPage(1); }}
               className="gv-filter-select"
             >
-              <option value="All">All Campaigns</option>
+              <option value="All">ALL</option>
               {uniqueMetaCampaigns.map((c, index) => (
                 <option key={`${c}-${index}`} value={c}>{c}</option>
               ))}
@@ -727,7 +727,7 @@ export default function GridView() {
                      onMouseEnter={(e) => { if (dateRangeFilter !== option) e.currentTarget.style.background = 'var(--dark-bg)' }}
                      onMouseLeave={(e) => { if (dateRangeFilter !== option) e.currentTarget.style.background = 'transparent' }}
                    >
-                     {option}
+                     {option === 'All Time' ? 'ALL' : option}
                      {dateRangeFilter === option && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg>}
                    </div>
                  ))}

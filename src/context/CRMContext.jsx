@@ -673,6 +673,24 @@ export const CRMProvider = ({ children }) => {
 
     // New Lead Creation
     const newLeadId = cleanPhone ? cleanPhone : `lead-${Date.now()}`;
+
+    let finalSource = leadData.source || 'Website Form';
+    let finalSubSource = leadData.subSource || '';
+    
+    if (finalSource) {
+      const srcLower = finalSource.toLowerCase().trim();
+      const standardSources = ['meta', 'whatsapp', 'google', 'website', 'call', 'facebook', 'instagram', 'walk-in', 'walkin'];
+      const isStandard = standardSources.some(s => srcLower.includes(s));
+      
+      if (srcLower === 'qr code walk-in') {
+        finalSource = 'Walk-in';
+        finalSubSource = finalSubSource || 'QR Code';
+      } else if (!isStandard) {
+        finalSubSource = finalSource;
+        finalSource = 'Walk-in';
+      }
+    }
+
     const newLead = {
       id: newLeadId,
       name: leadData.name || 'Anonymous Inquiry',
@@ -681,8 +699,8 @@ export const CRMProvider = ({ children }) => {
       location: leadData.location || 'Website Source',
       education: leadData.education || 'Not Provided',
       course: leadData.course || (courses[0] ? courses[0].name : ''),
-      source: leadData.source || 'Website Form',
-      subSource: leadData.subSource || '',
+      source: finalSource,
+      subSource: finalSubSource,
       counselor: leadData.counselor || activeUser,
       stage: leadData.stage || 'New Lead',
       temperature: leadData.temperature || 'Warm',
@@ -694,7 +712,7 @@ export const CRMProvider = ({ children }) => {
           id: `log-${Date.now()}`,
           type: 'system',
           title: 'Lead Captured',
-          content: `Inquiry successfully entered system via ${leadData.source === 'Walk-in' && leadData.subSource ? `Walk-in (${leadData.subSource})` : (leadData.source || 'Website Form')}.`,
+          content: `Inquiry successfully entered system via ${finalSource === 'Walk-in' && finalSubSource ? `Walk-in (${finalSubSource})` : finalSource}.`,
           timestamp: new Date().toISOString(),
           user: 'System'
         }

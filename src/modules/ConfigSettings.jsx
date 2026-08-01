@@ -811,10 +811,10 @@ export default function ConfigSettings() {
                   {/* Bottom section */}
                   <div style={{ borderTop: `1px solid ${(branding.sidebarHoverBg || '#173B7A')}33`, paddingTop: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: `${branding.sidebarText || '#ffffff'}22`, color: branding.sidebarText || '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '8px', fontWeight: '700' }}>
-                      SS
+                      A
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
-                      <span style={{ fontSize: '9px', fontWeight: '600', color: branding.sidebarText || '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Stefan Salvatore</span>
+                      <span style={{ fontSize: '9px', fontWeight: '600', color: branding.sidebarText || '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Admin User</span>
                       <span style={{ fontSize: '7px', color: branding.sidebarText || '#ffffff', opacity: 0.6 }}>Admin</span>
                     </div>
                   </div>
