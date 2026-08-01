@@ -112,21 +112,6 @@ export default function Topbar() {
       <div className="topbar-actions">
 
         <div className="profile-group">
-          {activeRole === 'Counselor' && (
-            <div className="role-switcher-container" style={{ background: 'transparent', border: '1px solid #e5e7eb' }}>
-              <select 
-                value={activeUser} 
-                onChange={handleUserChange}
-                className="role-select"
-                style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
-              >
-                {counselors.map(c => (
-                  <option key={c.id} value={c.name}>{c.name}</option>
-                ))}
-              </select>
-            </div>
-          )}
-          
           <button className="notification-bell-btn" onClick={() => setNotifOpen(!notifOpen)}>
             <svg viewBox="0 0 24 24" className="bell-icon">
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />

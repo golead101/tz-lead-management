@@ -29,3 +29,9 @@ This document tracks issues encountered during development, their root causes, a
 - **Root Cause:** The `.gv-filter-select` CSS class had a fixed `width: 140px;`.
 - **Solution:** Changed the width to `width: auto;`, added a `min-width: 85px;`, and set `max-width: 125px;` in `index.css` to dynamically shrink them while keeping them neat.
 - **Files Modified:** `src/index.css`
+
+**Issue [4/2026-08-01]:** Remove Role Switcher from Topbar
+- **Description:** A sandbox dropdown allowing Counselors to switch identities was visible in the header.
+- **Root Cause:** A developer testing tool was left exposed in the UI.
+- **Solution:** Removed the `role-switcher-container` block from `Topbar.jsx` to prevent users from changing their active identity via the UI.
+- **Files Modified:** `src/components/Topbar.jsx`
