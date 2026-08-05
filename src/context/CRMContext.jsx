@@ -109,18 +109,28 @@ export const CRMProvider = ({ children }) => {
     if (local) {
       try {
         const parsed = JSON.parse(local);
-        return parsed.map(lead => ({
-          email: '',
-          course: '',
-          education: '',
-          source: 'WhatsApp Inbound',
-          stage: lead.stage === 'Follow-up Pending' ? 'Follow-up' : (lead.stage || 'New Lead'),
-          counselor: 'Unassigned',
-          lastContacted: lead.createdDate || new Date().toISOString(),
-          timeline: [],
-          customFields: {},
-          ...lead
-        }));
+        return parsed.map(lead => {
+          let temp = lead.temperature || 'Hot';
+          if (temp === 'Hot' && lead.createdDate) {
+            const diffMs = new Date() - new Date(lead.createdDate);
+            if (diffMs > 4 * 24 * 60 * 60 * 1000) {
+              temp = 'Warm';
+            }
+          }
+          return {
+            email: '',
+            course: '',
+            education: '',
+            source: 'WhatsApp Inbound',
+            stage: lead.stage === 'Follow-up Pending' ? 'Follow-up' : (lead.stage || 'New Lead'),
+            counselor: 'Unassigned',
+            lastContacted: lead.createdDate || new Date().toISOString(),
+            timeline: [],
+            customFields: {},
+            ...lead,
+            temperature: temp
+          };
+        });
       } catch (e) {
         console.error(e);
       }
@@ -365,6 +375,16 @@ export const CRMProvider = ({ children }) => {
         } else {
           mainLeads = snapshot.docs.map(doc => {
             const data = doc.data();
+            
+            // Auto-downgrade Hot to Warm after 4 days
+            let temp = data.temperature || 'Hot';
+            if (temp === 'Hot' && data.createdDate) {
+              const diffMs = new Date() - new Date(data.createdDate);
+              if (diffMs > 4 * 24 * 60 * 60 * 1000) {
+                temp = 'Warm';
+              }
+            }
+
             return {
               email: '',
               course: '',
@@ -376,7 +396,8 @@ export const CRMProvider = ({ children }) => {
               timeline: [],
               customFields: {},
               id: doc.id,
-              ...data
+              ...data,
+              temperature: temp
             };
           });
           updateLeads();
@@ -393,6 +414,15 @@ export const CRMProvider = ({ children }) => {
         if (!snapshot.empty) {
           iframeLeads = snapshot.docs.map(doc => {
             const data = doc.data();
+            
+            let temp = data.temperature || 'Hot';
+            if (temp === 'Hot' && data.createdDate) {
+              const diffMs = new Date() - new Date(data.createdDate);
+              if (diffMs > 4 * 24 * 60 * 60 * 1000) {
+                temp = 'Warm';
+              }
+            }
+
             return {
               email: '',
               course: '',
@@ -404,7 +434,8 @@ export const CRMProvider = ({ children }) => {
               timeline: [],
               customFields: {},
               id: doc.id,
-              ...data
+              ...data,
+              temperature: temp
             };
           });
           updateLeads();
@@ -693,17 +724,17 @@ export const CRMProvider = ({ children }) => {
 
     const newLead = {
       id: newLeadId,
-      name: leadData.name || 'Anonymous Inquiry',
+      name: leadData.name || '',
       email: leadData.email || '',
       phone: leadData.phone || '',
       location: leadData.location || 'Website Source',
       education: leadData.education || 'Not Provided',
-      course: leadData.course || (courses[0] ? courses[0].name : ''),
+      course: leadData.course || '',
       source: finalSource,
       subSource: finalSubSource,
       counselor: leadData.counselor || activeUser,
       stage: leadData.stage || 'New Lead',
-      temperature: leadData.temperature || 'Warm',
+      temperature: leadData.temperature || 'Hot',
       createdDate: new Date().toISOString(),
       lastContacted: new Date().toISOString(),
       customFields: leadData.customFields || {},
@@ -755,12 +786,12 @@ export const CRMProvider = ({ children }) => {
       const cleanPhone = leadData.phone ? String(leadData.phone).replace(/\D/g, '') : '';
       return {
       id: cleanPhone ? cleanPhone : `lead-${Date.now()}-${index}`,
-      name: leadData.name || 'Anonymous Inquiry',
+      name: leadData.name || '',
       email: leadData.email || '',
       phone: leadData.phone || '',
       location: leadData.location || 'Campaign Upload',
       education: leadData.education || 'Not Provided',
-      course: leadData.course || (courses[0] ? courses[0].name : ''),
+      course: leadData.course || '',
       source: leadData.source || 'Campaign Upload',
       subSource: leadData.subSource || '',
       counselor: leadData.counselor || activeUser,
