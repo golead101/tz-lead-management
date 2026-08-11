@@ -3,7 +3,7 @@ import { useCRM } from '../context/CRMContext';
 import DetailTimeline from './DetailTimeline';
 
 export default function FollowUps() {
-  const { leads, selectedLeadId, setSelectedLeadId, setActiveView, showDetailModal, setShowDetailModal, logCall, pipelineStages } = useCRM();
+  const { leads, activeRole, activeUser, selectedLeadId, setSelectedLeadId, setActiveView, showDetailModal, setShowDetailModal, logCall, pipelineStages } = useCRM();
   const [activeTab, setActiveTab] = useState('overdue'); // Default to overdue as in the mockup
 
   // New filtering state
@@ -54,7 +54,10 @@ export default function FollowUps() {
   };
 
   // Filter leads that have followupDate set OR stage is Follow-up
-  let followUpLeads = leads.filter(lead => lead.followupDate || lead.stage === 'Follow-up');
+  let followUpLeads = leads.filter(lead => {
+    if (activeRole === 'Counselor' && lead.counselor !== activeUser) return false;
+    return lead.followupDate || lead.stage === 'Follow-up';
+  });
 
   // Apply search and dropdown filters
   if (searchQuery.trim()) {

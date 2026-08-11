@@ -35,14 +35,19 @@ export default function KanbanView() {
 
     // Role-based security (Counselors only see assigned leads, plus global sources)
     if (activeRole === 'Counselor' && lead.counselor !== activeUser) {
-      const src = (lead.source || '').toLowerCase();
-      const isGlobal = src.includes('meta') || src.includes('google') || src.includes('website');
-      if (!isGlobal) return false;
+      return false;
     }
 
     // Dropdown filters
     if (selectedCourse !== 'All' && lead.course !== selectedCourse) return false;
-    if (selectedCounselor !== 'All' && lead.counselor !== selectedCounselor) return false;
+    if (selectedCounselor !== 'All') {
+      if (selectedCounselor === 'Unassigned') {
+        const coun = (lead.counselor || '').trim().toLowerCase();
+        if (coun !== '' && coun !== 'unassigned' && coun !== 'none') return false;
+      } else if (lead.counselor !== selectedCounselor) {
+        return false;
+      }
+    }
     if (selectedSource !== 'All' && lead.source !== selectedSource) return false;
 
     // Search query matches Name, Phone, Email
@@ -133,21 +138,27 @@ export default function KanbanView() {
             ))}
           </select>
 
-          {/* Counselor filter */}
-          {activeRole !== 'Counselor' && (
-            <select 
-              value={selectedCounselor} 
-              onChange={(e) => setSelectedCounselor(e.target.value)}
-              className="filter-select"
-            >
-              <option value="All">All Counselors</option>
-              {counselors.map(c => (
-                <option key={c.id} value={c.name}>
-                  {c.name} {c.status === 'Deactivated' ? '(Deactivated)' : ''}
-                </option>
-              ))}
-            </select>
-          )}
+          {/* ASSIGNED TO filter */}
+          <select 
+            value={activeRole === 'Counselor' ? activeUser : selectedCounselor} 
+            onChange={(e) => setSelectedCounselor(e.target.value)}
+            className="filter-select"
+            disabled={activeRole === 'Counselor'}
+          >
+            {activeRole === 'Counselor' ? (
+              <option value={activeUser}>{activeUser}</option>
+            ) : (
+              <>
+                <option value="All">ASSIGNED TO: ALL</option>
+                <option value="Unassigned">Unassigned</option>
+                {counselors.map(c => (
+                  <option key={c.id} value={c.name}>
+                    {c.name} {c.status === 'Deactivated' ? '(Deactivated)' : ''}
+                  </option>
+                ))}
+              </>
+            )}
+          </select>
 
 
 

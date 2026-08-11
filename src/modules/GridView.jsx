@@ -78,14 +78,19 @@ export default function GridView() {
   // Filter Leads
   const filteredLeads = leads.filter(lead => {
     if (activeRole === 'Counselor' && lead.counselor !== activeUser) {
-      const src = (lead.source || '').toLowerCase();
-      const isGlobal = src.includes('meta') || src.includes('google') || src.includes('website');
-      if (!isGlobal) return false;
+      return false;
     }
     if (selectedCourse !== 'All' && lead.course !== selectedCourse) return false;
     if (selectedStage !== 'All' && lead.stage !== selectedStage) return false;
     if (selectedTemperature !== 'All' && (lead.temperature || 'Warm') !== selectedTemperature) return false;
-    if (selectedCounselor !== 'All' && lead.counselor !== selectedCounselor) return false;
+    if (selectedCounselor !== 'All') {
+      if (selectedCounselor === 'Unassigned') {
+        const coun = (lead.counselor || '').trim().toLowerCase();
+        if (coun !== '' && coun !== 'unassigned' && coun !== 'none') return false;
+      } else if (lead.counselor !== selectedCounselor) {
+        return false;
+      }
+    }
     if (selectedSource !== 'All') {
       const srcLower = (lead.source || '').toLowerCase();
       if (selectedSource === 'meta') {
@@ -318,7 +323,7 @@ export default function GridView() {
           name: name || 'Unknown',
           email: email || '',
           phone: phone || '',
-          course: course || courses[0]?.name,
+          course: course || '',
           source: source || 'CSV Import',
           campaign: campaign || '',
           counselor: activeUser,
@@ -414,7 +419,7 @@ export default function GridView() {
     setEditCourse(lead.course || '');
     setEditCounselor(lead.counselor || 'Unassigned');
     setEditStage(lead.stage || 'New Lead');
-    setEditSource(lead.source || 'Walk-in');
+    setEditSource(lead.source || '');
     setEditSubSource(lead.subSource || '');
     setEditCampaign(lead.campaign || lead.campaignName || '');
     setEditFollowupDate(lead.followupDate || '');
@@ -634,26 +639,32 @@ export default function GridView() {
           </select>
         </div>
 
-        {activeRole !== 'Counselor' && (
-          <div className="gv-filter-group">
-            <label className="gv-filter-label">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 3a4 4 0 100 8 4 4 0 000-8z"/></svg>
-              Owner
-            </label>
-            <select
-              value={selectedCounselor}
-              onChange={(e) => { setSelectedCounselor(e.target.value); setCurrentPage(1); }}
-              className="gv-filter-select"
-            >
-              <option key="all" value="All">ALL</option>
-              {counselors.map((c, index) => (
-                <option key={`${c.id}-${index}`} value={c.name}>
-                  {c.name} {c.status === 'Deactivated' ? '(Deactivated)' : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
+        <div className="gv-filter-group">
+          <label className="gv-filter-label">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 3a4 4 0 100 8 4 4 0 000-8z"/></svg>
+            ASSIGNED TO
+          </label>
+          <select
+            value={activeRole === 'Counselor' ? activeUser : selectedCounselor}
+            onChange={(e) => { setSelectedCounselor(e.target.value); setCurrentPage(1); }}
+            className="gv-filter-select"
+            disabled={activeRole === 'Counselor'}
+          >
+            {activeRole === 'Counselor' ? (
+              <option value={activeUser}>{activeUser}</option>
+            ) : (
+              <>
+                <option key="all" value="All">ALL</option>
+                <option key="unassigned" value="Unassigned">Unassigned</option>
+                {counselors.map((c, index) => (
+                  <option key={`${c.id}-${index}`} value={c.name}>
+                    {c.name} {c.status === 'Deactivated' ? '(Deactivated)' : ''}
+                  </option>
+                ))}
+              </>
+            )}
+          </select>
+        </div>
 
         <div className="gv-filter-group">
           <label className="gv-filter-label">
@@ -1350,6 +1361,7 @@ export default function GridView() {
                           onChange={(e) => setEditSource(e.target.value)}
                           style={{ padding: '8px 12px', fontSize: '13px', height: '38px' }}
                         >
+                        <option value="">Select Source</option>
                           <option value="Walk-in">Walk-in</option>
                           <option value="Meta Ads">Meta Ads</option>
                           <option value="WhatsApp">WhatsApp</option>

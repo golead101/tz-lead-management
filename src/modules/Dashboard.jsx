@@ -45,9 +45,7 @@ export default function Dashboard() {
   // Filter leads based on counselor permissions
   const roleFilteredLeads = leads.filter(lead => {
     if (activeRole === 'Counselor') {
-      const src = (lead.source || '').toLowerCase();
-      const isGlobal = src.includes('meta') || src.includes('google') || src.includes('website');
-      return lead.counselor === activeUser || isGlobal;
+      return lead.counselor === activeUser;
     }
     return true;
   });

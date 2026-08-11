@@ -290,6 +290,7 @@ exports.googleAdsWebhook = functions.https.onRequest(async (req, res) => {
       stage: 'New Lead',
       counselor: 'Unassigned',
       createdDate: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
       lastContacted: new Date().toISOString(),
       customFields: {
         campaignId: campaignId,
@@ -450,6 +451,7 @@ exports.googleAdsSync = functions.https.onRequest((req, res) => {
           stage: 'New Lead',
           counselor: 'Unassigned',
           createdDate: submissionTime,
+          createdAt: submissionTime,
           lastContacted: new Date().toISOString(),
           customFields: {
             campaign: campaign,
@@ -815,6 +817,7 @@ exports.metaWebhook = functions.https.onRequest(async (req, res) => {
         stage: 'New Lead',
         counselor: 'Unassigned',
         createdDate: metaLead.created_time || new Date().toISOString(),
+        createdAt: metaLead.created_time || new Date().toISOString(),
         lastContacted: new Date().toISOString(),
         customFields: {
           campaignId: campaignId,
@@ -1205,7 +1208,8 @@ exports.whatsappWebhook = functions.https.onRequest((req, res) => {
               name: senderName,
               phone: formattedPhone,
               whatsappMessages: [inboundMsg],
-              createdDate: new Date().toISOString()
+              createdDate: new Date().toISOString(),
+              createdAt: new Date().toISOString()
             };
 
             await db.collection('leads').doc(newLeadId).set(newLead);

@@ -187,18 +187,20 @@ export default function Topbar() {
                   {/* Lead Matches Search Results */}
                   <div className="cmd-section-title">Matched Student Leads</div>
                   {leads.filter(l => 
-                    l.name.toLowerCase().includes(cmdSearch.toLowerCase()) ||
-                    l.email.toLowerCase().includes(cmdSearch.toLowerCase()) ||
-                    l.phone.includes(cmdSearch)
+                    (activeRole !== 'Counselor' || l.counselor === activeUser) &&
+                    (l.name.toLowerCase().includes(cmdSearch.toLowerCase()) ||
+                     l.email.toLowerCase().includes(cmdSearch.toLowerCase()) ||
+                     l.phone.includes(cmdSearch))
                   ).length === 0 ? (
                     <div className="text-center" style={{ padding: '16px', color: 'var(--text-muted)', fontSize: '12px' }}>
                       No student inquiries found matching "{cmdSearch}"
                     </div>
                   ) : (
                     leads.filter(l => 
-                      l.name.toLowerCase().includes(cmdSearch.toLowerCase()) ||
-                      l.email.toLowerCase().includes(cmdSearch.toLowerCase()) ||
-                      l.phone.includes(cmdSearch)
+                      (activeRole !== 'Counselor' || l.counselor === activeUser) &&
+                      (l.name.toLowerCase().includes(cmdSearch.toLowerCase()) ||
+                       l.email.toLowerCase().includes(cmdSearch.toLowerCase()) ||
+                       l.phone.includes(cmdSearch))
                     ).slice(0, 5).map(l => (
                       <div 
                         key={l.id} 
