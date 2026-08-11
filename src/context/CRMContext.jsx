@@ -256,30 +256,21 @@ export const CRMProvider = ({ children }) => {
   }, [pipelineStages]);
 
   const [integrations, setIntegrations] = useState(() => {
-    const hasReset = localStorage.getItem('crm_integrations_seed_reset_v3');
-    if (!hasReset) {
-      localStorage.setItem('crm_integrations_seed_reset_v3', 'true');
-      const local = localStorage.getItem('crm_integrations');
-      if (local) {
-        try {
-          const parsed = JSON.parse(local);
-          const merged = {
-            meta: { ...DEFAULT_INTEGRATIONS.meta, ...parsed.meta },
-            google: { ...DEFAULT_INTEGRATIONS.google, ...parsed.google },
-            whatsapp: { ...DEFAULT_INTEGRATIONS.whatsapp, ...parsed.whatsapp },
-            webhooks: { ...DEFAULT_INTEGRATIONS.webhooks, ...parsed.webhooks }
-          };
-          localStorage.setItem('crm_integrations', JSON.stringify(merged));
-          return merged;
-        } catch (e) {
-          console.error("Error merging integrations state:", e);
-        }
-      }
-      localStorage.setItem('crm_integrations', JSON.stringify(DEFAULT_INTEGRATIONS));
-      return DEFAULT_INTEGRATIONS;
-    }
     const local = localStorage.getItem('crm_integrations');
-    return local ? JSON.parse(local) : DEFAULT_INTEGRATIONS;
+    if (local) {
+      try {
+        const parsed = JSON.parse(local);
+        return {
+          meta: { ...DEFAULT_INTEGRATIONS.meta, ...parsed.meta },
+          google: { ...DEFAULT_INTEGRATIONS.google, ...parsed.google },
+          whatsapp: { ...DEFAULT_INTEGRATIONS.whatsapp, ...parsed.whatsapp },
+          webhooks: { ...DEFAULT_INTEGRATIONS.webhooks, ...parsed.webhooks }
+        };
+      } catch (e) {
+        console.error("Error parsing crm_integrations from localStorage:", e);
+      }
+    }
+    return DEFAULT_INTEGRATIONS;
   });
 
   const [counselors, setCounselors] = useState([]);
@@ -600,11 +591,10 @@ export const CRMProvider = ({ children }) => {
         if (!active) return;
         if (snapshot.exists()) {
           const data = snapshot.data();
-          const whatsappData = data.whatsapp || {};
-          const metaData = data.meta || {};
-          // We simply use the data from Firestore, allowing the user to update it via the UI
-          // without hardcoded .env variables overriding and causing infinite encryption loops.
           setIntegrations(data);
+          try {
+            localStorage.setItem('crm_integrations', JSON.stringify(data));
+          } catch(e){}
         } else {
           setDoc(doc(db, 'settings', 'integrations'), DEFAULT_INTEGRATIONS)
             .catch(err => console.error("Firestore settings/integrations initialization failed:", err));
@@ -1852,14 +1842,16 @@ export const CRMProvider = ({ children }) => {
       }
     };
 
+    setIntegrations(nextIntegrations);
+    try {
+      localStorage.setItem('crm_integrations', JSON.stringify(nextIntegrations));
+    } catch(e){}
+
     if (isFirebaseEnabled) {
       setDoc(doc(db, 'settings', 'integrations'), nextIntegrations)
         .catch(err => {
           console.error("Firestore save integrations failed:", err);
-          setIntegrations(nextIntegrations);
         });
-    } else {
-      setIntegrations(nextIntegrations);
     }
 
     if (!silent) {
