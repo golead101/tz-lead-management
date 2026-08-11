@@ -143,7 +143,7 @@ export default function Dashboard() {
       return !(isMeta || isGoogle || isWhatsapp || isWebsite || isCall || isWalkin);
     }).length;
     
-    const contactedCount = activeLeads.filter(l => ['Contacted', 'Interested', 'Demo Scheduled', 'Demo Attended'].includes(l.stage)).length;
+    const contactedCount = activeLeads.filter(l => ['Contacted', 'Interested', 'Demo Scheduled', 'Demo Attended', 'Free Class'].includes(l.stage)).length;
     const followUpsCount = activeLeads.filter(l => l.followupDate || l.stage === 'Follow-up').length;
     const convertedCount = activeLeads.filter(l => l.stage === 'Converted').length;
 

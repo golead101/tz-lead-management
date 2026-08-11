@@ -62,7 +62,16 @@ export default function QRFormEmbed() {
     title: 'Student Registration',
     subtitle: 'Fill in your details below',
     qualifications: ['10th Pass', '12th Pass', 'Undergraduate', 'Postgraduate', 'Other'],
-    courses: ['Full-Stack Web Development', 'Data Science', 'UI/UX Design'],
+    courses: (() => {
+      try {
+        const saved = localStorage.getItem('crm_courses');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed.map(c => c.name || c);
+        }
+      } catch(e){}
+      return ['Full-Stack Web Development', 'Data Science & Artificial Intelligence', 'Cloud & DevOps Engineering', 'Cyber Security & Ethical Hacking', 'UI/UX Product Design'];
+    })(),
     timings: ['Morning (9 AM - 11 AM)', 'Afternoon (2 PM - 4 PM)', 'Evening (6 PM - 8 PM)', 'Weekend Batches'],
     sources: ['Instagram', 'Facebook', 'Google Search', 'Friend/Referral', 'Walk-in/Poster', 'Other']
   });

@@ -4,7 +4,7 @@ import { db } from '../firebase';
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 
 export default function Integrations() {
-  const { leads, integrations, updateIntegration, addLead, showToastMsg, setActiveView } = useCRM();
+  const { leads, courses, integrations, updateIntegration, addLead, showToastMsg, setActiveView } = useCRM();
 
   const getCapturedCount = (platform) => {
     let sourceNames = [];
@@ -515,7 +515,7 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
           email: fields.email || '',
           phone: fields.phone_number || '',
           source: 'Meta Ads',
-          course: 'Full-Stack Web Development',
+          course: (courses && courses[0]?.name) || 'Course Inquiry',
           createdDate: new Date().toISOString(),
           stage: 'New Lead',
           timeline: [{

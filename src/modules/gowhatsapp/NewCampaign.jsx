@@ -4,7 +4,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { whatsappDb } from './whatsappDb';
-import { useCRM } from '../../context/CRMContext';
+import { useCRM, normalizeLeadSource } from '../../context/CRMContext';
 import { storage } from '../../firebase';
 import { ref, uploadBytesResumable, getDownloadURL, listAll } from 'firebase/storage';
 
@@ -183,9 +183,9 @@ export default function NewCampaign({ setSubView }) {
   };
 
   const baseLeads = getBaseLeads();
-  const uniqueCourses = [...new Set(baseLeads.map(l => l.course).filter(Boolean))];
+  const uniqueCourses = (courses && courses.length > 0) ? courses.map(c => c.name) : [...new Set(baseLeads.map(l => l.course).filter(Boolean))];
   const uniqueStages = [...new Set(baseLeads.map(l => l.stage).filter(Boolean))];
-  const uniqueSources = [...new Set(baseLeads.map(l => l.source).filter(Boolean))];
+  const uniqueSources = [...new Set(baseLeads.map(l => normalizeLeadSource(l.source)).filter(Boolean))];
   const uniqueCampaigns = [...new Set(baseLeads.filter(l => (l.source || '').toLowerCase().includes('meta')).map(l => l.campaign || l.campaignName).filter(Boolean))];
 
   useEffect(() => {

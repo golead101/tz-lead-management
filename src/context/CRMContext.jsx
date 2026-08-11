@@ -4,6 +4,36 @@ import { collection, doc, setDoc, deleteDoc, onSnapshot, writeBatch, getDoc, get
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
 const CRMContext = createContext();
 
+export const normalizeLeadSource = (rawSource) => {
+  if (!rawSource || typeof rawSource !== 'string') return 'Walk-in';
+  const trimmed = rawSource.trim();
+  const lower = trimmed.toLowerCase();
+
+  if (lower === 'meta' || lower === 'meta ads' || lower === 'facebook' || lower === 'facebook ads' || lower === 'meta-ads') {
+    return 'Meta Ads';
+  }
+  if (lower === 'walk-in' || lower === 'walkin' || lower === 'walk in' || lower === 'qr code walk-in' || lower === 'qr code' || lower === 'qr-code-walkin') {
+    return 'Walk-in';
+  }
+  if (lower === 'whatsapp' || lower === 'whatsapp inbound' || lower === 'whatsapp-inbound') {
+    return 'WhatsApp Inbound';
+  }
+  if (lower === 'website' || lower === 'website form' || lower === 'website embedded form' || lower === 'website form widget' || lower === 'iframe') {
+    return 'Website Embedded Form';
+  }
+  if (lower === 'google' || lower === 'google ads' || lower === 'google-ads') {
+    return 'Google Ads';
+  }
+  if (lower === 'instagram' || lower === 'instagram ads') {
+    return 'Instagram';
+  }
+  if (lower === 'campaign upload' || lower === 'campaign-upload' || lower === 'campaign') {
+    return 'Campaign Upload';
+  }
+
+  return trimmed.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+};
+
 // Default configurations
 const DEFAULT_COURSES = [
   { id: 'c-1', name: 'Full-Stack Web Development', code: 'FSWD', duration: '6 Months', fee: '₹75,000', description: 'HTML, CSS, JS, React, Node.js, Express & MongoDB' },
@@ -19,6 +49,7 @@ const DEFAULT_STAGES = [
   { id: 'st-interest', name: 'Interested', color: '--color-interested', description: 'Expressed core interest' },
   { id: 'st-demosched', name: 'Demo Scheduled', color: '--color-demo-sched', description: 'Class scheduled' },
   { id: 'st-demoattend', name: 'Demo Attended', color: '--color-demo-attend', description: 'Attended the demo' },
+  { id: 'st-freeclass', name: 'Free Class', color: '--color-freeclass', description: 'Attended free trial class' },
   { id: 'st-followup', name: 'Follow-up', color: '--color-followup', description: 'Awaiting callback' },
   { id: 'st-notinterest', name: 'Not Interested', color: '--color-not-interested', description: 'Declined enrollment' },
   { id: 'st-converted', name: 'Converted', color: '--color-converted', description: 'Successfully enrolled' },
@@ -113,7 +144,7 @@ export const CRMProvider = ({ children }) => {
           let temp = lead.temperature || 'Hot';
           if (temp === 'Hot' && lead.createdDate) {
             const diffMs = new Date() - new Date(lead.createdDate);
-            if (diffMs > 4 * 24 * 60 * 60 * 1000) {
+            if (diffMs > 6 * 24 * 60 * 60 * 1000) {
               temp = 'Warm';
             }
           }
@@ -147,15 +178,30 @@ export const CRMProvider = ({ children }) => {
     const local = localStorage.getItem('crm_stages');
     let stages = local ? JSON.parse(local) : DEFAULT_STAGES;
     
-    // Migration for Follow-up name change
+    // Migration for Follow-up name change & Free Class stage addition/renaming
     let migrated = false;
     stages = stages.map(st => {
       if (st.name === 'Follow-up Pending') {
         migrated = true;
         return { ...st, name: 'Follow-up' };
       }
+      if (st.name === 'Free Class Attend' || st.id === 'st-freeclass') {
+        if (st.name !== 'Free Class') migrated = true;
+        return { ...st, name: 'Free Class' };
+      }
       return st;
     });
+
+    if (!stages.some(st => st.id === 'st-freeclass' || st.name === 'Free Class')) {
+      migrated = true;
+      const freeClassStage = { id: 'st-freeclass', name: 'Free Class', color: '--color-freeclass', description: 'Attended free trial class' };
+      const demoIdx = stages.findIndex(st => st.id === 'st-demoattend');
+      if (demoIdx !== -1) {
+        stages.splice(demoIdx + 1, 0, freeClassStage);
+      } else {
+        stages.push(freeClassStage);
+      }
+    }
     
     if (migrated) {
       localStorage.setItem('crm_stages', JSON.stringify(stages));
@@ -180,15 +226,32 @@ export const CRMProvider = ({ children }) => {
 
   useEffect(() => {
     let migrated = false;
-    const newStages = pipelineStages.map(st => {
+    let newStages = pipelineStages.map(st => {
       if (st.name === 'Follow-up Pending') {
         migrated = true;
         return { ...st, name: 'Follow-up' };
       }
+      if (st.name === 'Free Class Attend' || st.id === 'st-freeclass') {
+        if (st.name !== 'Free Class') migrated = true;
+        return { ...st, name: 'Free Class' };
+      }
       return st;
     });
+
+    if (!newStages.some(st => st.id === 'st-freeclass' || st.name === 'Free Class')) {
+      migrated = true;
+      const freeClassStage = { id: 'st-freeclass', name: 'Free Class', color: '--color-freeclass', description: 'Attended free trial class' };
+      const demoIdx = newStages.findIndex(st => st.id === 'st-demoattend');
+      if (demoIdx !== -1) {
+        newStages.splice(demoIdx + 1, 0, freeClassStage);
+      } else {
+        newStages.push(freeClassStage);
+      }
+    }
+
     if (migrated) {
       setPipelineStages(newStages);
+      localStorage.setItem('crm_stages', JSON.stringify(newStages));
     }
   }, [pipelineStages]);
 
@@ -354,7 +417,8 @@ export const CRMProvider = ({ children }) => {
         const combined = [...mainLeads, ...iframeLeads];
         const uniqueLeadsMap = new Map();
         combined.forEach(lead => {
-            uniqueLeadsMap.set(lead.id, lead);
+            const normSource = normalizeLeadSource(lead.source);
+            uniqueLeadsMap.set(lead.id, { ...lead, source: normSource });
         });
         
         // Filter out WhatsApp Campaign leads from showing in the CRM list
@@ -376,11 +440,11 @@ export const CRMProvider = ({ children }) => {
           mainLeads = snapshot.docs.map(doc => {
             const data = doc.data();
             
-            // Auto-downgrade Hot to Warm after 4 days
+            // Auto-downgrade Hot to Warm after 6 days
             let temp = data.temperature || 'Hot';
             if (temp === 'Hot' && data.createdDate) {
               const diffMs = new Date() - new Date(data.createdDate);
-              if (diffMs > 4 * 24 * 60 * 60 * 1000) {
+              if (diffMs > 6 * 24 * 60 * 60 * 1000) {
                 temp = 'Warm';
               }
             }
@@ -418,7 +482,7 @@ export const CRMProvider = ({ children }) => {
             let temp = data.temperature || 'Hot';
             if (temp === 'Hot' && data.createdDate) {
               const diffMs = new Date() - new Date(data.createdDate);
-              if (diffMs > 4 * 24 * 60 * 60 * 1000) {
+              if (diffMs > 6 * 24 * 60 * 60 * 1000) {
                 temp = 'Warm';
               }
             }
@@ -475,10 +539,15 @@ export const CRMProvider = ({ children }) => {
         } else {
           const orderMap = {
             'st-new': 0, 'st-contact': 1, 'st-interest': 2, 'st-demosched': 3,
-            'st-demoattend': 4, 'st-followup': 5, 'st-notinterest': 6,
-            'st-converted': 7, 'st-closed': 8
+            'st-demoattend': 4, 'st-freeclass': 5, 'st-followup': 6, 'st-notinterest': 7,
+            'st-converted': 8, 'st-closed': 9
           };
           const stagesData = snapshot.docs.map(doc => doc.data());
+          if (!stagesData.some(st => st.id === 'st-freeclass' || st.name === 'Free Class')) {
+            const freeClassStage = { id: 'st-freeclass', name: 'Free Class', color: '--color-freeclass', description: 'Attended free trial class', order: 5 };
+            stagesData.push(freeClassStage);
+            setDoc(doc(db, 'pipelineStages', freeClassStage.id), freeClassStage).catch(err => console.error("Error adding st-freeclass to Firestore:", err));
+          }
           stagesData.sort((a, b) => {
             const aIndex = a.order !== undefined ? a.order : (orderMap[a.id] !== undefined ? orderMap[a.id] : 999);
             const bIndex = b.order !== undefined ? b.order : (orderMap[b.id] !== undefined ? orderMap[b.id] : 999);
@@ -1424,8 +1493,11 @@ export const CRMProvider = ({ children }) => {
   };
 
   const triggerSimulatedBotReply = (leadId, studentName, outgoingText) => {
-    let coursesText = 'We offer the following programs:\n1. Full-Stack Web Development (6 Months)\n2. Data Science & AI (8 Months)\n3. Cloud & DevOps Engineering (5 Months)\n4. Cyber Security (6 Months)\n5. UI/UX Product Design (4 Months)\n\nReply with the course number to get fee details!';
-    let feeDetails = 'Our program fee structures are:\n- Web Development: ₹75,000\n- Data Science & AI: ₹95,000\n- Cloud & DevOps: ₹80,000\n- Cyber Security: ₹85,000\n- UI/UX Design: ₹60,000\n\nScholarships and monthly installment plans (EMIs starting at ₹5,000/month) are available. Let us know if you want to speak to a counselor.';
+    const activeCoursesList = courses && courses.length > 0 ? courses : DEFAULT_COURSES;
+    const courseListStr = activeCoursesList.map((c, i) => `${i + 1}. ${c.name}${c.duration ? ` (${c.duration})` : ''}`).join('\n');
+    let coursesText = `We offer the following programs:\n${courseListStr}\n\nReply with the course number to get fee details!`;
+    const feeListStr = activeCoursesList.map(c => `- ${c.name}: ${c.fee || 'Contact for fee'}`).join('\n');
+    let feeDetails = `Our program fee structures are:\n${feeListStr}\n\nScholarships and monthly installment plans are available. Let us know if you want to speak to a counselor.`;
     
     try {
       const storedSettings = localStorage.getItem('gowha_chatbot');

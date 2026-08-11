@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useCRM } from '../context/CRMContext';
+import { useCRM, normalizeLeadSource } from '../context/CRMContext';
 
 export default function KanbanView() {
   const {
@@ -22,7 +22,7 @@ export default function KanbanView() {
   const [selectedSource, setSelectedSource] = useState('All');
 
   // Dynamically extract unique lead sources from database to populate filter list
-  const uniqueSources = ['All', ...new Set(leads.map(l => l.source).filter(Boolean))];
+  const uniqueSources = ['All', ...new Set(leads.map(l => normalizeLeadSource(l.source)).filter(Boolean))];
 
   // Transition Modal State (for logging outcome notes manually)
   const [transitionPrompt, setTransitionPrompt] = useState(null); // { leadId, nextStage, leadName }
@@ -48,7 +48,7 @@ export default function KanbanView() {
         return false;
       }
     }
-    if (selectedSource !== 'All' && lead.source !== selectedSource) return false;
+    if (selectedSource !== 'All' && normalizeLeadSource(lead.source) !== selectedSource) return false;
 
     // Search query matches Name, Phone, Email
     if (searchQuery) {
@@ -171,7 +171,7 @@ export default function KanbanView() {
             <option value="All">All Sources</option>
             {uniqueSources.filter(s => s !== 'All').map(source => (
               <option key={source} value={source}>
-                {source === 'Website Form' || source === 'Website Form Widget' || source === 'Website' ? 'Website Leads' : source}
+                {source}
               </option>
             ))}
           </select>

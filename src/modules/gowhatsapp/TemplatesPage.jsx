@@ -393,7 +393,16 @@ export default function TemplatesPage() {
               <div style={{ flex: 1, minWidth: 320, padding: 24, borderRight: '1px solid #f1f5f9', maxHeight: 'calc(100vh - 140px)', overflowY: 'auto' }}>
                 <div style={{ marginBottom: 16 }}>
                   <label style={{ display: 'block', fontWeight: 600, fontSize: '0.85rem', marginBottom: 6, color: '#0f172a' }}>Template Name *</label>
-                  <input type="text" value={tplName} onChange={e => setTplName(e.target.value)} placeholder="e.g. order_confirmation" style={inputStyle} />
+                  <input
+                    type="text"
+                    value={tplName}
+                    onChange={e => setTplName(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_'))}
+                    placeholder="e.g. order_confirmation"
+                    style={inputStyle}
+                  />
+                  <p style={{ fontSize: '0.75rem', color: '#64748b', marginTop: 4, marginBottom: 0 }}>
+                    Meta requirement: Only lowercase letters, numbers, and underscores allowed (a-z, 0-9, _).
+                  </p>
                 </div>
 
                 <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useCRM } from '../context/CRMContext';
+import { useCRM, normalizeLeadSource } from '../context/CRMContext';
 import DetailTimeline from './DetailTimeline';
 
 export default function FollowUps() {
@@ -53,6 +53,56 @@ export default function FollowUps() {
     setShowDetailModal(false);
   };
 
+  const getLeadFollowupList = (lead) => {
+    if (Array.isArray(lead.followupHistory) && lead.followupHistory.length > 0) {
+      return lead.followupHistory;
+    }
+
+    if (Array.isArray(lead.timeline) && lead.timeline.length > 0) {
+      const followupLogs = lead.timeline.filter(t => 
+        t.type === 'followup' || 
+        t.type === 'call' || 
+        (t.title && (t.title.includes('Follow-up') || t.title.includes('Call')))
+      );
+
+      if (followupLogs.length > 0) {
+        return followupLogs.map((log, index) => {
+          let text = log.content || '';
+          if (text.includes('Reason:')) {
+            text = text.split('Reason:')[1].trim();
+          } else if (text.includes('Detail:')) {
+            text = text.split('Detail:')[1].trim();
+          } else if (text.includes('Notes:')) {
+            text = text.split('Notes:')[1].trim();
+          } else if (text.includes('Call Outcome:')) {
+            text = text.split('Call Outcome:')[1].trim();
+          }
+
+          let dateStr = '';
+          if (log.timestamp) {
+            try {
+              dateStr = new Date(log.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            } catch(e) {}
+          }
+
+          return {
+            num: index + 1,
+            dateStr: index === 0 ? '' : dateStr,
+            text: text || lead.followupReason || 'Scheduled callback'
+          };
+        });
+      }
+    }
+
+    return [
+      {
+        num: 1,
+        dateStr: '',
+        text: lead.followupReason || 'Scheduled callback'
+      }
+    ];
+  };
+
   // Filter leads that have followupDate set OR stage is Follow-up
   let followUpLeads = leads.filter(lead => {
     if (activeRole === 'Counselor' && lead.counselor !== activeUser) return false;
@@ -68,7 +118,7 @@ export default function FollowUps() {
     followUpLeads = followUpLeads.filter(l => l.stage === filterStage);
   }
   if (filterSource) {
-    followUpLeads = followUpLeads.filter(l => l.source === filterSource);
+    followUpLeads = followUpLeads.filter(l => normalizeLeadSource(l.source) === filterSource);
   }
 
   // Group into overdue and upcoming
@@ -164,7 +214,7 @@ export default function FollowUps() {
           style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', minWidth: '160px', fontSize: '13px', outline: 'none', backgroundColor: '#fff' }}
         >
           <option value="">All Sources</option>
-          {Array.from(new Set(leads.map(l => l.source).filter(Boolean))).map(source => (
+          {Array.from(new Set(leads.map(l => normalizeLeadSource(l.source)).filter(Boolean))).map(source => (
             <option key={source} value={source}>{source}</option>
           ))}
         </select>
@@ -232,9 +282,27 @@ export default function FollowUps() {
                       </div>
                     </div>
 
-                    <p className="lead-note-line">
-                      {lead.followupReason || 'No special note provided.'}
-                    </p>
+                    <div className="followups-stacked-list" style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {getLeadFollowupList(lead).map((item, idx) => (
+                        <div 
+                          key={idx} 
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            background: 'rgba(37, 99, 235, 0.03)',
+                            borderLeft: '3px solid #2563eb',
+                            borderRadius: '0 6px 6px 0',
+                            padding: '6px 12px',
+                            fontSize: '12.5px',
+                            color: '#334155'
+                          }}
+                        >
+                          <strong style={{ color: '#0f172a', marginRight: '6px' }}>Follow-up {item.num || (idx + 1)}:</strong>
+                          {item.dateStr ? <span style={{ color: '#64748b', marginRight: '6px' }}>{item.dateStr}:</span> : null}
+                          <span style={{ color: '#475569' }}>{item.text || item.remark}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
 
                   <div className="card-right-actions" onClick={(e) => e.stopPropagation()}>

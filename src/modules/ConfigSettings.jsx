@@ -129,7 +129,7 @@ export default function ConfigSettings() {
 
   // QR Form Settings
   const [qrQualifications, setQrQualifications] = useState('10th Pass, 12th Pass, Undergraduate, Postgraduate, Other');
-  const [qrCourses, setQrCourses] = useState('Full-Stack Web Development, Data Science, UI/UX Design');
+  const [qrCourses, setQrCourses] = useState(courses && courses.length > 0 ? courses.map(c => c.name).join(', ') : '');
   const [qrTimings, setQrTimings] = useState('Morning (9 AM - 11 AM), Afternoon (2 PM - 4 PM), Evening (6 PM - 8 PM), Weekend Batches');
   const [qrSources, setQrSources] = useState('Instagram, Facebook, Google Search, Friend/Referral, Walk-in/Poster, Other');
   const [isSavingQr, setIsSavingQr] = useState(false);
@@ -145,6 +145,8 @@ export default function ConfigSettings() {
           if (data.courses) setQrCourses(data.courses.join(', '));
           if (data.timings) setQrTimings(data.timings.join(', '));
           if (data.sources) setQrSources(data.sources.join(', '));
+        } else if (courses && courses.length > 0) {
+          setQrCourses(courses.map(c => c.name).join(', '));
         }
       } catch (err) {
         console.error("Error fetching QR config:", err);
@@ -153,7 +155,7 @@ export default function ConfigSettings() {
     if (activeRole === 'Admin') {
       fetchQrConfig();
     }
-  }, [activeRole]);
+  }, [activeRole, courses]);
 
   const handleSaveQrConfig = async (e) => {
     e.preventDefault();

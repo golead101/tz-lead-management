@@ -205,10 +205,9 @@ export default function GridView() {
     return sortOrder === 'asc' ? '↑' : '↓';
   };
 
-  // Row Selection helpers
   const handleSelectAll = (e) => {
     if (e.target.checked) {
-      setSelectedIds(paginatedLeads.map(l => l.id));
+      setSelectedIds(filteredLeads.map(l => l.id));
     } else {
       setSelectedIds([]);
     }
@@ -789,6 +788,15 @@ export default function GridView() {
           <div className="gv-bulk-left">
             <div className="gv-bulk-count">{selectedIds.length}</div>
             <span>lead{selectedIds.length > 1 ? 's' : ''} selected</span>
+            {selectedIds.length < filteredLeads.length && (
+              <button 
+                className="gv-btn-ghost gv-btn-sm" 
+                style={{ marginLeft: '12px', color: 'var(--primary)', fontWeight: '600', textDecoration: 'underline', cursor: 'pointer' }}
+                onClick={() => setSelectedIds(filteredLeads.map(l => l.id))}
+              >
+                Select all {filteredLeads.length} leads
+              </button>
+            )}
           </div>
           <div className="gv-bulk-right">
             <div style={{ position: 'relative' }}>
@@ -854,7 +862,7 @@ export default function GridView() {
                     <input
                       type="checkbox"
                       onChange={handleSelectAll}
-                      checked={selectedIds.length === paginatedLeads.length && paginatedLeads.length > 0}
+                      checked={selectedIds.length > 0 && selectedIds.length === filteredLeads.length}
                     />
                     <span className="gv-checkmark" />
                   </label>

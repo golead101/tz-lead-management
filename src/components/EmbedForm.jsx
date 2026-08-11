@@ -3,19 +3,25 @@ import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import '../index.css';
 
-const courses = [
-  'Full-Stack Web Development',
-  'Data Science & Artificial Intelligence',
-  'Cloud & DevOps Engineering',
-  'Cyber Security & Ethical Hacking',
-  'UI/UX Product Design'
-];
+const getDynamicCourses = () => {
+  try {
+    const saved = localStorage.getItem('crm_courses');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.map(c => c.name || c);
+      }
+    }
+  } catch (e) {}
+  return ['Full-Stack Web Development', 'Data Science & Artificial Intelligence', 'Cloud & DevOps Engineering', 'Cyber Security & Ethical Hacking', 'UI/UX Product Design'];
+};
 
 export default function EmbedForm() {
+  const dynamicCourses = getDynamicCourses();
   const [sbName, setSbName] = useState('');
   const [sbEmail, setSbEmail] = useState('');
   const [sbPhone, setSbPhone] = useState('');
-  const [sbCourse, setSbCourse] = useState(courses[0]);
+  const [sbCourse, setSbCourse] = useState(dynamicCourses[0]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -168,7 +174,7 @@ export default function EmbedForm() {
                 value={sbCourse}
                 onChange={(e) => setSbCourse(e.target.value)}
               >
-                {courses.map(c => <option key={c} value={c}>{c}</option>)}
+                {dynamicCourses.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
 
