@@ -1766,6 +1766,25 @@ exports.onLeadCreated = functions.firestore
     const newLead = snap.data();
     const leadId = context.params.leadId;
 
+    // Skip automated welcome 'thanks' template for WhatsApp templates, campaigns, bulk uploads, or non-new leads
+    const srcLower = (newLead.source || '').toLowerCase().trim();
+    const isTemplateOrCampaign = newLead.skipAutoReply || 
+                                newLead.isBulkImport || 
+                                newLead.disableAutoWelcome ||
+                                newLead.isCampaignSend ||
+                                newLead.isTemplateSend ||
+                                newLead.templateName ||
+                                srcLower.includes('csv') || 
+                                srcLower.includes('campaign') || 
+                                srcLower.includes('template') || 
+                                srcLower.includes('excel') || 
+                                srcLower.includes('import');
+
+    if (isTemplateOrCampaign) {
+      console.log(`[onLeadCreated] Bypassing welcome 'thanks' template for template/campaign/imported lead ${leadId}.`);
+      return null;
+    }
+
     if (!newLead.phone) {
       console.log(`[onLeadCreated] No phone number for lead ${leadId}. Skipping auto-reply.`);
       return null;

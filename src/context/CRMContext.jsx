@@ -855,8 +855,12 @@ export const CRMProvider = ({ children }) => {
       subSource: leadData.subSource || '',
       counselor: leadData.counselor || activeUser,
       stage: leadData.stage || 'New Lead',
-      createdDate: new Date().toISOString(),
-      lastContacted: new Date().toISOString(),
+      temperature: leadData.temperature || 'Hot',
+      createdDate: leadData.createdDate || new Date().toISOString(),
+      lastContacted: leadData.createdDate || new Date().toISOString(),
+      skipAutoReply: true,
+      isBulkImport: true,
+      disableAutoWelcome: true,
       customFields: leadData.customFields || {},
       timeline: [
         {
@@ -1472,8 +1476,8 @@ export const CRMProvider = ({ children }) => {
     }
 
     // 3. Fallback / Mock Behavior
-    // If the API failed (e.g. not configured yet), trigger the simulated bot response so the UI still feels alive.
-    if (!apiSuccess) {
+    // Do NOT trigger simulated bot auto-reply when sending WhatsApp template or campaign messages!
+    if (!apiSuccess && !templateData) {
       setTimeout(() => {
         triggerSimulatedBotReply(leadId, updatedLead?.name || 'Student', messageText);
       }, 3000);

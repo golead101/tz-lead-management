@@ -1679,8 +1679,9 @@ a {
 }
 
 .gv-student-meta {
-  font-size: 11px;
-  color: var(--text-muted);
+  font-size: 11.5px;
+  color: #334155;
+  font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

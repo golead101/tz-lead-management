@@ -48,7 +48,7 @@ export default function GridView() {
 
   // Sorting State
   const [sortBy, setSortBy] = useState('createdDate');
-  const [sortOrder, setSortOrder] = useState('desc');
+  const [sortOrder, setSortOrder] = useState('asc');
 
   // Selection State for Bulk Actions
   const [selectedIds, setSelectedIds] = useState([]);
@@ -250,63 +250,125 @@ export default function GridView() {
     setWhatsappSubView('new-campaign');
   };
 
-  // CSV Import Parser with Deduplication Algorithm
+  // CSV / Excel Import Parser
   const handleCsvImport = () => {
     const dataToProcess = uploadedFileData || csvText;
     if (!dataToProcess || typeof dataToProcess !== 'string' || !dataToProcess.trim()) return;
-    const lines = dataToProcess.split('\n');
+
+    // Helper to parse a single CSV line respecting quotes
+    const parseCsvLine = (line) => {
+      const result = [];
+      let current = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === '"') {
+          inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+          result.push(current.trim().replace(/^"|"$/g, ''));
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+      result.push(current.trim().replace(/^"|"$/g, ''));
+      return result;
+    };
+
+    const lines = dataToProcess.split('\n').filter(l => l.trim() !== '');
+    if (lines.length === 0) return;
+
+    let nameIdx = -1, emailIdx = -1, phoneIdx = -1, courseIdx = -1, statusIdx = -1, sourceIdx = -1, counselorIdx = -1, tempIdx = -1, createdDateIdx = -1, campaignIdx = -1;
+    let hasHeader = false;
+
+    const firstLineParts = parseCsvLine(lines[0]);
+    const firstLineLower = lines[0].toLowerCase();
+
+    if (firstLineLower.includes('name') || firstLineLower.includes('email') || firstLineLower.includes('phone') || firstLineLower.includes('status') || firstLineLower.includes('assigned') || firstLineLower.includes('course')) {
+      hasHeader = true;
+      const headers = firstLineParts.map(h => h.trim().toLowerCase());
+
+      nameIdx = headers.findIndex(h => h === 'name' || (h.includes('name') && !h.includes('campaign')));
+      emailIdx = headers.findIndex(h => h.includes('email'));
+      phoneIdx = headers.findIndex(h => h.includes('phone') || h.includes('contact') || h.includes('mobile'));
+      courseIdx = headers.findIndex(h => h.includes('course') || h.includes('program'));
+      statusIdx = headers.findIndex(h => h.includes('status') || h.includes('stage'));
+      sourceIdx = headers.findIndex(h => h.includes('source') || h.includes('platform'));
+      counselorIdx = headers.findIndex(h => h.includes('assigned') || h.includes('counselor') || h.includes('owner'));
+      tempIdx = headers.findIndex(h => h.includes('temperature') || h.includes('temp') || h.includes('priority'));
+      createdDateIdx = headers.findIndex(h => h.includes('created') || h.includes('date'));
+      campaignIdx = headers.findIndex(h => h.includes('campaign'));
+    }
+
+    const mapCsvStage = (raw) => {
+      if (!raw) return 'New Lead';
+      const trimmed = raw.trim();
+      const lower = trimmed.toLowerCase();
+      if (lower === 'free class attend' || lower === 'free class' || lower === 'st-freeclass') return 'Free Class';
+      if (lower === 'follow-up pending' || lower === 'followup pending' || lower === 'follow up') return 'Follow-up';
+      if (lower === 'new lead' || lower === 'new') return 'New Lead';
+      if (lower === 'contacted') return 'Contacted';
+      if (lower === 'interested') return 'Interested';
+      if (lower === 'demo scheduled' || lower === 'demo') return 'Demo Scheduled';
+      if (lower === 'demo attended') return 'Demo Attended';
+      if (lower === 'admission taken' || lower === 'converted' || lower === 'enrolled') return 'Converted';
+      if (lower === 'not interested' || lower === 'lost') return 'Not Interested';
+      return trimmed;
+    };
+
+    const mapCsvCounselor = (raw) => {
+      if (!raw) return activeUser || 'Unassigned';
+      const trimmed = raw.trim();
+      if (trimmed.toLowerCase() === 'unassigned' || trimmed.toLowerCase() === 'none' || trimmed === '') {
+        return 'Unassigned';
+      }
+      return trimmed;
+    };
+
+    const parseCsvDate = (raw) => {
+      if (!raw) return new Date().toISOString();
+      try {
+        const parsed = new Date(raw);
+        if (!isNaN(parsed.getTime())) {
+          return parsed.toISOString();
+        }
+      } catch (e) {}
+      return new Date().toISOString();
+    };
+
     let addedCount = 0;
     let dupCount = 0;
 
     lines.forEach((line, index) => {
-      if (index === 0 && (line.toLowerCase().includes('name') || line.toLowerCase().includes('email') || line.toLowerCase().includes('phone'))) {
-        return;
-      }
-    });
-
-    let nameIdx = 0, emailIdx = 1, phoneIdx = 2, courseIdx = 3, sourceIdx = 4, campaignIdx = 5;
-    let hasHeader = false;
-
-    if (lines.length > 0) {
-      const headerLine = lines[0].toLowerCase();
-      if (headerLine.includes('name') || headerLine.includes('email') || headerLine.includes('phone') || headerLine.includes('program')) {
-        hasHeader = true;
-        const headers = lines[0].split(',').map(p => p.trim().toLowerCase());
-        
-        nameIdx = headers.findIndex(h => h.includes('name') && !h.includes('campaign'));
-        emailIdx = headers.findIndex(h => h.includes('email'));
-        phoneIdx = headers.findIndex(h => h.includes('phone') || h.includes('contact') || h.includes('mobile'));
-        courseIdx = headers.findIndex(h => h.includes('course') || h.includes('program'));
-        sourceIdx = headers.findIndex(h => h.includes('source') || h.includes('platform'));
-        campaignIdx = headers.findIndex(h => h.includes('campaign'));
-      }
-    }
-
-    lines.forEach((line, index) => {
       if (index === 0 && hasHeader) return;
-      
-      const parts = line.split(',').map(p => p.trim());
+
+      const parts = parseCsvLine(line);
       if (parts.length < 2) return;
-      
-      let name = '', email = '', phone = '', course = '', source = '', campaign = '';
-      
+
+      let name = '', email = '', phone = '', course = '', rawStatus = '', source = '', rawCounselor = '', rawTemp = '', rawCreatedDate = '', campaign = '';
+
       if (hasHeader) {
-         name = nameIdx !== -1 && nameIdx < parts.length ? parts[nameIdx] : '';
-         email = emailIdx !== -1 && emailIdx < parts.length ? parts[emailIdx] : '';
-         phone = phoneIdx !== -1 && phoneIdx < parts.length ? parts[phoneIdx] : '';
-         course = courseIdx !== -1 && courseIdx < parts.length ? parts[courseIdx] : '';
-         source = sourceIdx !== -1 && sourceIdx < parts.length ? parts[sourceIdx] : '';
-         campaign = campaignIdx !== -1 && campaignIdx < parts.length ? parts[campaignIdx] : '';
+        name = nameIdx !== -1 && nameIdx < parts.length ? parts[nameIdx] : '';
+        email = emailIdx !== -1 && emailIdx < parts.length ? parts[emailIdx] : '';
+        phone = phoneIdx !== -1 && phoneIdx < parts.length ? parts[phoneIdx] : '';
+        course = courseIdx !== -1 && courseIdx < parts.length ? parts[courseIdx] : '';
+        rawStatus = statusIdx !== -1 && statusIdx < parts.length ? parts[statusIdx] : '';
+        source = sourceIdx !== -1 && sourceIdx < parts.length ? parts[sourceIdx] : '';
+        rawCounselor = counselorIdx !== -1 && counselorIdx < parts.length ? parts[counselorIdx] : '';
+        rawTemp = tempIdx !== -1 && tempIdx < parts.length ? parts[tempIdx] : '';
+        rawCreatedDate = createdDateIdx !== -1 && createdDateIdx < parts.length ? parts[createdDateIdx] : '';
+        campaign = campaignIdx !== -1 && campaignIdx < parts.length ? parts[campaignIdx] : '';
       } else {
-         name = parts[0];
-         email = parts[1];
-         phone = parts[2];
-         course = parts[3];
-         source = parts[4];
-         campaign = parts.length > 5 ? parts[5] : '';
+        name = parts[0];
+        email = parts[1];
+        phone = parts[2];
+        course = parts[3];
+        rawStatus = parts.length > 4 ? parts[4] : '';
+        source = parts.length > 5 ? parts[5] : '';
+        campaign = parts.length > 6 ? parts[6] : '';
       }
-      
-      if (!name && !email && !phone) return; // Skip completely empty rows
+
+      if (!name && !email && !phone) return;
 
       const cleanPhone = phone ? String(phone).replace(/[^0-9]/g, '') : '';
       const cleanEmail = email ? email.toLowerCase() : '';
@@ -315,9 +377,15 @@ export default function GridView() {
         (cleanEmail && lead.email && lead.email.toLowerCase() === cleanEmail) ||
         (cleanPhone && String(lead.phone || '').replace(/[^0-9]/g, '') === cleanPhone)
       );
+
       if (duplicateExists) {
         dupCount++;
       } else {
+        const finalStage = mapCsvStage(rawStatus);
+        const finalCounselor = mapCsvCounselor(rawCounselor);
+        const finalCreatedDate = parseCsvDate(rawCreatedDate);
+        const finalTemp = rawTemp && ['Hot', 'Warm', 'Cold'].includes(rawTemp.trim()) ? rawTemp.trim() : 'Hot';
+
         addLead({
           name: name || 'Unknown',
           email: email || '',
@@ -325,8 +393,13 @@ export default function GridView() {
           course: course || '',
           source: source || 'CSV Import',
           campaign: campaign || '',
-          counselor: activeUser,
-          stage: 'New Lead'
+          counselor: finalCounselor,
+          stage: finalStage,
+          temperature: finalTemp,
+          createdDate: finalCreatedDate,
+          skipAutoReply: true,
+          isBulkImport: true,
+          disableAutoWelcome: true
         });
         addedCount++;
       }
@@ -334,6 +407,8 @@ export default function GridView() {
 
     if (addedCount > 0) {
       showToastMsg(`CSV parsing completed. Imported ${addedCount} leads.`);
+      const lastPage = Math.ceil((leads.length + addedCount) / itemsPerPage);
+      setCurrentPage(lastPage > 0 ? lastPage : 1);
     }
     if (dupCount > 0) {
       showToastMsg(`Identified & bypassed ${dupCount} duplicate records.`);
@@ -808,6 +883,7 @@ export default function GridView() {
                 <div className="gv-popover">
                   <label className="form-label" style={{ fontSize: '11px' }}>Assign to Counselor</label>
                   <select className="gv-filter-select" style={{ width: '100%' }} value={bulkCounselorName} onChange={(e) => setBulkCounselorName(e.target.value)}>
+                    <option value="Unassigned">Unassigned</option>
                     {counselors.filter(c => c.status === 'Active' && c.role !== 'Admin' && c.name.toLowerCase() !== 'admin').map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                   </select>
                   <button className="gv-btn-primary gv-btn-sm" style={{ width: '100%', marginTop: '8px', justifyContent: 'center' }} onClick={executeBulkReassign}>Apply</button>
@@ -938,7 +1014,7 @@ export default function GridView() {
                                 </span>
                               )}
                             </span>
-                            <span className="gv-student-meta" style={{ fontFamily: 'monospace', opacity: 0.8 }}>{lead.phone || '-'}</span>
+                            <span className="gv-student-meta" style={{ fontFamily: 'monospace', color: '#334155', fontWeight: '600' }}>{lead.phone || '-'}</span>
                           </div>
                         </div>
                       </td>
