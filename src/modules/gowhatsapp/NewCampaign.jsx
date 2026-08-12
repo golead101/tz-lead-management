@@ -228,7 +228,7 @@ export default function NewCampaign({ setSubView }) {
   }, [selectedTemplate, columns, templates]);
 
   const loadExistingLists = () => {
-    const lists = whatsappDb.getContactLists().filter(l => l.id !== 'crm-leads-all');
+    const lists = whatsappDb.getContactLists().filter(l => l.id !== 'crm-leads-all' && l.name !== 'Active CRM Leads (Live)');
     const crmList = {
       id: 'crm-leads-all',
       name: 'Active CRM Leads (Live)',

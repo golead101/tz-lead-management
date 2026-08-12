@@ -106,7 +106,24 @@ export default function InboxPage() {
   const conversations = React.useMemo(() => {
     const contactLeads = activeRole === 'Counselor' ? leads.filter(l => l.counselor === activeUser) : leads;
 
-    const mapped = contactLeads.map(lead => {
+    const filteredLeads = contactLeads.filter(lead => {
+      const msgs = lead.whatsappMessages || [];
+
+      // If user is explicitly viewing the 'campaign' filter tab, show leads with campaign history
+      if (inboxFilter === 'campaign') {
+        return msgs.length > 0;
+      }
+
+      // For 'all', 'unread', 'read': Hide leads with no messages OR leads that only have bulk campaign broadcasts with no inbound replies!
+      if (msgs.length === 0) return false;
+
+      const hasInbound = msgs.some(m => m.sender === 'lead' || m.type === 'inbound' || m.isInbound);
+      const hasDirectChat = msgs.some(m => (m.sender === 'counselor' || m.sender === 'user') && !m.isCampaign && !m.isTemplate && !m.id?.includes('camp') && !m.title?.toLowerCase().includes('campaign'));
+
+      return hasInbound || hasDirectChat;
+    });
+
+    const mapped = filteredLeads.map(lead => {
       const msgs = lead.whatsappMessages || [];
       const lastMsg = msgs[msgs.length - 1];
       
@@ -127,7 +144,7 @@ export default function InboxPage() {
         id: lead.id,
         phone: lead.phone,
         contactName: lead.name,
-        lastMessage: lastMsg ? lastMsg.text : 'No messages yet',
+        lastMessage: lastMsg ? (lastMsg.text || lastMsg.content || 'Message') : 'No messages yet',
         lastMessageAt,
         lastDirection: lastMsg ? (lastMsg.sender === 'counselor' ? 'outbound' : 'inbound') : null,
         unreadCount,
@@ -141,7 +158,7 @@ export default function InboxPage() {
       const timeB = b.lastMessageAt?._seconds || 0;
       return timeB - timeA;
     });
-  }, [leads, activeRole, activeUser]);
+  }, [leads, activeRole, activeUser, inboxFilter]);
 
   const selectedConvo = conversations.find(c => c.id === selectedLeadId);
   const messages = selectedConvo?.lead?.whatsappMessages || [];

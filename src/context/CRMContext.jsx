@@ -1411,7 +1411,9 @@ export const CRMProvider = ({ children }) => {
       sender: 'counselor',
       text: messageText,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      status: 'sent'
+      status: 'sent',
+      isTemplate: !!templateData,
+      isCampaign: !!templateData
     };
 
     let updatedLead = null;
