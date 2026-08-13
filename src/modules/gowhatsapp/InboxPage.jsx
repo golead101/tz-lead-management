@@ -72,6 +72,98 @@ function StatusIcon({ status, size = 14 }) {
   }
 }
 
+function LeadStatusBadge({ stage }) {
+  const currentStage = stage || 'New Lead';
+  const stageLower = currentStage.toLowerCase();
+
+  let bg = '#eff6ff';
+  let border = '#bfdbfe';
+  let color = '#1e40af';
+  let icon = (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+      <circle cx="8.5" cy="7" r="4" />
+      <line x1="20" y1="8" x2="20" y2="14" />
+      <line x1="23" y1="11" x2="17" y2="11" />
+    </svg>
+  );
+
+  if (stageLower.includes('converted') || stageLower.includes('won')) {
+    bg = '#f0fdf4';
+    border = '#bbf7d0';
+    color = '#15803d';
+    icon = (
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+        <polyline points="22 4 12 14.01 9 11.01" />
+      </svg>
+    );
+  } else if (stageLower.includes('interested')) {
+    bg = '#f0fdf4';
+    border = '#86efac';
+    color = '#166534';
+    icon = (
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
+      </svg>
+    );
+  } else if (stageLower.includes('follow-up') || stageLower.includes('later') || stageLower.includes('busy')) {
+    bg = '#fefce8';
+    border = '#fef08a';
+    color = '#a16207';
+    icon = (
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10" />
+        <polyline points="12 6 12 12 16 14" />
+      </svg>
+    );
+  } else if (stageLower.includes('not interested') || stageLower.includes('wrong') || stageLower.includes('lost')) {
+    bg = '#fef2f2';
+    border = '#fecaca';
+    color = '#b91c1c';
+    icon = (
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10" />
+        <line x1="15" y1="9" x2="9" y2="15" />
+        <line x1="9" y1="9" x2="15" y2="15" />
+      </svg>
+    );
+  } else if (stageLower.includes('demo')) {
+    bg = '#faf5ff';
+    border = '#e9d5ff';
+    color = '#6b21a8';
+    icon = (
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+        <line x1="8" y1="21" x2="16" y2="21" />
+        <line x1="12" y1="17" x2="12" y2="21" />
+      </svg>
+    );
+  }
+
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '4px',
+        padding: '2px 8px',
+        borderRadius: '12px',
+        fontSize: '11px',
+        fontWeight: '600',
+        background: bg,
+        border: `1px solid ${border}`,
+        color: color,
+        lineHeight: '1.3',
+        width: 'fit-content'
+      }}
+    >
+      {icon}
+      {currentStage}
+    </span>
+  );
+}
+
 export default function InboxPage() {
   const { leads, sendWhatsAppMsg, updateLead, activeRole, activeUser, showToastMsg, selectedLeadId, setSelectedLeadId } = useCRM();
   const [replyText, setReplyText] = useState('');
@@ -332,16 +424,22 @@ export default function InboxPage() {
                     {(convo.contactName || convo.phone || 'C').charAt(0).toUpperCase()}
                   </span>
                 </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ fontWeight: 500, fontSize: '15px', color: '#111b21' }}>
-                      {convo.contactName || formatPhone(convo.phone)}
-                    </span>
-                    <span style={{ fontSize: '12px', color: '#667781' }}>
+                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                  {/* Top Row: Lead Status Pill Badge & Timestamp */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <LeadStatusBadge stage={convo.lead?.stage} />
+                    <span style={{ fontSize: '12px', color: '#667781', fontWeight: '400' }}>
                       {formatTime(convo.lastMessageAt)}
                     </span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
+
+                  {/* Middle Row: Lead Name */}
+                  <div style={{ fontWeight: 600, fontSize: '14px', color: '#111b21', marginTop: '1px' }}>
+                    {convo.contactName || formatPhone(convo.phone)}
+                  </div>
+
+                  {/* Bottom Row: Message preview & unread badge */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 1 }}>
                     <span style={{
                       fontSize: '13px', color: '#667781',
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -352,7 +450,7 @@ export default function InboxPage() {
                       <span style={{
                         background: '#25d366', color: '#fff', borderRadius: '50%',
                         width: 20, height: 20, fontSize: '11px', fontWeight: 700,
-                        display: 'grid', placeItems: 'center',
+                        display: 'grid', placeItems: 'center', flexShrink: 0
                       }}>
                         {convo.unreadCount}
                       </span>
