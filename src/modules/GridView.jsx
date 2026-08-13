@@ -1298,6 +1298,38 @@ export default function GridView() {
                     </div>
                   )}
 
+                  {/* WhatsApp Chat Option */}
+                  {!isEditing && lead.phone && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedLeadId(lead.id);
+                        setShowDetailModal(false);
+                        setActiveView('gowhatsapp');
+                        setWhatsappSubView('inbox');
+                      }}
+                      className="gv-btn-primary"
+                      style={{
+                        padding: '6px 12px',
+                        fontSize: '13px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        height: '36px',
+                        backgroundColor: '#25D366',
+                        borderColor: '#25D366',
+                        color: '#ffffff',
+                        cursor: 'pointer'
+                      }}
+                      title={`Chat with ${lead.name} in WhatsApp Inbox`}
+                    >
+                      <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
+                        <path d="M12.012 2c-5.506 0-9.969 4.463-9.969 9.969 0 1.761.459 3.479 1.331 4.988l-1.413 5.163 5.281-1.385c1.455.794 3.1 1.213 4.77 1.213 5.506 0 9.969-4.463 9.969-9.969s-4.463-9.969-9.969-9.969zm5.82 14.344c-.244.688-1.425 1.313-1.969 1.394-.544.081-1.244.119-3.563-.825-2.731-1.113-4.488-3.9-4.625-4.081-.138-.181-1.106-1.469-1.106-2.8 0-1.331.694-1.988.944-2.25.25-.263.544-.325.725-.325.181 0 .363.006.519.013.169.006.394-.063.619.475.244.588.825 2.013.894 2.156.069.144.113.313.019.5-.094.188-.144.3-.288.469-.144.169-.3.375-.431.506-.144.144-.294.3-.125.588.169.288.75 1.238 1.613 2.006 1.106.988 2.038 1.294 2.325 1.438.288.144.456.125.625-.069.169-.194.725-.844.919-1.138.194-.294.394-.244.662-.144.269.094 1.713.806 2.006.95.294.144.494.219.569.344.075.125.075.725-.169 1.413z"/>
+                      </svg>
+                      WhatsApp
+                    </button>
+                  )}
+
                   {/* Edit Lead Option */}
                   {!isEditing && (
                     <button 

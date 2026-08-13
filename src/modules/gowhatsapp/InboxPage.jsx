@@ -73,8 +73,7 @@ function StatusIcon({ status, size = 14 }) {
 }
 
 export default function InboxPage() {
-  const { leads, sendWhatsAppMsg, updateLead, activeRole, activeUser, showToastMsg } = useCRM();
-  const [selectedLeadId, setSelectedLeadId] = useState(null);
+  const { leads, sendWhatsAppMsg, updateLead, activeRole, activeUser, showToastMsg, selectedLeadId, setSelectedLeadId } = useCRM();
   const [replyText, setReplyText] = useState('');
   const [sending, setSending] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -104,9 +103,9 @@ export default function InboxPage() {
 
   // Dynamically compute conversations from CRM leads
   const conversations = React.useMemo(() => {
-    const contactLeads = activeRole === 'Counselor' ? leads.filter(l => l.counselor === activeUser) : leads;
-
-    const filteredLeads = contactLeads.filter(lead => {
+    const filteredLeads = leads.filter(lead => {
+      if (selectedLeadId && lead.id === selectedLeadId) return true;
+      if (activeRole === 'Counselor' && lead.counselor !== activeUser) return false;
       const msgs = lead.whatsappMessages || [];
 
       // If user is explicitly viewing the 'campaign' filter tab, show leads with campaign history
@@ -158,10 +157,18 @@ export default function InboxPage() {
       const timeB = b.lastMessageAt?._seconds || 0;
       return timeB - timeA;
     });
-  }, [leads, activeRole, activeUser, inboxFilter]);
+  }, [leads, activeRole, activeUser, inboxFilter, selectedLeadId]);
 
-  const selectedConvo = conversations.find(c => c.id === selectedLeadId);
-  const messages = selectedConvo?.lead?.whatsappMessages || [];
+  const targetLead = leads.find(l => l.id === selectedLeadId);
+  const selectedConvo = conversations.find(c => c.id === selectedLeadId) || (targetLead ? {
+    id: targetLead.id,
+    phone: targetLead.phone,
+    contactName: targetLead.name,
+    lastMessage: 'No messages yet',
+    unreadCount: 0,
+    lead: targetLead
+  } : null);
+  const messages = targetLead?.whatsappMessages || selectedConvo?.lead?.whatsappMessages || [];
 
   // Automatically select first contact if none is active and there are contacts (desktop only)
   useEffect(() => {
