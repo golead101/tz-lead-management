@@ -146,6 +146,11 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
 
   // Sync states on lead selection change
   React.useEffect(() => {
+    setCallStatus('');
+    setDropdownOpen(false);
+    setCallNotes('');
+    setCallSchedFollowup(false);
+    setCallFollowupDate('');
     if (lead) {
       setFormName(lead.name);
       setFormEmail(lead.email);
@@ -214,7 +219,7 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
 
   // Log Call Handler
   const handleSubmitCall = () => {
-    const canFollowup = ['interested', 'busy', 'call later', 'answered'].includes((callStatus || '').toLowerCase());
+    const canFollowup = ['interested', 'busy', 'call later', 'answered', 'no answer'].includes((callStatus || '').toLowerCase());
     const isFollowupSched = canFollowup && !!callFollowupDate;
     logCall(lead.id, {
       status: callStatus,
@@ -919,7 +924,7 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
                     }}
                   >
                     <span style={{ display: 'flex', alignItems: 'center' }}>
-                      {callStatus === '' && '— Select an outcome —'}
+                      {callStatus === '' && 'Call Outcome'}
                       {callStatus === 'Interested' && (
                         <>
                           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#22c55e" strokeWidth="2.5" style={{ marginRight: '8px' }}><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" /></svg>
@@ -1035,7 +1040,7 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
               </div>
 
               {/* Schedule Follow-up card */}
-              {['interested', 'busy', 'call later', 'answered'].includes((callStatus || '').toLowerCase()) && (
+              {['interested', 'busy', 'call later', 'answered', 'no answer'].includes((callStatus || '').toLowerCase()) && (
                 <div 
                   className="fade-in" 
                   style={{ 

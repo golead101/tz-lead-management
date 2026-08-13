@@ -905,100 +905,33 @@ export default function NewCampaign({ setSubView }) {
         <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', padding: 24 }}>
           <h2 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: 16, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
             <Users size={20} />
-            Select or Upload Contacts
+            Select Contacts
           </h2>
-
-          <div
-            onClick={() => fileInputRef.current?.click()}
-            style={{
-              border: '2px dashed #cbd5e1', borderRadius: 12, padding: 40,
-              textAlign: 'center', cursor: 'pointer', marginBottom: 20,
-              background: uploadedContacts.length > 0 ? '#f0fdf4' : '#fafafa',
-              transition: 'all 0.2s',
-            }}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv,.xlsx,.xls"
-              onChange={handleFileUpload}
-              style={{ display: 'none' }}
-            />
-            {uploadedContacts.length > 0 ? (
-              <>
-                <FileSpreadsheet size={36} color={BRAND_BLUE} style={{ margin: '0 auto 8px' }} />
-                <p style={{ fontWeight: 600, color: '#16a34a' }}>{uploadedContacts.length} contacts loaded</p>
-                <p style={{ fontSize: '0.85rem', color: '#64748b', marginTop: 4 }}>
-                  Columns: {columns.join(', ')}
-                </p>
-              </>
-            ) : (
-              <>
-                <Upload size={36} color="#94a3b8" style={{ margin: '0 auto 8px' }} />
-                <p style={{ fontWeight: 500, color: '#475569' }}>Drop CSV or Excel file here, or click to upload</p>
-                <p style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: 4 }}>
-                  File must have a column with phone numbers (named: phone, Phone, number, mobile, etc.)
-                </p>
-              </>
-            )}
-          </div>
-
-          {uploadedContacts.length > 0 && !selectedListId && (
-            <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 20 }}>
-              <input
-                value={uploadName}
-                onChange={(e) => setUploadName(e.target.value)}
-                placeholder="Contact list name..."
-                style={{
-                  flex: 1, padding: '10px 14px', borderRadius: 8,
-                  border: '1px solid #d1d5db', outline: 'none',
-                }}
-              />
-              <button
-                onClick={handleUploadToServer}
-                disabled={uploading}
-                style={{
-                  padding: '10px 20px', borderRadius: 8, fontWeight: 600,
-                  background: BRAND_BLUE, color: '#fff', border: 'none', cursor: 'pointer',
-                  opacity: uploading ? 0.6 : 1,
-                }}
-              >
-                {uploading ? 'Saving...' : 'Save Contacts'}
-              </button>
-            </div>
-          )}
 
           {/* Existing Lists */}
           {existingLists.length > 0 && (
-            <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '20px 0 12px' }}>
-                <div style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
-                <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>or select existing list</span>
-                <div style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {existingLists
-                  .filter(list => !selectedListId || selectedListId === list.id)
-                  .map(list => (
-                  <div
-                    key={list.id}
-                    onClick={() => handleSelectExistingList(list.id)}
-                    style={{
-                      padding: '12px 16px', borderRadius: 10, cursor: 'pointer',
-                      border: selectedListId === list.id ? `2px solid ${BRAND_BLUE}` : '1px solid #e2e8f0',
-                      background: selectedListId === list.id ? `${BRAND_BLUE}08` : '#fff',
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontWeight: 500, color: '#0f172a' }}>{list.name}</div>
-                      <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{list.contactCount} contacts</div>
-                    </div>
-                    {selectedListId === list.id && <CheckCircle size={20} color={BRAND_BLUE} />}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {existingLists
+                .filter(list => !selectedListId || selectedListId === list.id)
+                .map(list => (
+                <div
+                  key={list.id}
+                  onClick={() => handleSelectExistingList(list.id)}
+                  style={{
+                    padding: '12px 16px', borderRadius: 10, cursor: 'pointer',
+                    border: selectedListId === list.id ? `2px solid ${BRAND_BLUE}` : '1px solid #e2e8f0',
+                    background: selectedListId === list.id ? `${BRAND_BLUE}08` : '#fff',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 500, color: '#0f172a' }}>{list.name}</div>
+                    <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{list.contactCount} contacts</div>
                   </div>
-                ))}
-              </div>
-            </>
+                  {selectedListId === list.id && <CheckCircle size={20} color={BRAND_BLUE} />}
+                </div>
+              ))}
+            </div>
           )}
 
           {selectedListId && (

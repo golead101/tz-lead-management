@@ -3,13 +3,15 @@ import { useCRM, normalizeLeadSource } from '../context/CRMContext';
 import DetailTimeline from './DetailTimeline';
 
 export default function FollowUps() {
-  const { leads, activeRole, activeUser, selectedLeadId, setSelectedLeadId, setActiveView, showDetailModal, setShowDetailModal, logCall, pipelineStages } = useCRM();
+  const { leads, activeRole, activeUser, selectedLeadId, setSelectedLeadId, setActiveView, showDetailModal, setShowDetailModal, logCall, pipelineStages, courses, counselors } = useCRM();
   const [activeTab, setActiveTab] = useState('overdue'); // Default to overdue as in the mockup
 
   // New filtering state
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterCourse, setFilterCourse] = useState('');
   const [filterStage, setFilterStage] = useState('');
   const [filterSource, setFilterSource] = useState('');
+  const [filterCounselor, setFilterCounselor] = useState('');
 
   const [modalStep, setModalStep] = useState(1); // 1 = simple contact view, 2 = call outcome form
   const [callStatus, setCallStatus] = useState('');
@@ -29,7 +31,7 @@ export default function FollowUps() {
   };
 
   const handleSubmitCall = (leadId) => {
-    const canFollowup = ['interested', 'busy', 'call later', 'answered'].includes((callStatus || '').toLowerCase());
+    const canFollowup = ['interested', 'busy', 'call later', 'answered', 'no answer'].includes((callStatus || '').toLowerCase());
     const isFollowupSched = canFollowup && !!callFollowupDate;
     logCall(leadId, {
       status: callStatus,
@@ -115,11 +117,20 @@ export default function FollowUps() {
     const q = searchQuery.toLowerCase();
     followUpLeads = followUpLeads.filter(l => l.name?.toLowerCase().includes(q) || l.phone?.includes(q));
   }
+  if (filterCourse) {
+    followUpLeads = followUpLeads.filter(l => 
+      l.course === filterCourse || 
+      (l.course || '').toLowerCase().includes(filterCourse.toLowerCase())
+    );
+  }
   if (filterStage) {
     followUpLeads = followUpLeads.filter(l => l.stage === filterStage);
   }
   if (filterSource) {
     followUpLeads = followUpLeads.filter(l => normalizeLeadSource(l.source) === filterSource);
+  }
+  if (filterCounselor && activeRole !== 'Counselor') {
+    followUpLeads = followUpLeads.filter(l => l.counselor === filterCounselor);
   }
 
   // Group into overdue and upcoming
@@ -200,6 +211,16 @@ export default function FollowUps() {
           style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', minWidth: '220px', fontSize: '13px', outline: 'none' }}
         />
         <select 
+          value={filterCourse} 
+          onChange={(e) => setFilterCourse(e.target.value)}
+          style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', minWidth: '160px', fontSize: '13px', outline: 'none', backgroundColor: '#fff' }}
+        >
+          <option value="">All Courses</option>
+          {(courses || []).map(c => (
+            <option key={c.id || c.name} value={c.name}>{c.name}</option>
+          ))}
+        </select>
+        <select 
           value={filterStage} 
           onChange={(e) => setFilterStage(e.target.value)}
           style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', minWidth: '160px', fontSize: '13px', outline: 'none', backgroundColor: '#fff' }}
@@ -219,6 +240,21 @@ export default function FollowUps() {
             <option key={source} value={source}>{source}</option>
           ))}
         </select>
+        {activeRole !== 'Counselor' && (
+          <select 
+            value={filterCounselor} 
+            onChange={(e) => setFilterCounselor(e.target.value)}
+            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', minWidth: '160px', fontSize: '13px', outline: 'none', backgroundColor: '#fff' }}
+          >
+            <option value="">All Counselors</option>
+            {Array.from(new Set([
+              ...(counselors || []).filter(c => c.status === 'Active' && c.role !== 'Admin' && c.name.toLowerCase() !== 'admin').map(c => c.name),
+              ...leads.map(l => l.counselor).filter(Boolean)
+            ])).map(counselor => (
+              <option key={counselor} value={counselor}>{counselor}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       <div className="followups-list-container">
@@ -514,7 +550,7 @@ export default function FollowUps() {
                           }}
                         >
                           <span style={{ display: 'flex', alignItems: 'center' }}>
-                            {callStatus === '' && '— Select an outcome —'}
+                            {callStatus === '' && 'Call Outcome'}
                             {callStatus === 'Interested' && (
                               <>
                                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#22c55e" strokeWidth="2.5" style={{ marginRight: '8px' }}><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" /></svg>
@@ -630,7 +666,7 @@ export default function FollowUps() {
                     </div>
 
                     {/* Schedule Follow-up card */}
-                    {['interested', 'busy', 'call later', 'answered'].includes((callStatus || '').toLowerCase()) && (
+                    {['interested', 'busy', 'call later', 'answered', 'no answer'].includes((callStatus || '').toLowerCase()) && (
                       <div 
                         className="fade-in" 
                         style={{ 

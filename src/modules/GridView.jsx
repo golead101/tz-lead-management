@@ -450,14 +450,21 @@ export default function GridView() {
 
   const [timelineNoteText, setTimelineNoteText] = useState('');
 
-  const [callOutcome, setCallOutcome] = useState('No Answer');
+  const [callOutcome, setCallOutcome] = useState('');
   const [callNotes, setCallNotes] = useState('');
   const [scheduleFollowup, setScheduleFollowup] = useState(false);
   const [followupDate, setFollowupDate] = useState('');
 
+  React.useEffect(() => {
+    setCallOutcome('');
+    setCallNotes('');
+    setScheduleFollowup(false);
+    setFollowupDate('');
+  }, [selectedLeadId]);
+
   const handleLogCallSubmit = () => {
-    if (!selectedLeadId) return;
-    const canFollowup = ['interested', 'busy', 'call later', 'answered'].includes((callOutcome || '').toLowerCase());
+    if (!selectedLeadId || !callOutcome) return;
+    const canFollowup = ['interested', 'busy', 'call later', 'answered', 'no answer'].includes((callOutcome || '').toLowerCase());
     const hasFollowup = canFollowup && scheduleFollowup && !!followupDate;
     logCall(selectedLeadId, {
       status: callOutcome,
@@ -470,7 +477,7 @@ export default function GridView() {
     setCallNotes('');
     setScheduleFollowup(false);
     setFollowupDate('');
-    setCallOutcome('No Answer');
+    setCallOutcome('');
   };
 
   const handleAddNoteSubmit = () => {
@@ -1635,14 +1642,15 @@ export default function GridView() {
                     <div style={{ display: 'flex', gap: '12px' }}>
                       <div style={{ flex: 1 }}>
                         <label style={{ fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', color: '#64748b', marginBottom: '4px', display: 'block' }}>Call Outcome</label>
-                        <select className="form-control" value={callOutcome} onChange={(e) => setCallOutcome(e.target.value)} style={{ padding: '8px 12px', fontSize: '13px', height: '36px', width: '100%' }}>
-                          <option value="Answered">Answered</option>
-                          <option value="No Answer">No Answer</option>
-                          <option value="Busy">Busy</option>
-                          <option value="Wrong Number">Wrong Number</option>
-                          <option value="Interested">Interested</option>
-                          <option value="Not Interested">Not Interested</option>
-                          <option value="Call Later">Call Later</option>
+                        <select className="form-control" value={callOutcome} onChange={(e) => setCallOutcome(e.target.value)} style={{ padding: '8px 12px', fontSize: '13px', height: '36px', width: '100%', color: callOutcome ? 'inherit' : '#94a3b8' }}>
+                          <option value="" disabled>Call Outcome</option>
+                          <option value="Answered" style={{ color: '#1e293b' }}>Answered</option>
+                          <option value="No Answer" style={{ color: '#1e293b' }}>No Answer</option>
+                          <option value="Busy" style={{ color: '#1e293b' }}>Busy</option>
+                          <option value="Wrong Number" style={{ color: '#1e293b' }}>Wrong Number</option>
+                          <option value="Interested" style={{ color: '#1e293b' }}>Interested</option>
+                          <option value="Not Interested" style={{ color: '#1e293b' }}>Not Interested</option>
+                          <option value="Call Later" style={{ color: '#1e293b' }}>Call Later</option>
                         </select>
                       </div>
                       <div style={{ flex: 2 }}>
@@ -1653,7 +1661,7 @@ export default function GridView() {
                     
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        {['interested', 'busy', 'call later', 'answered'].includes((callOutcome || '').toLowerCase()) && (
+                        {['interested', 'busy', 'call later', 'answered', 'no answer'].includes((callOutcome || '').toLowerCase()) && (
                           <>
                             <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', cursor: 'pointer', color: '#334155' }}>
                               <input type="checkbox" checked={scheduleFollowup} onChange={(e) => setScheduleFollowup(e.target.checked)} />
