@@ -1087,14 +1087,8 @@ export const CRMProvider = ({ children }) => {
         // Determine if outcome maps to a pipeline stage shift
         let targetStage = callDetails.updateStage;
         if (!targetStage || targetStage === '') {
-          if (callDetails.status === 'Converted') {
-            targetStage = 'Converted';
-          } else if (callDetails.status === 'Not Interested') {
-            targetStage = 'Not Interested';
-          } else if (callDetails.status === 'Interested') {
-            targetStage = 'Interested';
-          } else if (callDetails.status === 'Call Later') {
-            targetStage = 'Follow-up';
+          if (callDetails.status) {
+            targetStage = callDetails.status;
           }
         }
 
@@ -1169,9 +1163,11 @@ export const CRMProvider = ({ children }) => {
 
         // Setup dynamic follow-up inside lead profile if scheduled
         if (callDetails.scheduleFollowup && callDetails.followupDate) {
-          nextFollowupDate = new Date(callDetails.scheduleFollowup && callDetails.followupDate).toISOString();
+          nextFollowupDate = new Date(callDetails.followupDate).toISOString();
           nextFollowupReason = callDetails.followupReason || 'Scheduled callback';
-          // Removed the duplicate nextTimeline.push here to avoid double entries
+        } else {
+          nextFollowupDate = null;
+          nextFollowupReason = null;
         }
 
         updatedLead = {

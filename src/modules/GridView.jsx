@@ -191,6 +191,10 @@ export default function GridView() {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedLeads = sortedLeads.slice(startIndex, startIndex + itemsPerPage);
 
+  const currentPageIds = paginatedLeads.map(l => l.id);
+  const isAllPageSelected = paginatedLeads.length > 0 && currentPageIds.every(id => selectedIds.includes(id));
+  const isSomePageSelected = currentPageIds.some(id => selectedIds.includes(id));
+
   const handleSort = (field) => {
     if (sortBy === field) {
       setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -207,9 +211,9 @@ export default function GridView() {
 
   const handleSelectAll = (e) => {
     if (e.target.checked) {
-      setSelectedIds(filteredLeads.map(l => l.id));
+      setSelectedIds(prev => Array.from(new Set([...prev, ...currentPageIds])));
     } else {
-      setSelectedIds([]);
+      setSelectedIds(prev => prev.filter(id => !currentPageIds.includes(id)));
     }
   };
 
@@ -453,13 +457,15 @@ export default function GridView() {
 
   const handleLogCallSubmit = () => {
     if (!selectedLeadId) return;
+    const canFollowup = ['interested', 'busy', 'call later', 'answered'].includes((callOutcome || '').toLowerCase());
+    const hasFollowup = canFollowup && scheduleFollowup && !!followupDate;
     logCall(selectedLeadId, {
       status: callOutcome,
       notes: callNotes,
-      scheduleFollowup: scheduleFollowup,
-      followupDate: followupDate,
-      followupReason: callNotes,
-      updateStage: ''
+      scheduleFollowup: hasFollowup,
+      followupDate: hasFollowup ? followupDate : '',
+      followupReason: hasFollowup ? (callNotes || 'Scheduled callback') : '',
+      updateStage: callOutcome
     });
     setCallNotes('');
     setScheduleFollowup(false);
@@ -863,7 +869,7 @@ export default function GridView() {
           <div className="gv-bulk-left">
             <div className="gv-bulk-count">{selectedIds.length}</div>
             <span>lead{selectedIds.length > 1 ? 's' : ''} selected</span>
-            {selectedIds.length < filteredLeads.length && (
+            {selectedIds.length < filteredLeads.length ? (
               <button 
                 className="gv-btn-ghost gv-btn-sm" 
                 style={{ marginLeft: '12px', color: 'var(--primary)', fontWeight: '600', textDecoration: 'underline', cursor: 'pointer' }}
@@ -871,6 +877,16 @@ export default function GridView() {
               >
                 Select all {filteredLeads.length} leads
               </button>
+            ) : (
+              filteredLeads.length > itemsPerPage && (
+                <button 
+                  className="gv-btn-ghost gv-btn-sm" 
+                  style={{ marginLeft: '12px', color: 'var(--primary)', fontWeight: '600', textDecoration: 'underline', cursor: 'pointer' }}
+                  onClick={() => setSelectedIds(currentPageIds)}
+                >
+                  Select current page only ({paginatedLeads.length})
+                </button>
+              )
             )}
           </div>
           <div className="gv-bulk-right">
@@ -934,11 +950,12 @@ export default function GridView() {
             <thead>
               <tr>
                 <th style={{ width: '44px' }}>
-                  <label className="gv-checkbox-wrap">
+                  <label className="gv-checkbox-wrap" title={isAllPageSelected ? "Deselect current page" : "Select current page"}>
                     <input
                       type="checkbox"
+                      ref={el => { if (el) el.indeterminate = isSomePageSelected && !isAllPageSelected; }}
                       onChange={handleSelectAll}
-                      checked={selectedIds.length > 0 && selectedIds.length === filteredLeads.length}
+                      checked={isAllPageSelected}
                     />
                     <span className="gv-checkmark" />
                   </label>
@@ -1604,12 +1621,16 @@ export default function GridView() {
                     
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', cursor: 'pointer', color: '#334155' }}>
-                          <input type="checkbox" checked={scheduleFollowup} onChange={(e) => setScheduleFollowup(e.target.checked)} />
-                          Schedule Follow-up
-                        </label>
-                        {scheduleFollowup && (
-                          <input type="datetime-local" className="form-control" value={followupDate} onChange={(e) => setFollowupDate(e.target.value)} style={{ padding: '4px 8px', fontSize: '12px', height: '28px' }} />
+                        {['interested', 'busy', 'call later', 'answered'].includes((callOutcome || '').toLowerCase()) && (
+                          <>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', cursor: 'pointer', color: '#334155' }}>
+                              <input type="checkbox" checked={scheduleFollowup} onChange={(e) => setScheduleFollowup(e.target.checked)} />
+                              Schedule Follow-up
+                            </label>
+                            {scheduleFollowup && (
+                              <input type="datetime-local" className="form-control" value={followupDate} onChange={(e) => setFollowupDate(e.target.value)} style={{ padding: '4px 8px', fontSize: '12px', height: '28px' }} />
+                            )}
+                          </>
                         )}
                       </div>
                       <button type="button" onClick={handleLogCallSubmit} className="gv-btn-primary" style={{ padding: '0 16px', fontSize: '12px', height: '32px' }}>
