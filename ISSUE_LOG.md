@@ -59,3 +59,27 @@ This document tracks issues encountered during development, their root causes, a
 - **Root Cause:** Legacy/local leads were missing the `temperature` field. My previous update mapped missing temperatures to `undefined`, which `setDoc` rejects.
 - **Solution:** Ensured the mapped temperature fallback safely evaluates to 'Hot' in all data loaders (Firestore snapshots and localStorage initializers) so `undefined` is never passed back.
 - **Files Modified:** `src/context/CRMContext.jsx`
+
+**Issue [9/2026-08-13]:** Enable Schedule Follow-up on 'No Answer' Call Outcome
+- **Description:** Selecting "No Answer" in call outcome form did not display the Schedule Follow-up date/time picker.
+- **Root Cause:** The `canFollowup` condition checked array `['interested', 'busy', 'call later', 'answered']` which excluded `'no answer'`.
+- **Solution:** Added `'no answer'` to `canFollowup` allowed list in `GridView.jsx`, `DetailTimeline.jsx`, and `FollowUps.jsx`.
+- **Files Modified:** `src/modules/GridView.jsx`, `src/modules/DetailTimeline.jsx`, `src/modules/FollowUps.jsx`
+
+**Issue [10/2026-08-13]:** Call Outcome Form Reset & Placeholder Behavior
+- **Description:** Call Outcome dropdown pre-selected "Answered" by default and retained previous lead status when switching leads.
+- **Root Cause:** Initial state was set to a default value instead of empty, and `selectedLeadId` change did not reset form state.
+- **Solution:** Initialized `callOutcome` state to `''`, added default "Call Outcome" placeholder option to `<select>`, and added `useEffect` on `selectedLeadId` to reset form state when switching leads.
+- **Files Modified:** `src/modules/GridView.jsx`, `src/modules/DetailTimeline.jsx`, `src/modules/FollowUps.jsx`
+
+**Issue [11/2026-08-13]:** Remove CSV/Excel Upload Dropzone from GoWhatsApp Campaign
+- **Description:** Step 1 (Contacts) of New Campaign contained an unnecessary CSV/Excel dropzone box and divider line.
+- **Root Cause:** UI cleanup request to streamline WhatsApp campaign contact list selection.
+- **Solution:** Removed file upload dropzone container and "or select existing list" divider from `NewCampaign.jsx`.
+- **Files Modified:** `src/modules/gowhatsapp/NewCampaign.jsx`
+
+**Issue [12/2026-08-13]:** Add Course Filter and Role-Based Counselor Filter to Follow-ups
+- **Description:** Follow-ups page lacked a Course filter and showed all counselor follow-ups without manager filtering.
+- **Root Cause:** Missing course filter UI and lack of Admin counselor dropdown.
+- **Solution:** Added Course Select Filter (`All Courses`) mapped to active CRM courses. Implemented Option C role-based access: auto-filtered Counselors to their own leads (`lead.counselor === activeUser`) and provided an "All Counselors" dropdown filter for Admins.
+- **Files Modified:** `src/modules/FollowUps.jsx`

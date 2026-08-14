@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   MessageCircle, Send, Search, Check, CheckCheck, Clock,
-  AlertCircle, Paperclip, FileText
+  AlertCircle, Paperclip, FileText, UploadCloud, RefreshCw, Loader2
 } from 'lucide-react';
+import { ref, listAll, getMetadata, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
+import { storage } from '../../firebase';
 import { whatsappDb } from './whatsappDb';
 import { useCRM } from '../../context/CRMContext';
 
@@ -178,16 +180,147 @@ export default function InboxPage() {
   const [attachedTemplate, setAttachedTemplate] = useState(null);
   const [metaTemplates, setMetaTemplates] = useState([]);
 
+  const [storageFiles, setStorageFiles] = useState([]);
+  const [loadingStorage, setLoadingStorage] = useState(false);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const fileInputRef = useRef(null);
+
   useEffect(() => {
     setMetaTemplates(whatsappDb.getTemplates());
   }, []);
-  
-  const mockStorageFiles = [
-    { id: 1, name: 'AI_Course_Brochure.pdf', type: 'document', size: '2.4 MB' },
-    { id: 2, name: 'Campus_Tour.mp4', type: 'video', size: '14.1 MB' },
-    { id: 3, name: 'Promo_Offer_Poster.jpg', type: 'image', size: '1.1 MB' },
-    { id: 4, name: 'Fee_Structure_2026.pdf', type: 'document', size: '0.8 MB' }
-  ];
+
+  const formatFileSize = (bytes) => {
+    if (!bytes) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
+
+  const fetchStorageFiles = async () => {
+    setLoadingStorage(true);
+    try {
+      let storageRef = ref(storage, 'documents');
+      let result = await listAll(storageRef);
+      if (result.items.length === 0) {
+        const rootRef = ref(storage, '');
+        const rootResult = await listAll(rootRef);
+        if (rootResult.items.length > 0) {
+          result = rootResult;
+        }
+      }
+
+      const files = await Promise.all(
+        result.items.map(async (itemRef) => {
+          let url = '';
+          let meta = {};
+          try {
+            url = await getDownloadURL(itemRef);
+            meta = await getMetadata(itemRef);
+          } catch (err) {
+            console.warn('Error fetching metadata for storage file:', itemRef.name, err);
+          }
+          const contentType = meta.contentType || '';
+          let fileType = 'document';
+          if (contentType.startsWith('image/')) fileType = 'image';
+          else if (contentType.startsWith('video/')) fileType = 'video';
+
+          return {
+            id: itemRef.fullPath,
+            name: itemRef.name,
+            type: fileType,
+            size: formatFileSize(meta.size),
+            url: url,
+            fullPath: itemRef.fullPath,
+            isSample: false
+          };
+        })
+      );
+
+      const fallbackMock = [
+        { id: 'mock-1', name: 'AI_Course_Brochure.pdf', type: 'document', size: '2.4 MB', isSample: true },
+        { id: 'mock-2', name: 'Campus_Tour.mp4', type: 'video', size: '14.1 MB', isSample: true },
+        { id: 'mock-3', name: 'Promo_Offer_Poster.jpg', type: 'image', size: '1.1 MB', isSample: true },
+        { id: 'mock-4', name: 'Fee_Structure_2026.pdf', type: 'document', size: '0.8 MB', isSample: true }
+      ];
+
+      if (files.length > 0) {
+        setStorageFiles(files);
+      } else {
+        setStorageFiles(fallbackMock);
+      }
+    } catch (error) {
+      console.warn('Firebase Storage query warning:', error);
+      setStorageFiles([
+        { id: 'mock-1', name: 'AI_Course_Brochure.pdf', type: 'document', size: '2.4 MB', isSample: true },
+        { id: 'mock-2', name: 'Campus_Tour.mp4', type: 'video', size: '14.1 MB', isSample: true },
+        { id: 'mock-3', name: 'Promo_Offer_Poster.jpg', type: 'image', size: '1.1 MB', isSample: true },
+        { id: 'mock-4', name: 'Fee_Structure_2026.pdf', type: 'document', size: '0.8 MB', isSample: true }
+      ]);
+    } finally {
+      setLoadingStorage(false);
+    }
+  };
+
+  useEffect(() => {
+    if (showStorageModal) {
+      fetchStorageFiles();
+    }
+  }, [showStorageModal]);
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingFile(true);
+    setUploadProgress(0);
+
+    try {
+      const storageRef = ref(storage, `documents/${Date.now()}_${file.name}`);
+      const uploadTask = uploadBytesResumable(storageRef, file);
+
+      uploadTask.on(
+        'state_changed',
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          setUploadProgress(Math.round(progress));
+        },
+        (error) => {
+          console.error('Upload error:', error);
+          if (showToastMsg) showToastMsg('Failed to upload file to Firebase Storage.');
+          setUploadingFile(false);
+        },
+        async () => {
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+          const meta = await getMetadata(uploadTask.snapshot.ref);
+          let fileType = 'document';
+          if (file.type.startsWith('image/')) fileType = 'image';
+          else if (file.type.startsWith('video/')) fileType = 'video';
+
+          const newFile = {
+            id: uploadTask.snapshot.ref.fullPath,
+            name: file.name,
+            type: fileType,
+            size: formatFileSize(meta.size || file.size),
+            url: downloadURL,
+            fullPath: uploadTask.snapshot.ref.fullPath,
+            isSample: false
+          };
+
+          setStorageFiles(prev => [newFile, ...prev.filter(f => !f.isSample)]);
+          setAttachedFile(newFile);
+          if (showToastMsg) showToastMsg(`Uploaded & attached "${file.name}"!`);
+          setUploadingFile(false);
+          setShowStorageModal(false);
+        }
+      );
+    } catch (err) {
+      console.error('File upload exception:', err);
+      if (showToastMsg) showToastMsg('Upload failed.');
+      setUploadingFile(false);
+    }
+  };
 
   const handleAttachClick = () => {
     setShowStorageModal(true);
@@ -297,7 +430,8 @@ export default function InboxPage() {
     let templateData = null;
     
     if (attachedFile) {
-      text = text ? `${text}\n[Attached: ${attachedFile.name}]` : `[Attached: ${attachedFile.name}]`;
+      const urlInfo = attachedFile.url ? `\nLink: ${attachedFile.url}` : '';
+      text = text ? `${text}\n[Attached: ${attachedFile.name}${urlInfo}]` : `[Attached: ${attachedFile.name}${urlInfo}]`;
     }
     if (attachedTemplate) {
       const bodyText = attachedTemplate.components?.find(c => c.type === 'BODY')?.text || '';
@@ -602,31 +736,102 @@ export default function InboxPage() {
       {/* Firebase Storage Modal */}
       {showStorageModal && (
         <div className="storage-modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'grid', placeItems: 'center' }} onClick={() => setShowStorageModal(false)}>
-          <div className="storage-modal-content" style={{ background: '#fff', padding: '24px', borderRadius: '16px', width: '90%', maxWidth: '440px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold', color: '#0f172a' }}>Select from Storage</h3>
+          <div className="storage-modal-content" style={{ background: '#fff', padding: '24px', borderRadius: '16px', width: '90%', maxWidth: '460px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold', color: '#0f172a' }}>Select from Storage</h3>
+                <button 
+                  onClick={fetchStorageFiles} 
+                  disabled={loadingStorage}
+                  title="Refresh Firebase Storage"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', padding: 4 }}
+                >
+                  <RefreshCw size={15} className={loadingStorage ? 'animate-spin' : ''} />
+                </button>
+              </div>
               <button onClick={() => setShowStorageModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', color: '#64748b' }}>×</button>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {mockStorageFiles.map(file => (
-                <div 
-                  key={file.id} 
-                  onClick={() => {
-                    setAttachedFile(file);
-                    if (showToastMsg) showToastMsg(`Attached "${file.name}" to conversation!`);
-                    setShowStorageModal(false);
-                  }} 
-                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', border: '1px solid #e2e8f0', borderRadius: '10px', cursor: 'pointer', transition: 'background-color 0.2s' }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                    <span style={{ fontSize: '22px' }}>{file.type === 'video' ? '🎥' : file.type === 'image' ? '🖼️' : '📄'}</span>
-                    <span style={{ fontWeight: '500', color: '#334155', fontSize: '14px' }}>{file.name}</span>
-                  </div>
-                  <span style={{ color: '#94a3b8', fontSize: '12px' }}>{file.size}</span>
+
+            {/* Hidden File Input for Direct Upload */}
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              style={{ display: 'none' }} 
+              onChange={handleFileUpload} 
+            />
+
+            {/* Upload Button */}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingFile}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justify: 'center',
+                gap: '8px',
+                padding: '10px 16px',
+                marginBottom: '16px',
+                background: '#eff6ff',
+                color: BRAND_BLUE,
+                border: `1px dashed ${BRAND_BLUE}`,
+                borderRadius: '10px',
+                fontWeight: '600',
+                fontSize: '14px',
+                cursor: uploadingFile ? 'not-allowed' : 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              {uploadingFile ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  <span>Uploading to Firebase Storage ({uploadProgress}%)...</span>
+                </>
+              ) : (
+                <>
+                  <UploadCloud size={18} />
+                  <span>Upload Document to Firebase Storage</span>
+                </>
+              )}
+            </button>
+
+            {/* File List */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '320px', overflowY: 'auto', paddingRight: '4px' }}>
+              {loadingStorage ? (
+                <div style={{ padding: '30px', textAlign: 'center', color: '#64748b', fontSize: '14px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                  <Loader2 size={24} className="animate-spin" color={BRAND_BLUE} />
+                  <span>Fetching files from Firebase Storage...</span>
                 </div>
-              ))}
+              ) : storageFiles.length === 0 ? (
+                <div style={{ padding: '20px', textAlign: 'center', color: '#64748b', fontSize: '14px' }}>
+                  No files found in Firebase Storage. Click upload above to add one.
+                </div>
+              ) : (
+                storageFiles.map(file => (
+                  <div 
+                    key={file.id} 
+                    onClick={() => {
+                      setAttachedFile(file);
+                      if (showToastMsg) showToastMsg(`Attached "${file.name}" to conversation!`);
+                      setShowStorageModal(false);
+                    }} 
+                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', border: '1px solid #e2e8f0', borderRadius: '10px', cursor: 'pointer', transition: 'background-color 0.2s' }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px', overflow: 'hidden' }}>
+                      <span style={{ fontSize: '22px', flexShrink: 0 }}>{file.type === 'video' ? '🎥' : file.type === 'image' ? '🖼️' : '📄'}</span>
+                      <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                        <span style={{ fontWeight: '500', color: '#334155', fontSize: '14px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{file.name}</span>
+                        {file.isSample && (
+                          <span style={{ fontSize: '10px', color: '#94a3b8', fontStyle: 'italic' }}>Sample item</span>
+                        )}
+                      </div>
+                    </div>
+                    <span style={{ color: '#94a3b8', fontSize: '12px', flexShrink: 0, marginLeft: '8px' }}>{file.size}</span>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
