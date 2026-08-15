@@ -166,6 +166,98 @@ function LeadStatusBadge({ stage }) {
   );
 }
 
+function renderMessageBubbleContent(msg) {
+  let mediaData = msg.mediaData;
+  let text = msg.text || '';
+
+  if (!mediaData && text.includes('[Attached:')) {
+    const matchName = text.match(/\[Attached:\s*([^\]\n]+)/);
+    const matchLink = text.match(/Link:\s*(https?:\/\/[^\s\]\n]+)/);
+    if (matchName || matchLink) {
+      const fileName = matchName ? matchName[1].trim() : 'Document';
+      const fileUrl = matchLink ? matchLink[1].trim() : null;
+      let type = 'document';
+      if (fileName.match(/\.(jpg|jpeg|png|gif|webp)$/i)) type = 'image';
+      else if (fileName.match(/\.(mp4|webm|mov|avi)$/i)) type = 'video';
+      
+      mediaData = {
+        name: fileName,
+        filename: fileName,
+        url: fileUrl,
+        type: type
+      };
+      
+      text = text.replace(/\[Attached:[\s\S]*?\]/, '').trim();
+    }
+  }
+
+  return (
+    <>
+      {mediaData && (
+        <div style={{
+          background: 'rgba(255, 255, 255, 0.9)',
+          border: '1px solid #cbd5e1',
+          borderRadius: '10px',
+          padding: '10px 12px',
+          marginBottom: text ? '8px' : '2px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          minWidth: '240px',
+          maxWidth: '320px',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+        }}>
+          <div style={{
+            fontSize: '22px',
+            width: '38px',
+            height: '38px',
+            borderRadius: '8px',
+            background: '#e2e8f0',
+            display: 'grid',
+            placeItems: 'center',
+            flexShrink: 0
+          }}>
+            {mediaData.type === 'video' ? '🎥' : mediaData.type === 'image' ? '🖼️' : '📄'}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+            <span style={{ fontWeight: '600', fontSize: '13px', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {mediaData.name || mediaData.filename || 'Document Brochure'}
+            </span>
+            <span style={{ fontSize: '11px', color: '#64748b' }}>
+              {mediaData.size || (mediaData.type ? mediaData.type.toUpperCase() : 'DOCUMENT')}
+            </span>
+          </div>
+          {mediaData.url && (
+            <a
+              href={mediaData.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Download or View File"
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justify: 'center',
+                padding: '6px 12px',
+                background: '#2563eb',
+                color: '#ffffff',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: '600',
+                textDecoration: 'none',
+                flexShrink: 0
+              }}
+            >
+              Open ↗
+            </a>
+          )}
+        </div>
+      )}
+      {text ? <div style={{ color: '#0f172a', whiteSpace: 'pre-wrap' }}>{text}</div> : null}
+    </>
+  );
+}
+
 export default function InboxPage() {
   const { leads, sendWhatsAppMsg, updateLead, activeRole, activeUser, showToastMsg, selectedLeadId, setSelectedLeadId } = useCRM();
   const [replyText, setReplyText] = useState('');
@@ -428,10 +520,19 @@ export default function InboxPage() {
     setSending(true);
     let text = replyText.trim();
     let templateData = null;
+    let mediaData = null;
     
     if (attachedFile) {
-      const urlInfo = attachedFile.url ? `\nLink: ${attachedFile.url}` : '';
-      text = text ? `${text}\n[Attached: ${attachedFile.name}${urlInfo}]` : `[Attached: ${attachedFile.name}${urlInfo}]`;
+      mediaData = {
+        type: attachedFile.type === 'image' ? 'image' : attachedFile.type === 'video' ? 'video' : 'document',
+        url: attachedFile.url || '',
+        filename: attachedFile.name || 'document.pdf',
+        name: attachedFile.name,
+        size: attachedFile.size
+      };
+      if (!text) {
+        text = `[Attached: ${attachedFile.name}${attachedFile.url ? `\nLink: ${attachedFile.url}` : ''}]`;
+      }
     }
     if (attachedTemplate) {
       const bodyText = attachedTemplate.components?.find(c => c.type === 'BODY')?.text || '';
@@ -471,7 +572,7 @@ export default function InboxPage() {
     setAttachedFile(null);
     setAttachedTemplate(null);
 
-    sendWhatsAppMsg(selectedLeadId, text, templateData);
+    sendWhatsAppMsg(selectedLeadId, text, templateData, mediaData);
     setSending(false);
   };
 
@@ -644,7 +745,7 @@ export default function InboxPage() {
                   const isOutbound = msg.direction === 'outbound' || msg.sender === 'counselor';
                   return (
                     <div key={msg.id} className={`message-bubble ${isOutbound ? 'bubble-outbound' : 'bubble-inbound'}`}>
-                      <div style={{ color: '#0f172a', whiteSpace: 'pre-wrap' }}>{msg.text}</div>
+                      {renderMessageBubbleContent(msg)}
                       <div className="message-time">
                         {getDisplayTime(msg)}
                         {isOutbound && <StatusIcon status={msg.status || 'read'} size={15} />}

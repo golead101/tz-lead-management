@@ -967,9 +967,9 @@ exports.sendWhatsAppMessage = functions.https.onRequest((req, res) => {
     }
 
     try {
-      const { leadId, recipientPhone, messageText, templateData } = req.body;
-      if (!recipientPhone || (!messageText && !templateData)) {
-        return res.status(400).json({ error: 'recipientPhone and either messageText or templateData are required.' });
+      const { leadId, recipientPhone, messageText, templateData, mediaData } = req.body;
+      if (!recipientPhone || (!messageText && !templateData && !mediaData)) {
+        return res.status(400).json({ error: 'recipientPhone and either messageText, templateData, or mediaData are required.' });
       }
 
       // 1. Load configuration
@@ -1003,6 +1003,19 @@ exports.sendWhatsAppMessage = functions.https.onRequest((req, res) => {
         payload.type = 'template';
         payload.template = templateData;
         console.log(`[WhatsApp CF] Dynamic template payload received. Template name: ${templateData.name}`);
+      } else if (mediaData && mediaData.url) {
+        const mediaType = mediaData.type || 'document';
+        payload.type = mediaType;
+        payload[mediaType] = {
+          link: mediaData.url
+        };
+        if (mediaType === 'document') {
+          payload.document.filename = mediaData.filename || mediaData.name || 'Brochure.pdf';
+        }
+        if (messageText && messageText.trim() && !messageText.startsWith('[Attached:')) {
+          payload[mediaType].caption = messageText.trim();
+        }
+        console.log(`[WhatsApp CF] Dynamic media payload received. Type: ${mediaType}, Link: ${mediaData.url}`);
       } else {
         // Normal conversation messaging layer
         payload.type = 'text';

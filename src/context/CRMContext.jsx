@@ -1398,14 +1398,15 @@ export const CRMProvider = ({ children }) => {
   };
 
   // Sending custom WhatsApp logs & triggering bot automated simulated reply
-  const sendWhatsAppMsg = async (leadId, messageText, templateData = null) => {
-    if (!messageText.trim() && !templateData) return false;
+  const sendWhatsAppMsg = async (leadId, messageText, templateData = null, mediaData = null) => {
+    if (!messageText.trim() && !templateData && !mediaData) return false;
 
     // 1. Optimistic UI Update - Show immediately in the chat interface
     const outgoingMsg = {
       id: `msg-sent-${Date.now()}`,
       sender: 'counselor',
       text: messageText,
+      mediaData: mediaData || null,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       status: 'sent',
       isTemplate: !!templateData,
@@ -1457,7 +1458,8 @@ export const CRMProvider = ({ children }) => {
             recipientPhone: normalizedPhone,
             messageText: messageText,
             counselorName: activeUser,
-            templateData: templateData
+            templateData: templateData,
+            mediaData: mediaData
           })
         });
 
