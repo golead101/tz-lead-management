@@ -1595,38 +1595,67 @@ exports.sendBulkWhatsAppCampaign = functions.runWith({ timeoutSeconds: 540, memo
             if (cleanPhone.length === 10) cleanPhone = '91' + cleanPhone;
             if (cleanPhone.startsWith('00')) cleanPhone = cleanPhone.substring(2);
 
-            // Find or create lead
+            // Find or create lead safely
             let leadId = null;
+            let leadData = null;
             const leadsRef = db.collection('leads');
             const phoneSuffix = cleanPhone.slice(-10);
-            let snapshot;
-            if (phoneSuffix.length === 10) {
-               // Try to find lead ending with those 10 digits
-               snapshot = await leadsRef.where('phone', '>=', phoneSuffix).where('phone', '<=', phoneSuffix + '\uf8ff').limit(1).get();
-            } else {
-               snapshot = await leadsRef.where('phone', '==', cleanPhone).limit(1).get();
+
+            // 1. Check by contact.id if available
+            if (contact.id) {
+              const docSnap = await leadsRef.doc(String(contact.id)).get();
+              if (docSnap.exists) {
+                leadId = docSnap.id;
+                leadData = docSnap.data();
+              }
+            }
+
+            // 2. Check by exact doc ID = cleanPhone
+            if (!leadData && cleanPhone) {
+              const docSnap = await leadsRef.doc(cleanPhone).get();
+              if (docSnap.exists) {
+                leadId = docSnap.id;
+                leadData = docSnap.data();
+              }
+            }
+
+            // 3. Check by phone field matching
+            if (!leadData) {
+              const phoneQueries = [
+                leadsRef.where('phone', '==', cleanPhone).limit(1).get(),
+                leadsRef.where('phone', '==', phone).limit(1).get()
+              ];
+              if (phoneSuffix.length === 10) {
+                phoneQueries.push(leadsRef.where('phone', '==', phoneSuffix).limit(1).get());
+                phoneQueries.push(leadsRef.where('phone', '==', `+91${phoneSuffix}`).limit(1).get());
+              }
+              const querySnapshots = await Promise.all(phoneQueries);
+              for (const snap of querySnapshots) {
+                if (!snap.empty) {
+                  leadId = snap.docs[0].id;
+                  leadData = snap.docs[0].data();
+                  break;
+                }
+              }
             }
             
-            let leadData = null;
-            
-            if (!snapshot.empty) {
-              leadId = snapshot.docs[0].id;
-              leadData = snapshot.docs[0].data();
-            } else {
-              // Create lead
+            if (!leadData) {
+              // Create new lead (only if not found in CRM)
               leadId = cleanPhone || `lead-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+              const nowISO = new Date().toISOString();
               leadData = {
                 name: contact.name || contact.Name || 'Campaign Contact',
                 phone: phone,
                 course: contact.course || contact.Course || '',
-                source: 'WhatsApp Campaign',
+                source: contact.source || 'WhatsApp Campaign',
                 subSource: campaignName || 'Bulk Campaign',
-                counselor: counselorName || 'Unassigned',
-                stage: 'New',
+                counselor: contact.counselor || counselorName || 'Unassigned',
+                stage: contact.stage || 'New Lead',
                 status: 'Active',
                 timeline: [],
                 whatsappMessages: [],
-                createdAt: new Date().toISOString()
+                createdDate: contact.createdDate || contact.createdAt || nowISO,
+                createdAt: nowISO
               };
               await leadsRef.doc(leadId).set(leadData);
             }

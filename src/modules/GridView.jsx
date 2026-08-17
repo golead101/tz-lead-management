@@ -1076,14 +1076,20 @@ export default function GridView() {
 
                       {/* Date */}
                       <td>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                            {new Date(lead.createdDate).toLocaleDateString()}
-                          </span>
-                          <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
-                            {new Date(lead.createdDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        </div>
+                        {(() => {
+                          const rawDate = lead.createdDate || lead.createdAt;
+                          const parsedDate = rawDate && !isNaN(new Date(rawDate).getTime()) ? new Date(rawDate) : null;
+                          return (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                              <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                {parsedDate ? parsedDate.toLocaleDateString() : '—'}
+                              </span>
+                              <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                                {parsedDate ? parsedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                              </span>
+                            </div>
+                          );
+                        })()}
                       </td>
                     </tr>
                   );

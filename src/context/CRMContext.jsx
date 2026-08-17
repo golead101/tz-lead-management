@@ -412,10 +412,14 @@ export const CRMProvider = ({ children }) => {
             uniqueLeadsMap.set(lead.id, { ...lead, source: normSource });
         });
         
-        // Filter out WhatsApp Campaign leads from showing in the CRM list
-        const uniqueLeads = Array.from(uniqueLeadsMap.values()).filter(lead => lead.source !== 'WhatsApp Campaign');
+        // Keep all leads in the CRM list
+        const uniqueLeads = Array.from(uniqueLeadsMap.values());
         
-        uniqueLeads.sort((a, b) => new Date(b.createdDate) - new Date(a.createdDate));
+        uniqueLeads.sort((a, b) => {
+          const dateA = new Date(a.createdDate || a.createdAt || 0).getTime();
+          const dateB = new Date(b.createdDate || b.createdAt || 0).getTime();
+          return dateB - dateA;
+        });
         setLeads(uniqueLeads);
       };
 

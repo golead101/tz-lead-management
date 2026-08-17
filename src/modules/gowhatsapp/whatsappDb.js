@@ -246,8 +246,96 @@ export function initWhatsappDb() {
         localStorage.setItem('gowha_recipients', JSON.stringify(recipientsObj));
       }
     });
+    // Trigger auto-repair for any leads that were overwritten by previous WhatsApp campaigns
+    autoRepairOverwrittenLeads();
   } catch (error) {
     console.error("Failed to initialize Firestore WhatsApp listeners:", error);
+  }
+}
+
+let autoRepairRan = false;
+export async function autoRepairOverwrittenLeads() {
+  if (autoRepairRan) return;
+  autoRepairRan = true;
+
+  try {
+    const leadsSnap = await getDocs(collection(db, 'leads'));
+    if (leadsSnap.empty) return;
+
+    // Get recipient snapshots from whatsapp_recipients
+    const recipientsSnap = await getDocs(collection(db, 'whatsapp_recipients'));
+    const savedRecipientsMap = new Map();
+    recipientsSnap.docs.forEach(docSnap => {
+      const recs = docSnap.data().recipients || [];
+      recs.forEach(r => {
+        const phone = r.phone || r.Phone || '';
+        let cleanPhone = String(phone).replace(/[^0-9]/g, '').trim();
+        if (cleanPhone.length === 10) cleanPhone = '91' + cleanPhone;
+        if (cleanPhone) {
+          savedRecipientsMap.set(cleanPhone, r);
+          if (cleanPhone.slice(-10)) savedRecipientsMap.set(cleanPhone.slice(-10), r);
+        }
+      });
+    });
+
+    const updates = [];
+    leadsSnap.docs.forEach(docSnap => {
+      const data = docSnap.data();
+      const phone = data.phone || '';
+      let cleanPhone = String(phone).replace(/[^0-9]/g, '').trim();
+      const phone10 = cleanPhone.slice(-10);
+
+      const isOverwritten = (
+        data.source === 'WhatsApp Campaign' ||
+        data.stage === 'New' ||
+        !data.createdDate ||
+        data.createdDate === 'Invalid Date'
+      );
+
+      if (isOverwritten) {
+        const original = savedRecipientsMap.get(cleanPhone) || savedRecipientsMap.get(phone10) || savedRecipientsMap.get(docSnap.id);
+
+        const repairData = {};
+        
+        // Restore source if overwritten
+        if (data.source === 'WhatsApp Campaign') {
+          repairData.source = (original && original.source && original.source !== 'WhatsApp Campaign')
+            ? original.source
+            : 'Website Form';
+        }
+
+        // Restore stage if overwritten
+        if (data.stage === 'New') {
+          repairData.stage = (original && original.stage && original.stage !== 'New')
+            ? original.stage
+            : 'New Lead';
+        }
+
+        // Restore counselor if set to generic 'Counselor'
+        if (data.counselor === 'Counselor') {
+          repairData.counselor = (original && original.counselor && original.counselor !== 'Counselor')
+            ? original.counselor
+            : (data.timeline?.find(t => t.user && t.user !== 'Counselor')?.user || 'Unassigned');
+        }
+
+        // Restore createdDate if missing or invalid
+        if (!data.createdDate || data.createdDate === 'Invalid Date') {
+          const fallbackDate = (original && original.createdDate) || (original && original.createdAt) || data.createdAt || new Date().toISOString();
+          repairData.createdDate = fallbackDate;
+        }
+
+        if (Object.keys(repairData).length > 0) {
+          updates.push(setDoc(doc(db, 'leads', docSnap.id), repairData, { merge: true }));
+        }
+      }
+    });
+
+    if (updates.length > 0) {
+      await Promise.all(updates);
+      console.log(`[autoRepair] Successfully repaired ${updates.length} overwritten leads in Firestore.`);
+    }
+  } catch (err) {
+    console.error('Failed to auto-repair overwritten leads:', err);
   }
 }
 
