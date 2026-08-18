@@ -1,0 +1,107 @@
+/* Instagram Inbox UI Styles */
+
+.gowhatsapp-scope.instagram-scope {
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Outbound message bubble with Instagram branded gradient */
+.instagram-scope .bubble-outbound {
+  align-self: flex-end;
+  background: linear-gradient(135deg, #833ab4, #fd1d1d, #fcb045);
+  color: #ffffff;
+  margin-left: auto;
+  border-top-right-radius: 0;
+  position: relative;
+  box-shadow: 0 2px 8px rgba(225, 48, 108, 0.15);
+}
+
+.instagram-scope .bubble-outbound * {
+  color: #ffffff !important;
+}
+
+/* Tail for outbound bubble */
+.instagram-scope .bubble-outbound::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: -8px;
+  width: 0;
+  height: 0;
+  border-top: 8px solid #fd1d1d; /* Approximate matching edge color */
+  border-right: 8px solid transparent;
+}
+
+/* Inbound message bubble */
+.instagram-scope .bubble-inbound {
+  align-self: flex-start;
+  background-color: #f1f5f9; /* Slate 100 */
+  color: #0f172a;
+  margin-right: auto;
+  border-top-left-radius: 0;
+  position: relative;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.instagram-scope .bubble-inbound::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -8px;
+  width: 0;
+  height: 0;
+  border-top: 8px solid #f1f5f9;
+  border-left: 8px solid transparent;
+}
+
+/* Outbound message time and checkmarks status colors */
+.instagram-scope .bubble-outbound .message-time {
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.instagram-scope .bubble-outbound .message-time svg {
+  color: #ffffff !important;
+}
+
+/* Active tab selection indicator for Instagram */
+.instagram-scope .tab-active-indicator {
+  border-bottom: 3px solid #E1306C !important;
+  color: #E1306C !important;
+}
+
+/* Active conversation item in the list */
+.instagram-scope .sidebar-item.active {
+  background: rgba(225, 48, 108, 0.05) !important;
+  border-left: 4px solid #E1306C;
+  padding-left: 12px !important; /* Compensate for border-left */
+}
+
+/* Brand header */
+.instagram-scope .instagram-header {
+  height: 59px;
+  background: #f8fafc;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #e2e8f0;
+  z-index: 10;
+}
+
+.instagram-scope .avatar-instagram {
+  background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%) !important;
+  color: #ffffff !important;
+}
+
+/* Sending / failed status text styling */
+.instagram-scope .message-time .status-sending {
+  color: rgba(255, 255, 255, 0.6);
+  font-style: italic;
+}
+
+.instagram-scope .message-time .status-failed {
+  color: #ef4444 !important;
+  font-weight: bold;
+}

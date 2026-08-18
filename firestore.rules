@@ -1,0 +1,153 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─────────────────────────────────────────────
+    // Helper: check authentication
+    // ─────────────────────────────────────────────
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper: fetch the calling user's document from Firestore
+    function userData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // Helper: role checks (roles: Admin, Counselor, Telecaller)
+    function isAdmin() {
+      return isAuthenticated() && userData().role == 'Admin';
+    }
+
+    function isCounselor() {
+      return isAuthenticated() && userData().role == 'Counselor';
+    }
+
+    function isTelecaller() {
+      return isAuthenticated() && userData().role == 'Telecaller';
+    }
+
+    // Any internal staff member
+    function isStaff() {
+      return isAdmin() || isCounselor() || isTelecaller();
+    }
+
+    // ─────────────────────────────────────────────
+    // /users collection
+    //  All Staff   → read all user profiles (needed for counselor dropdowns)
+    //  Admin       → full read/write on all user documents
+    // ─────────────────────────────────────────────
+    match /users/{userId} {
+      allow read: if isStaff();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ─────────────────────────────────────────────
+    // /leads collection
+    //  All Staff  → read all leads (UI handles filtering)
+    //  Anyone     → create leads (allows unauthenticated website forms to submit)
+    //  Admin      → full update & delete
+    //  Counselor  → update only their assigned leads
+    //  Telecaller → update allowed fields only
+    // ─────────────────────────────────────────────
+    match /leads/{leadId} {
+      // Read access: allow all staff so the React onSnapshot listener doesn't crash
+      allow read: if isStaff();
+
+      // Create: allow anyone so the public website EmbedForm can submit leads
+      allow create: if true;
+
+      // Update: Admin unrestricted
+      allow update: if isAdmin();
+      
+      // Counselor: only their assigned leads
+      allow update: if isCounselor() &&
+                       resource.data.counselor == userData().name;
+                       
+      // Telecaller: only safe fields
+      allow update: if isTelecaller() &&
+                       request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['stage', 'followUpDate', 'timeline',
+                                   'notes', 'whatsappMessages', 'lastContacted',
+                                   'callAttempts', 'status']);
+
+      // Delete: Admin only
+      allow delete: if isAdmin();
+    }
+
+    // ─────────────────────────────────────────────
+    // /settings collection
+    // ─────────────────────────────────────────────
+    match /settings/{documentId} {
+      allow read: if documentId == 'live_form' || documentId == 'qr_form';
+      allow read: if isStaff() && (documentId == 'whatsapp_chatbot' || documentId == 'whatsapp_api' || documentId == 'instagram_chatbot');
+      allow read, write: if isAdmin();
+    }
+
+    // ─────────────────────────────────────────────
+    // /whatsapp_templates collection
+    //  All Staff → read and write (so they can save new templates)
+    // ─────────────────────────────────────────────
+    match /whatsapp_templates/{templateId} {
+      allow read, write: if isStaff();
+    }
+
+    // ─────────────────────────────────────────────
+    // WhatsApp Campaign & Contact Collections
+    // ─────────────────────────────────────────────
+    match /whatsapp_campaigns/{campaignId} {
+      allow read, write: if isStaff();
+    }
+    match /whatsapp_contact_lists/{listId} {
+      allow read, write: if isStaff();
+    }
+    match /whatsapp_contacts/{docId} {
+      allow read, write: if isStaff();
+    }
+    match /whatsapp_recipients/{docId} {
+      allow read, write: if isStaff();
+    }
+    match /whatsapp_campaigns/{docId} {
+      allow read, write: if isStaff();
+    }
+
+    // ─────────────────────────────────────────────
+    // Config Collections (courses, stages, fields)
+    // ─────────────────────────────────────────────
+    match /courses/{courseId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /pipelineStages/{stageId} {
+      allow read: if isStaff();
+      allow write: if isAdmin();
+    }
+    match /customFields/{fieldId} {
+      allow read: if isStaff();
+      allow write: if isAdmin();
+    }
+
+    // ─────────────────────────────────────────────
+    // Logs & Webhooks
+    // ─────────────────────────────────────────────
+    match /googleAdsLogs/{documentId} {
+      allow read, write: if isAdmin();
+    }
+    match /i-frame/{documentId} {
+      allow create: if true;
+      allow read, update, delete: if isStaff();
+    }
+
+    // ─────────────────────────────────────────────
+    // Dialer Integrations
+    // ─────────────────────────────────────────────
+    match /phoneCallLeads/{docId} {
+      allow read: if isStaff();
+      allow write: if isAdmin();
+    }
+    match /phoneCallActivities/{docId} {
+      allow read: if isStaff();
+      allow write: if isAdmin();
+    }
+  }
+}

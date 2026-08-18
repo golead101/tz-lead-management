@@ -1,0 +1,16 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Allow public read for campaign media so Meta can download the images
+    match /campaign_media/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null; 
+    }
+    
+    // Default rule for everything else (only logged-in users can read/write)
+    match /{allPaths=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
