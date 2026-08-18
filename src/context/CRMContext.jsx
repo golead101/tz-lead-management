@@ -5,8 +5,9 @@ import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebas
 const CRMContext = createContext();
 
 export const normalizeLeadSource = (rawSource) => {
-  if (!rawSource || typeof rawSource !== 'string') return 'Walk-in';
+  if (!rawSource || typeof rawSource !== 'string') return rawSource || '';
   const trimmed = rawSource.trim();
+  if (!trimmed) return '';
   const lower = trimmed.toLowerCase();
 
   if (lower === 'meta' || lower === 'meta ads' || lower === 'facebook' || lower === 'facebook ads' || lower === 'meta-ads') {
@@ -31,7 +32,7 @@ export const normalizeLeadSource = (rawSource) => {
     return 'Campaign Upload';
   }
 
-  return trimmed.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+  return trimmed;
 };
 
 // Default configurations
@@ -152,9 +153,9 @@ export const CRMProvider = ({ children }) => {
             email: '',
             course: '',
             education: '',
-            source: 'WhatsApp Inbound',
+            source: lead.source || '',
             stage: lead.stage === 'Follow-up Pending' ? 'Follow-up' : (lead.stage || 'New Lead'),
-            counselor: 'Unassigned',
+            counselor: lead.counselor || 'Unassigned',
             lastContacted: lead.createdDate || new Date().toISOString(),
             timeline: [],
             customFields: {},
@@ -409,7 +410,7 @@ export const CRMProvider = ({ children }) => {
         const uniqueLeadsMap = new Map();
         combined.forEach(lead => {
             const normSource = normalizeLeadSource(lead.source);
-            uniqueLeadsMap.set(lead.id, { ...lead, source: normSource });
+            uniqueLeadsMap.set(lead.id, { ...lead, source: normSource || lead.source || '' });
         });
         
         // Keep all leads in the CRM list
@@ -448,9 +449,9 @@ export const CRMProvider = ({ children }) => {
               email: '',
               course: '',
               education: '',
-              source: 'WhatsApp Inbound',
-              stage: 'New Lead',
-              counselor: 'Unassigned',
+              source: data.source || '',
+              stage: data.stage || 'New Lead',
+              counselor: data.counselor || 'Unassigned',
               lastContacted: data.createdDate || new Date().toISOString(),
               timeline: [],
               customFields: {},
@@ -486,9 +487,9 @@ export const CRMProvider = ({ children }) => {
               email: '',
               course: '',
               education: '',
-              source: 'Website Embedded Form',
-              stage: 'New Lead',
-              counselor: 'Unassigned',
+              source: data.source || 'Website Embedded Form',
+              stage: data.stage || 'New Lead',
+              counselor: data.counselor || 'Unassigned',
               lastContacted: data.createdDate || new Date().toISOString(),
               timeline: [],
               customFields: {},
@@ -768,20 +769,14 @@ export const CRMProvider = ({ children }) => {
     // New Lead Creation
     const newLeadId = cleanPhone ? cleanPhone : `lead-${Date.now()}`;
 
-    let finalSource = leadData.source || 'Website Form';
+    let finalSource = leadData.source || '';
     let finalSubSource = leadData.subSource || '';
     
     if (finalSource) {
       const srcLower = finalSource.toLowerCase().trim();
-      const standardSources = ['meta', 'whatsapp', 'google', 'website', 'call', 'facebook', 'instagram', 'walk-in', 'walkin'];
-      const isStandard = standardSources.some(s => srcLower.includes(s));
-      
       if (srcLower === 'qr code walk-in') {
         finalSource = 'Walk-in';
         finalSubSource = finalSubSource || 'QR Code';
-      } else if (!isStandard) {
-        finalSubSource = finalSource;
-        finalSource = 'Walk-in';
       }
     }
 
@@ -1655,6 +1650,57 @@ export const CRMProvider = ({ children }) => {
     showToastMsg(`Bulk shifted ${leadIds.length} inquiries to ${nextStage}`);
   };
 
+  // Bulk Source Shift
+  const bulkUpdateSource = (leadIds, nextSource) => {
+    const normSource = normalizeLeadSource(nextSource);
+    const targetSource = normSource || nextSource;
+    const nextLeads = leads.map(lead => {
+      if (leadIds.includes(lead.id)) {
+        return {
+          ...lead,
+          source: targetSource,
+          timeline: [
+            ...(lead.timeline || []),
+            {
+              id: `log-bulk-src-${Date.now()}-${Math.random()}`,
+              type: 'system',
+              title: 'Bulk Source Shift',
+              content: `Lead source updated collectively to "${targetSource}"`,
+              timestamp: new Date().toISOString(),
+              user: activeUser
+            }
+          ]
+        };
+      }
+      return lead;
+    });
+
+    if (isFirebaseEnabled) {
+      const CHUNK_SIZE = 450;
+      const processBatches = async () => {
+        try {
+          const leadsToUpdate = nextLeads.filter(l => leadIds.includes(l.id));
+          for (let i = 0; i < leadsToUpdate.length; i += CHUNK_SIZE) {
+            const chunk = leadsToUpdate.slice(i, i + CHUNK_SIZE);
+            const batch = writeBatch(db);
+            chunk.forEach(lead => {
+              batch.set(doc(db, 'leads', lead.id), lead);
+            });
+            await batch.commit();
+          }
+          setLeads(nextLeads);
+        } catch (err) {
+          console.error("Firestore bulkUpdateSource failed, falling back to local update:", err);
+          setLeads(nextLeads);
+        }
+      };
+      processBatches();
+    } else {
+      setLeads(nextLeads);
+    }
+    showToastMsg(`Bulk updated source for ${leadIds.length} inquiries to ${targetSource}`);
+  };
+
   // Bulk Delete
   const bulkDeleteLeads = (leadIds) => {
     if (isFirebaseEnabled) {
@@ -1917,6 +1963,7 @@ export const CRMProvider = ({ children }) => {
       sendWhatsAppMsg,
       bulkReassignLeads,
       bulkUpdateStage,
+      bulkUpdateSource,
       bulkDeleteLeads,
       addCustomField,
       addCourse,

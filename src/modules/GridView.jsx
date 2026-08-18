@@ -14,6 +14,7 @@ export default function GridView() {
     activeUser,
     bulkReassignLeads,
     bulkUpdateStage,
+    bulkUpdateSource,
     bulkDeleteLeads,
     addLead,
     searchQuery,
@@ -61,8 +62,10 @@ export default function GridView() {
   // Bulk operation popovers
   const [bulkReassignOpen, setBulkReassignOpen] = useState(false);
   const [bulkStageOpen, setBulkStageOpen] = useState(false);
+  const [bulkSourceOpen, setBulkSourceOpen] = useState(false);
   const [bulkCounselorName, setBulkCounselorName] = useState(counselors.filter(c => c.status === 'Active')[0]?.name || '');
   const [bulkStageName, setBulkStageName] = useState('Contacted');
+  const [bulkSourceName, setBulkSourceName] = useState('Meta Ads');
 
   React.useEffect(() => {
     const activeCouns = counselors.filter(c => c.status === 'Active');
@@ -237,6 +240,12 @@ export default function GridView() {
     bulkUpdateStage(selectedIds, bulkStageName);
     setSelectedIds([]);
     setBulkStageOpen(false);
+  };
+
+  const executeBulkSourceUpdate = () => {
+    bulkUpdateSource(selectedIds, bulkSourceName);
+    setSelectedIds([]);
+    setBulkSourceOpen(false);
   };
 
   const executeBulkDelete = () => {
@@ -915,7 +924,7 @@ export default function GridView() {
             </div>
 
             <div style={{ position: 'relative' }}>
-              <button className="gv-btn-outline gv-btn-sm" onClick={() => { setBulkStageOpen(!bulkStageOpen); setBulkReassignOpen(false); }}>
+              <button className="gv-btn-outline gv-btn-sm" onClick={() => { setBulkStageOpen(!bulkStageOpen); setBulkReassignOpen(false); setBulkSourceOpen(false); }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                 Move Stage
               </button>
@@ -926,6 +935,28 @@ export default function GridView() {
                     {pipelineStages.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
                   </select>
                   <button className="gv-btn-primary gv-btn-sm" style={{ width: '100%', marginTop: '8px', justifyContent: 'center' }} onClick={executeBulkStageUpdate}>Apply</button>
+                </div>
+              )}
+            </div>
+
+            <div style={{ position: 'relative' }}>
+              <button className="gv-btn-outline gv-btn-sm" onClick={() => { setBulkSourceOpen(!bulkSourceOpen); setBulkStageOpen(false); setBulkReassignOpen(false); }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+                Change Source
+              </button>
+              {bulkSourceOpen && (
+                <div className="gv-popover">
+                  <label className="form-label" style={{ fontSize: '11px' }}>Update Source to</label>
+                  <select className="gv-filter-select" style={{ width: '100%' }} value={bulkSourceName} onChange={(e) => setBulkSourceName(e.target.value)}>
+                    <option value="Meta Ads">Meta Ads</option>
+                    <option value="Walk-in">Walk-in</option>
+                    <option value="WhatsApp Inbound">WhatsApp Inbound</option>
+                    <option value="Website Embedded Form">Website Embedded Form</option>
+                    <option value="Google Ads">Google Ads</option>
+                    <option value="Instagram">Instagram</option>
+                    <option value="Campaign Upload">Campaign Upload</option>
+                  </select>
+                  <button className="gv-btn-primary gv-btn-sm" style={{ width: '100%', marginTop: '8px', justifyContent: 'center' }} onClick={executeBulkSourceUpdate}>Apply</button>
                 </div>
               )}
             </div>

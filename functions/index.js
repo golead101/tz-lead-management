@@ -1150,89 +1150,96 @@ exports.whatsappWebhook = functions.https.onRequest((req, res) => {
       let messageText = message.text?.body || '';
       if (message.type === 'interactive') {
         if (message.interactive?.button_reply) {
-          messageText = message.interactive.button_reply.title;
+          messageText = message.interactive.button_reply.title || message.interactive.button_reply.id || '';
         } else if (message.interactive?.list_reply) {
-          messageText = message.interactive.list_reply.title;
+          messageText = message.interactive.list_reply.title || message.interactive.list_reply.id || '';
         }
+      } else if (message.type === 'button') {
+        messageText = message.button?.text || message.button?.payload || '';
       }
 
       const cleanedSenderPhone = senderPhoneRaw.replace(/[^0-9]/g, '');
 
-      // Query leads collection to find a phone number match
-      return db.collection('leads').get()
-        .then(async (leadsSnap) => {
-          let matchedLeadRef = null;
-          let matchedLeadData = null;
+      // Query both 'leads' and 'i-frame' collections to find a phone number match
+      const leadsSnap = await db.collection('leads').get();
+      const iframeSnap = await db.collection('i-frame').get();
 
-          leadsSnap.forEach((doc) => {
-            const lead = doc.data();
-            if (lead.phone) {
-              const cleanedLeadPhone = String(lead.phone).replace(/[^0-9]/g, '');
-              if (cleanedLeadPhone === cleanedSenderPhone ||
-                (cleanedLeadPhone.length >= 10 && cleanedSenderPhone.length >= 10 &&
-                  cleanedLeadPhone.slice(-10) === cleanedSenderPhone.slice(-10))) {
-                matchedLeadRef = doc.ref;
-                matchedLeadData = lead;
-              }
-            }
-          });
+      let matchedLeadRef = null;
+      let matchedLeadData = null;
 
-          const inboundMsg = {
-            id: `msg-recv-${Date.now()}`,
-            sender: 'lead',
-            text: messageText || `[${message.type || 'attachment'} shared]`,
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            waMessageId: message.id || null,
-            timestamp: new Date().toISOString()
-          };
+      const checkDoc = (docSnap) => {
+        if (matchedLeadRef) return;
+        const lead = docSnap.data() || {};
+        const docId = docSnap.id || '';
 
-          if (matchedLeadRef && matchedLeadData) {
-            console.log(`[WhatsApp Webhook] Appending to lead: ${matchedLeadData.name}`);
+        const phoneVal = lead.phone || docId || '';
+        const cleanedLeadPhone = String(phoneVal).replace(/[^0-9]/g, '');
 
-            const updatedChat = [...(matchedLeadData.whatsappMessages || []), inboundMsg];
-            const nextTimeline = [...(matchedLeadData.timeline || []), {
-              id: `log-wa-in-${Date.now()}`,
-              type: 'whatsapp',
-              title: 'WhatsApp Received',
-              content: messageText || `[${message.type || 'attachment'} shared]`,
-              timestamp: new Date().toISOString(),
-              user: 'System'
-            }];
-
-            await matchedLeadRef.update({
-              whatsappMessages: updatedChat,
-              timeline: nextTimeline,
-              lastContacted: new Date().toISOString()
-            });
-
-          } else {
-            console.log(`[WhatsApp Webhook] Creating new lead for phone ${senderPhoneRaw}`);
-
-            let formattedPhone = senderPhoneRaw;
-            if (senderPhoneRaw.startsWith('91') && senderPhoneRaw.length === 12) {
-              formattedPhone = `+91 ${senderPhoneRaw.slice(2, 7)} ${senderPhoneRaw.slice(7)}`;
-            } else if (!senderPhoneRaw.startsWith('+')) {
-              formattedPhone = `+${senderPhoneRaw}`;
-            }
-
-            const newLeadId = cleanedSenderPhone || `lead-wa-inbound-${Date.now()}`;
-            const newLead = {
-              id: newLeadId,
-              name: senderName,
-              phone: formattedPhone,
-              whatsappMessages: [inboundMsg],
-              createdDate: new Date().toISOString(),
-              createdAt: new Date().toISOString()
-            };
-
-            await db.collection('leads').doc(newLeadId).set(newLead);
+        if (cleanedLeadPhone && cleanedSenderPhone) {
+          if (cleanedLeadPhone === cleanedSenderPhone ||
+            (cleanedLeadPhone.length >= 10 && cleanedSenderPhone.length >= 10 &&
+              cleanedLeadPhone.slice(-10) === cleanedSenderPhone.slice(-10))) {
+            matchedLeadRef = docSnap.ref;
+            matchedLeadData = lead;
           }
+        }
+      };
 
-          // === CHATBOT AUTO-REPLY LOGIC ===
-          const messageTimestamp = message.timestamp ? parseInt(message.timestamp, 10) * 1000 : Date.now();
-          const isOldMessage = (Date.now() - messageTimestamp) > 2 * 60 * 1000; // Ignore > 2 mins old
+      leadsSnap.forEach(checkDoc);
+      if (!matchedLeadRef && !iframeSnap.empty) {
+        iframeSnap.forEach(checkDoc);
+      }
 
-          if (messageText && !isOldMessage) {
+      const inboundMsg = {
+        id: `msg-recv-${Date.now()}`,
+        sender: 'lead',
+        text: messageText || `[${message.type || 'attachment'} shared]`,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        waMessageId: message.id || null,
+        timestamp: new Date().toISOString()
+      };
+
+      if (matchedLeadRef && matchedLeadData) {
+        console.log(`[WhatsApp Webhook] Appending to lead: ${matchedLeadData.name || matchedLeadData.id}`);
+
+        const updatedChat = [...(matchedLeadData.whatsappMessages || []), inboundMsg];
+        const nextTimeline = [...(matchedLeadData.timeline || []), {
+          id: `log-wa-in-${Date.now()}`,
+          type: 'whatsapp',
+          title: 'WhatsApp Received',
+          content: messageText || `[${message.type || 'attachment'} shared]`,
+          timestamp: new Date().toISOString(),
+          user: 'System'
+        }];
+
+        await matchedLeadRef.update({
+          whatsappMessages: updatedChat,
+          timeline: nextTimeline,
+          lastContacted: new Date().toISOString()
+        });
+
+      } else {
+        console.log(`[WhatsApp Webhook] Creating new lead for phone ${senderPhoneRaw}`);
+
+        let formattedPhone = senderPhoneRaw;
+        if (senderPhoneRaw.startsWith('91') && senderPhoneRaw.length === 12) {
+          formattedPhone = `+91 ${senderPhoneRaw.slice(2, 7)} ${senderPhoneRaw.slice(7)}`;
+        } else if (!senderPhoneRaw.startsWith('+')) {
+          formattedPhone = `+${senderPhoneRaw}`;
+        }
+
+        const newLeadId = cleanedSenderPhone || `lead-wa-inbound-${Date.now()}`;
+        const newLead = {
+          id: newLeadId,
+          name: senderName,
+          phone: formattedPhone,
+          whatsappMessages: [inboundMsg],
+          createdDate: new Date().toISOString(),
+          createdAt: new Date().toISOString()
+        };
+
+        await db.collection('leads').doc(newLeadId).set(newLead);
+      }
             try {
               const chatbotDoc = await db.collection('settings').doc('whatsapp_chatbot').get();
               if (chatbotDoc.exists) {
