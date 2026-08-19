@@ -511,13 +511,27 @@ export const CRMProvider = ({ children }) => {
       coursesUnsub = onSnapshot(collection(db, 'courses'), (snapshot) => {
         if (!active) return;
         if (snapshot.empty) {
-          console.log("Firestore courses collection is empty. Seeding with DEFAULT courses...");
-          const batch = writeBatch(db);
-          DEFAULT_COURSES.forEach((course) => {
-            batch.set(doc(db, 'courses', course.id), course);
-          });
-          batch.commit().catch(err => console.error("Firestore seeding courses failed:", err));
+          // Only seed DEFAULT_COURSES on true first install — not if user deliberately deleted all courses
+          const hasEverSeeded = localStorage.getItem('crm_courses_seeded');
+          if (!hasEverSeeded) {
+            console.log('[courses] First install — seeding DEFAULT courses...');
+            const batch = writeBatch(db);
+            DEFAULT_COURSES.forEach((course) => {
+              batch.set(doc(db, 'courses', course.id), course);
+            });
+            batch.commit()
+              .then(() => localStorage.setItem('crm_courses_seeded', '1'))
+              .catch(err => console.error('[courses] Seeding failed:', err));
+          } else {
+            console.log('[courses] Collection is empty — user deleted all courses. Not re-seeding.');
+            setCourses([]);
+            try { localStorage.setItem('crm_courses', JSON.stringify([])); } catch (e) {}
+          }
         } else {
+          // Mark as seeded once we have real data
+          if (!localStorage.getItem('crm_courses_seeded')) {
+            localStorage.setItem('crm_courses_seeded', '1');
+          }
           const coursesData = snapshot.docs
             .filter(docSnap => !deletingCourseIds.current.has(docSnap.id))
             .map(docSnap => ({
@@ -530,7 +544,7 @@ export const CRMProvider = ({ children }) => {
           } catch (e) {}
         }
       }, (err) => {
-        console.error("Firestore courses subscription error:", err);
+        console.error('[courses] Firestore subscription error:', err);
       });
 
       // 3. Pipeline Stages
@@ -642,9 +656,8 @@ export const CRMProvider = ({ children }) => {
     localStorage.setItem('crm_leads', JSON.stringify(leads));
   }, [leads]);
 
-  useEffect(() => {
-    localStorage.setItem('crm_courses', JSON.stringify(courses));
-  }, [courses]);
+  // NOTE: crm_courses localStorage is written directly by onSnapshot, removeCourse, and updateCourse.
+  // No separate useEffect needed here — that would cause a redundant double-write.
 
   useEffect(() => {
     localStorage.setItem('crm_stages', JSON.stringify(pipelineStages));
@@ -1712,6 +1725,58 @@ export const CRMProvider = ({ children }) => {
     showToastMsg(`Bulk updated source for ${leadIds.length} inquiries to ${targetSource}`);
   };
 
+  // Bulk Course Update
+  const bulkUpdateCourse = (leadIds, nextCourse) => {
+    const targetCourse = (nextCourse || '').trim();
+    if (!targetCourse) return;
+
+    const nextLeads = leads.map(lead => {
+      if (leadIds.includes(lead.id)) {
+        return {
+          ...lead,
+          course: targetCourse,
+          timeline: [
+            ...(lead.timeline || []),
+            {
+              id: `log-bulk-course-${Date.now()}-${Math.random()}`,
+              type: 'system',
+              title: 'Bulk Course Change',
+              content: `Lead course updated collectively to "${targetCourse}"`,
+              timestamp: new Date().toISOString(),
+              user: activeUser
+            }
+          ]
+        };
+      }
+      return lead;
+    });
+
+    if (isFirebaseEnabled) {
+      const CHUNK_SIZE = 450;
+      const processBatches = async () => {
+        try {
+          const leadsToUpdate = nextLeads.filter(l => leadIds.includes(l.id));
+          for (let i = 0; i < leadsToUpdate.length; i += CHUNK_SIZE) {
+            const chunk = leadsToUpdate.slice(i, i + CHUNK_SIZE);
+            const batch = writeBatch(db);
+            chunk.forEach(lead => {
+              batch.set(doc(db, 'leads', lead.id), lead);
+            });
+            await batch.commit();
+          }
+          setLeads(nextLeads);
+        } catch (err) {
+          console.error('Firestore bulkUpdateCourse failed, falling back to local update:', err);
+          setLeads(nextLeads);
+        }
+      };
+      processBatches();
+    } else {
+      setLeads(nextLeads);
+    }
+    showToastMsg(`Bulk updated course for ${leadIds.length} lead(s) to "${targetCourse}"`);
+  };
+
   // Bulk Delete
   const bulkDeleteLeads = (leadIds) => {
     if (isFirebaseEnabled) {
@@ -1749,11 +1814,21 @@ export const CRMProvider = ({ children }) => {
     showToastMsg(`Custom field "${field.name}" added successfully.`);
   };
 
-  // Course Adder
+  // Course Adder (with duplicate name guard)
   const addCourse = (courseData) => {
+    const newName = (courseData.name || '').trim();
+    const newNameLower = newName.toLowerCase();
+
+    // Bug 4 fix: Reject duplicate course names (case-insensitive)
+    const isDuplicate = courses.some(c => (c.name || '').trim().toLowerCase() === newNameLower);
+    if (isDuplicate) {
+      showToastMsg(`Course "${newName}" already exists. Please use a different name.`, 'error');
+      return;
+    }
+
     const newCourse = {
       id: `c-${Date.now()}`,
-      name: courseData.name,
+      name: newName,
       code: courseData.code,
       duration: courseData.duration,
       fee: courseData.fee,
@@ -1769,7 +1844,7 @@ export const CRMProvider = ({ children }) => {
     } else {
       setCourses(prev => [...prev, newCourse]);
     }
-    showToastMsg(`Course "${courseData.name}" added to list.`);
+    showToastMsg(`Course "${newName}" added to list.`);
   };
 
   // Course Remover — deletes by real Firestore docSnap.id (always reliable)
@@ -1824,6 +1899,11 @@ export const CRMProvider = ({ children }) => {
       }
     }
     showToastMsg('Course removed successfully.', 'error');
+
+    // Bug 1 fix: Clean up deletingCourseIds after 5s to prevent Set growing forever
+    setTimeout(() => {
+      deletingCourseIds.current.delete(targetId);
+    }, 5000);
   };
 
   // Course Updater — saves edits to Firestore by Firestore doc path ID
@@ -2051,6 +2131,7 @@ export const CRMProvider = ({ children }) => {
       bulkReassignLeads,
       bulkUpdateStage,
       bulkUpdateSource,
+      bulkUpdateCourse,
       bulkDeleteLeads,
       addCustomField,
       addCourse,

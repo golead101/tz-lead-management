@@ -4,6 +4,169 @@ import DetailTimeline from './DetailTimeline';
 import * as XLSX from 'xlsx';
 
 
+function MultiSelectFilter({ label, icon, options, selectedValues, onChange, allLabel = "ALL" }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = React.useRef(null);
+
+  React.useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleToggleOption = (value) => {
+    if (value === 'All') {
+      onChange(['All']);
+    } else {
+      let newValues = selectedValues.filter(v => v !== 'All');
+      if (newValues.includes(value)) {
+        newValues = newValues.filter(v => v !== value);
+      } else {
+        newValues.push(value);
+      }
+      if (newValues.length === 0) {
+        newValues = ['All'];
+      }
+      onChange(newValues);
+    }
+  };
+
+  const isAllSelected = selectedValues.includes('All') || selectedValues.length === 0;
+
+  let labelText = allLabel;
+  if (!isAllSelected) {
+    if (selectedValues.length === 1) {
+      const opt = options.find(o => o.value === selectedValues[0]);
+      labelText = opt ? opt.label : selectedValues[0];
+    } else {
+      labelText = `${selectedValues.length} Selected`;
+    }
+  }
+
+  return (
+    <div className="gv-filter-group" ref={dropdownRef} style={{ position: 'relative' }}>
+      <label className="gv-filter-label">
+        {icon}
+        {label}
+      </label>
+      <div 
+        className="gv-filter-select"
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          cursor: 'pointer',
+          userSelect: 'none',
+          backgroundImage: 'none',
+          paddingRight: '12px'
+        }}
+      >
+        <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+          {labelText}
+        </span>
+        <svg 
+          width="12" 
+          height="12" 
+          viewBox="0 0 24 24" 
+          fill="none" 
+          stroke="#6b7280" 
+          strokeWidth="2"
+          style={{ 
+            marginLeft: '8px', 
+            transition: 'transform 0.15s ease', 
+            transform: isOpen ? 'rotate(180deg)' : 'none',
+            flexShrink: 0
+          }}
+        >
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </div>
+
+      {isOpen && (
+        <div 
+          className="gv-popover" 
+          style={{ 
+            left: 0, 
+            right: 'auto', 
+            width: '240px', 
+            maxHeight: '300px', 
+            overflowY: 'auto', 
+            padding: '8px', 
+            zIndex: 150, 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: '4px',
+            marginTop: '4px',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.1)'
+          }}
+        >
+          <label 
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px', 
+              padding: '6px 8px', 
+              borderRadius: '4px', 
+              cursor: 'pointer', 
+              fontSize: '12.5px',
+              fontWeight: isAllSelected ? '600' : 'normal',
+              background: isAllSelected ? '#f1f5f9' : 'transparent',
+              color: isAllSelected ? 'var(--primary)' : 'var(--text-primary)',
+              margin: 0
+            }}
+          >
+            <input 
+              type="checkbox" 
+              checked={isAllSelected}
+              onChange={() => handleToggleOption('All')}
+              style={{ accentColor: 'var(--primary)', cursor: 'pointer' }}
+            />
+            {allLabel}
+          </label>
+
+          <div style={{ height: '1px', background: '#e2e8f0', margin: '4px 0' }} />
+
+          {options.map((opt) => {
+            const isChecked = selectedValues.includes(opt.value);
+            return (
+              <label 
+                key={opt.value}
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '8px', 
+                  padding: '6px 8px', 
+                  borderRadius: '4px', 
+                  cursor: 'pointer', 
+                  fontSize: '12.5px',
+                  fontWeight: isChecked ? '600' : 'normal',
+                  background: isChecked ? '#eff6ff' : 'transparent',
+                  color: isChecked ? 'var(--primary)' : 'var(--text-primary)',
+                  margin: 0
+                }}
+              >
+                <input 
+                  type="checkbox" 
+                  checked={isChecked}
+                  onChange={() => handleToggleOption(opt.value)}
+                  style={{ accentColor: 'var(--primary)', cursor: 'pointer' }}
+                />
+                {opt.label}
+              </label>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 export default function GridView() {
   const {
     leads,
@@ -15,6 +178,7 @@ export default function GridView() {
     bulkReassignLeads,
     bulkUpdateStage,
     bulkUpdateSource,
+    bulkUpdateCourse,
     bulkDeleteLeads,
     addLead,
     searchQuery,
@@ -33,13 +197,13 @@ export default function GridView() {
     setPrefilledCampaignLeads
   } = useCRM();
 
-  // Filter States
-  const [selectedCourse, setSelectedCourse] = useState('All');
-  const [selectedStage, setSelectedStage] = useState('All');
-  const [selectedCounselor, setSelectedCounselor] = useState('All');
-  const [selectedSource, setSelectedSource] = useState('All');
-  const [selectedCampaign, setSelectedCampaign] = useState('All');
-  const [selectedTemperature, setSelectedTemperature] = useState('All');
+  // Filter States (now supporting multi-select as arrays)
+  const [selectedCourse, setSelectedCourse] = useState(['All']);
+  const [selectedStage, setSelectedStage] = useState(['All']);
+  const [selectedCounselor, setSelectedCounselor] = useState(['All']);
+  const [selectedSource, setSelectedSource] = useState(['All']);
+  const [selectedCampaign, setSelectedCampaign] = useState(['All']);
+  const [selectedTemperature, setSelectedTemperature] = useState(['All']);
 
   const [dateRangeFilter, setDateRangeFilter] = useState('All Time');
   const [customStartDate, setCustomStartDate] = useState('');
@@ -66,6 +230,8 @@ export default function GridView() {
   const [bulkCounselorName, setBulkCounselorName] = useState(counselors.filter(c => c.status === 'Active')[0]?.name || '');
   const [bulkStageName, setBulkStageName] = useState('Contacted');
   const [bulkSourceName, setBulkSourceName] = useState('Meta Ads');
+  const [bulkCourseOpen, setBulkCourseOpen] = useState(false);
+  const [bulkCourseName, setBulkCourseName] = useState(courses[0]?.name || '');
 
   React.useEffect(() => {
     const activeCouns = counselors.filter(c => c.status === 'Active');
@@ -83,53 +249,77 @@ export default function GridView() {
     if (activeRole === 'Counselor' && lead.counselor !== activeUser) {
       return false;
     }
-    if (selectedCourse !== 'All') {
+    // Course Multi-select filter
+    if (selectedCourse && selectedCourse.length > 0 && !selectedCourse.includes('All')) {
       const leadC = (lead.course || '').trim().toLowerCase();
-      const filterC = selectedCourse.trim().toLowerCase();
-      if (leadC !== filterC && !leadC.includes(filterC) && !filterC.includes(leadC)) return false;
+      const match = selectedCourse.some(val => {
+        const filterC = val.trim().toLowerCase();
+        return leadC === filterC || leadC.includes(filterC) || filterC.includes(leadC);
+      });
+      if (!match) return false;
     }
-    if (selectedStage !== 'All') {
+    // Stage Multi-select filter
+    if (selectedStage && selectedStage.length > 0 && !selectedStage.includes('All')) {
       const leadS = (lead.stage || '').trim().toLowerCase();
-      const filterS = selectedStage.trim().toLowerCase();
-      if (leadS !== filterS) return false;
+      const match = selectedStage.some(val => {
+        const filterS = val.trim().toLowerCase();
+        return leadS === filterS;
+      });
+      if (!match) return false;
     }
-    if (selectedTemperature !== 'All' && (lead.temperature || 'Warm') !== selectedTemperature) return false;
-    if (selectedCounselor !== 'All') {
-      if (selectedCounselor === 'Unassigned') {
-        const coun = (lead.counselor || '').trim().toLowerCase();
-        if (coun !== '' && coun !== 'unassigned' && coun !== 'none') return false;
-      } else if (lead.counselor !== selectedCounselor) {
-        return false;
-      }
+    // Temperature Multi-select filter
+    if (selectedTemperature && selectedTemperature.length > 0 && !selectedTemperature.includes('All')) {
+      const leadTemp = lead.temperature || 'Warm';
+      if (!selectedTemperature.includes(leadTemp)) return false;
     }
-    if (selectedSource !== 'All') {
-      const srcLower = (lead.source || '').toLowerCase();
-      if (selectedSource === 'meta') {
-        if (!srcLower.includes('meta')) return false;
-        if (selectedCampaign !== 'All') {
-          const leadCampaign = (lead.campaign || lead.campaignName || lead.subSource || '').trim().toLowerCase();
-          const filterCamp = selectedCampaign.trim().toLowerCase();
-          if (leadCampaign !== filterCamp) return false;
+    // Counselor Multi-select filter
+    if (selectedCounselor && selectedCounselor.length > 0 && !selectedCounselor.includes('All')) {
+      const leadCoun = lead.counselor || 'Unassigned';
+      const counLower = leadCoun.trim().toLowerCase();
+      const isLeadUnassigned = counLower === '' || counLower === 'unassigned' || counLower === 'none';
+      
+      const match = selectedCounselor.some(val => {
+        if (val === 'Unassigned') {
+          return isLeadUnassigned;
         }
-      } else if (selectedSource === 'google') {
-        if (!srcLower.includes('google')) return false;
-      } else if (selectedSource === 'whatsapp') {
-        if (!srcLower.includes('whatsapp')) return false;
-      } else if (selectedSource === 'website') {
-        if (!srcLower.includes('website')) return false;
-      } else if (selectedSource === 'call') {
-        if (!srcLower.includes('call') && !srcLower.includes('phone')) return false;
-      } else if (selectedSource === 'walkin') {
-        if (!srcLower.includes('walk-in') && !srcLower.includes('walkin')) return false;
-      } else if (selectedSource === 'other') {
-        const isMeta = srcLower.includes('meta');
-        const isGoogle = srcLower.includes('google');
-        const isWhatsapp = srcLower.includes('whatsapp');
-        const isWebsite = srcLower.includes('website');
-        const isCall = srcLower.includes('call') || srcLower.includes('phone');
-        const isWalkin = srcLower.includes('walk-in') || srcLower.includes('walkin');
-        if (isMeta || isGoogle || isWhatsapp || isWebsite || isCall || isWalkin) return false;
-      }
+        return lead.counselor === val;
+      });
+      if (!match) return false;
+    }
+    // Source Multi-select filter
+    if (selectedSource && selectedSource.length > 0 && !selectedSource.includes('All')) {
+      const matchesSingleSource = (sourceOption) => {
+        const srcLower = (lead.source || '').toLowerCase();
+        if (sourceOption === 'meta') {
+          if (!srcLower.includes('meta')) return false;
+          if (selectedCampaign && selectedCampaign.length > 0 && !selectedCampaign.includes('All')) {
+            const leadCampaign = (lead.campaign || lead.campaignName || lead.subSource || '').trim().toLowerCase();
+            const campaignMatch = selectedCampaign.some(camp => {
+              return leadCampaign === camp.trim().toLowerCase();
+            });
+            if (!campaignMatch) return false;
+          }
+          return true;
+        }
+        if (sourceOption === 'google') return srcLower.includes('google');
+        if (sourceOption === 'whatsapp') return srcLower.includes('whatsapp');
+        if (sourceOption === 'website') return srcLower.includes('website');
+        if (sourceOption === 'call') return srcLower.includes('call') || srcLower.includes('phone');
+        if (sourceOption === 'walkin') return srcLower.includes('walk-in') || srcLower.includes('walkin');
+        if (sourceOption === 'other') {
+          const isMeta = srcLower.includes('meta');
+          const isGoogle = srcLower.includes('google');
+          const isWhatsapp = srcLower.includes('whatsapp');
+          const isWebsite = srcLower.includes('website');
+          const isCall = srcLower.includes('call') || srcLower.includes('phone');
+          const isWalkin = srcLower.includes('walk-in') || srcLower.includes('walkin');
+          return !(isMeta || isGoogle || isWhatsapp || isWebsite || isCall || isWalkin);
+        }
+        return false;
+      };
+
+      const match = selectedSource.some(srcOpt => matchesSingleSource(srcOpt));
+      if (!match) return false;
     }
 
     if (dateRangeFilter !== 'All Time') {
@@ -249,6 +439,12 @@ export default function GridView() {
     bulkUpdateStage(selectedIds, bulkStageName);
     setSelectedIds([]);
     setBulkStageOpen(false);
+  };
+
+  const executeBulkCourseUpdate = () => {
+    bulkUpdateCourse(selectedIds, bulkCourseName);
+    setSelectedIds([]);
+    setBulkCourseOpen(false);
   };
 
   const executeBulkSourceUpdate = () => {
@@ -619,7 +815,15 @@ export default function GridView() {
   // Quick stats
   const totalAll = leads.filter(l => activeRole !== 'Counselor' || l.counselor === activeUser).length;
   const convertedCount = filteredLeads.filter(l => l.stage === 'Converted').length;
-  const activeFiltersCount = [selectedCourse, selectedStage, selectedCounselor, selectedSource, selectedCampaign, dateRangeFilter].filter(f => f !== 'All' && f !== 'All Time').length;
+  const activeFiltersCount = [
+    selectedCourse.length > 0 && !selectedCourse.includes('All'),
+    selectedStage.length > 0 && !selectedStage.includes('All'),
+    selectedCounselor.length > 0 && !selectedCounselor.includes('All'),
+    selectedSource.length > 0 && !selectedSource.includes('All'),
+    selectedCampaign.length > 0 && !selectedCampaign.includes('All'),
+    selectedTemperature.length > 0 && !selectedTemperature.includes('All'),
+    dateRangeFilter !== 'All Time'
+  ].filter(Boolean).length;
 
   const uniqueMetaCampaigns = [...new Set(
     leads.filter(l => (l.source || '').toLowerCase().includes('meta'))
@@ -743,7 +947,19 @@ export default function GridView() {
             <span style={{ color: 'var(--primary)', fontWeight: 600 }}>{activeFiltersCount} filter{activeFiltersCount > 1 ? 's' : ''} active</span>
             <button
               className="gv-clear-filters"
-              onClick={() => { setSelectedCourse('All'); setSelectedStage('All'); setSelectedCounselor('All'); setSelectedSource('All'); setSelectedCampaign('All'); setDateRangeFilter('All Time'); setCustomStartDate(''); setCustomEndDate(''); setGridSearch(''); setCurrentPage(1); }}
+              onClick={() => {
+                setSelectedCourse(['All']);
+                setSelectedStage(['All']);
+                setSelectedCounselor(['All']);
+                setSelectedSource(['All']);
+                setSelectedCampaign(['All']);
+                setSelectedTemperature(['All']);
+                setDateRangeFilter('All Time');
+                setCustomStartDate('');
+                setCustomEndDate('');
+                setGridSearch('');
+                setCurrentPage(1);
+              }}
             >Clear</button>
           </div>
         )}
@@ -751,124 +967,90 @@ export default function GridView() {
 
       {/* ──────────── FILTERS ──────────── */}
       <div className="gv-filter-bar">
-        <div className="gv-filter-group">
-          <label className="gv-filter-label">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20M4 19.5A2.5 2.5 0 014 17V5a2 2 0 012-2h14v14H6.5A2.5 2.5 0 004 19.5z"/></svg>
-            Course
-          </label>
-          <select
-            value={selectedCourse}
-            onChange={(e) => { setSelectedCourse(e.target.value); setCurrentPage(1); }}
-            className="gv-filter-select"
-          >
-            <option value="All">ALL</option>
-            {courses.map((c, index) => (
-              <option key={`${c.id}-${index}`} value={c.name}>{c.code} — {c.name}</option>
-            ))}
-          </select>
-        </div>
+        <MultiSelectFilter
+          label="Course"
+          icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20M4 19.5A2.5 2.5 0 014 17V5a2 2 0 012-2h14v14H6.5A2.5 2.5 0 004 19.5z"/></svg>}
+          options={courses.map(c => ({ value: c.name, label: `${c.code ? `${c.code} — ` : ''}${c.name}` }))}
+          selectedValues={selectedCourse}
+          onChange={(vals) => { setSelectedCourse(vals); setCurrentPage(1); }}
+        />
 
-        <div className="gv-filter-group">
-          <label className="gv-filter-label">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-            Stage
-          </label>
-          <select
-            value={selectedStage}
-            onChange={(e) => { setSelectedStage(e.target.value); setCurrentPage(1); }}
-            className="gv-filter-select"
-          >
-            <option value="All">ALL</option>
-            {pipelineStages.map(s => (
-              <option key={s.id} value={s.name}>{s.name}</option>
-            ))}
-          </select>
-        </div>
-        <div className="gv-filter-group">
-          <label className="gv-filter-label">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" strokeLinecap="round"/><circle cx="12" cy="12" r="4"/></svg>
-            Temperature
-          </label>
-          <select
-            value={selectedTemperature}
-            onChange={(e) => { setSelectedTemperature(e.target.value); setCurrentPage(1); }}
-            className="gv-filter-select"
-          >
-            <option value="All">ALL</option>
-            <option value="Hot">🔥 Hot Leads</option>
-            <option value="Warm">☀️ Warm Leads</option>
-            <option value="Cold">❄️ Cold Leads</option>
-          </select>
-        </div>
+        <MultiSelectFilter
+          label="Stage"
+          icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>}
+          options={pipelineStages.map(s => ({ value: s.name, label: s.name }))}
+          selectedValues={selectedStage}
+          onChange={(vals) => { setSelectedStage(vals); setCurrentPage(1); }}
+        />
 
-        <div className="gv-filter-group">
-          <label className="gv-filter-label">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 3a4 4 0 100 8 4 4 0 000-8z"/></svg>
-            ASSIGNED TO
-          </label>
-          <select
-            value={activeRole === 'Counselor' ? activeUser : selectedCounselor}
-            onChange={(e) => { setSelectedCounselor(e.target.value); setCurrentPage(1); }}
-            className="gv-filter-select"
-            disabled={activeRole === 'Counselor'}
-          >
-            {activeRole === 'Counselor' ? (
-              <option value={activeUser}>{activeUser}</option>
-            ) : (
-              <>
-                <option key="all" value="All">ALL</option>
-                <option key="unassigned" value="Unassigned">Unassigned</option>
-                {counselors.map((c, index) => (
-                  <option key={`${c.id}-${index}`} value={c.name}>
-                    {c.name} {c.status === 'Deactivated' ? '(Deactivated)' : ''}
-                  </option>
-                ))}
-              </>
-            )}
-          </select>
-        </div>
+        <MultiSelectFilter
+          label="Temperature"
+          icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" strokeLinecap="round"/><circle cx="12" cy="12" r="4"/></svg>}
+          options={[
+            { value: 'Hot', label: '🔥 Hot Leads' },
+            { value: 'Warm', label: '☀️ Warm Leads' },
+            { value: 'Cold', label: '❄️ Cold Leads' }
+          ]}
+          selectedValues={selectedTemperature}
+          onChange={(vals) => { setSelectedTemperature(vals); setCurrentPage(1); }}
+        />
 
-        <div className="gv-filter-group">
-          <label className="gv-filter-label">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-            Source
-          </label>
-          <select
-            value={selectedSource}
-            onChange={(e) => { 
-              setSelectedSource(e.target.value); 
-              setCurrentPage(1); 
-              if (e.target.value !== 'meta') setSelectedCampaign('All');
-            }}
-            className="gv-filter-select"
-          >
-            <option value="All">ALL</option>
-            <option value="meta">Meta</option>
-            <option value="google">Google</option>
-            <option value="whatsapp">WhatsApp</option>
-            <option value="website">Website</option>
-            <option value="call">Call</option>
-            <option value="walkin">Walk-in</option>
-          </select>
-        </div>
-
-        {selectedSource === 'meta' && (
+        {activeRole === 'Counselor' ? (
           <div className="gv-filter-group">
             <label className="gv-filter-label">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" strokeLinecap="round"/><circle cx="12" cy="12" r="4"/></svg>
-              Campaign
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 3a4 4 0 100 8 4 4 0 000-8z"/></svg>
+              ASSIGNED TO
             </label>
-            <select
-              value={selectedCampaign}
-              onChange={(e) => { setSelectedCampaign(e.target.value); setCurrentPage(1); }}
-              className="gv-filter-select"
-            >
-              <option value="All">ALL</option>
-              {uniqueMetaCampaigns.map((c, index) => (
-                <option key={`${c}-${index}`} value={c}>{c}</option>
-              ))}
+            <select className="gv-filter-select" disabled value={activeUser} style={{ opacity: 0.8 }}>
+              <option value={activeUser}>{activeUser}</option>
             </select>
           </div>
+        ) : (
+          <MultiSelectFilter
+            label="ASSIGNED TO"
+            icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 3a4 4 0 100 8 4 4 0 000-8z"/></svg>}
+            options={[
+              { value: 'Unassigned', label: 'Unassigned' },
+              ...counselors.map(c => ({
+                value: c.name,
+                label: `${c.name}${c.status === 'Deactivated' ? ' (Deactivated)' : ''}`
+              }))
+            ]}
+            selectedValues={selectedCounselor}
+            onChange={(vals) => { setSelectedCounselor(vals); setCurrentPage(1); }}
+          />
+        )}
+
+        <MultiSelectFilter
+          label="Source"
+          icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>}
+          options={[
+            { value: 'meta', label: 'Meta' },
+            { value: 'google', label: 'Google' },
+            { value: 'whatsapp', label: 'WhatsApp' },
+            { value: 'website', label: 'Website' },
+            { value: 'call', label: 'Call' },
+            { value: 'walkin', label: 'Walk-in' },
+            { value: 'other', label: 'Other' }
+          ]}
+          selectedValues={selectedSource}
+          onChange={(vals) => {
+            setSelectedSource(vals);
+            setCurrentPage(1);
+            if (!vals.includes('meta')) {
+              setSelectedCampaign(['All']);
+            }
+          }}
+        />
+
+        {selectedSource && selectedSource.includes('meta') && (
+          <MultiSelectFilter
+            label="Campaign"
+            icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" strokeLinecap="round"/><circle cx="12" cy="12" r="4"/></svg>}
+            options={uniqueMetaCampaigns.map(c => ({ value: c, label: c }))}
+            selectedValues={selectedCampaign}
+            onChange={(vals) => { setSelectedCampaign(vals); setCurrentPage(1); }}
+          />
         )}
 
         <div className="gv-filter-group" style={{ position: 'relative' }}>
@@ -1023,6 +1205,22 @@ export default function GridView() {
                     <option value="Campaign Upload">Campaign Upload</option>
                   </select>
                   <button className="gv-btn-primary gv-btn-sm" style={{ width: '100%', marginTop: '8px', justifyContent: 'center' }} onClick={executeBulkSourceUpdate}>Apply</button>
+                </div>
+              )}
+            </div>
+
+            <div style={{ position: 'relative' }}>
+              <button className="gv-btn-outline gv-btn-sm" onClick={() => { setBulkCourseOpen(!bulkCourseOpen); setBulkSourceOpen(false); setBulkStageOpen(false); setBulkReassignOpen(false); }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20M4 19.5A2.5 2.5 0 014 17V5a2 2 0 012-2h14v14H6.5A2.5 2.5 0 004 19.5z"/></svg>
+                Change Course
+              </button>
+              {bulkCourseOpen && (
+                <div className="gv-popover">
+                  <label className="form-label" style={{ fontSize: '11px' }}>Change Course to</label>
+                  <select className="gv-filter-select" style={{ width: '100%' }} value={bulkCourseName} onChange={(e) => setBulkCourseName(e.target.value)}>
+                    {courses.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                  </select>
+                  <button className="gv-btn-primary gv-btn-sm" style={{ width: '100%', marginTop: '8px', justifyContent: 'center' }} onClick={executeBulkCourseUpdate}>Apply</button>
                 </div>
               )}
             </div>

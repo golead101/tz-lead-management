@@ -2,16 +2,184 @@ import React, { useState } from 'react';
 import { useCRM, normalizeLeadSource } from '../context/CRMContext';
 import DetailTimeline from './DetailTimeline';
 
+function MultiSelectFilter({ label, options, selectedValues, onChange, allLabel }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = React.useRef(null);
+
+  React.useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleToggleOption = (value) => {
+    if (value === 'All') {
+      onChange(['All']);
+    } else {
+      let newValues = selectedValues.filter(v => v !== 'All');
+      if (newValues.includes(value)) {
+        newValues = newValues.filter(v => v !== value);
+      } else {
+        newValues.push(value);
+      }
+      if (newValues.length === 0) {
+        newValues = ['All'];
+      }
+      onChange(newValues);
+    }
+  };
+
+  const isAllSelected = selectedValues.includes('All') || selectedValues.length === 0;
+
+  let labelText = allLabel;
+  if (!isAllSelected) {
+    if (selectedValues.length === 1) {
+      const opt = options.find(o => o.value === selectedValues[0]);
+      labelText = opt ? opt.label : selectedValues[0];
+    } else {
+      labelText = `${selectedValues.length} Selected`;
+    }
+  }
+
+  return (
+    <div ref={dropdownRef} style={{ position: 'relative' }}>
+      <div 
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          padding: '8px 30px 8px 12px',
+          borderRadius: '8px',
+          border: '1px solid #e2e8f0',
+          minWidth: '160px',
+          fontSize: '13px',
+          outline: 'none',
+          backgroundColor: '#fff',
+          cursor: 'pointer',
+          userSelect: 'none',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          color: '#1e293b',
+          fontWeight: '500',
+          boxSizing: 'border-box'
+        }}
+      >
+        <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '120px' }}>
+          {labelText}
+        </span>
+        <svg 
+          width="12" 
+          height="12" 
+          viewBox="0 0 24 24" 
+          fill="none" 
+          stroke="#6b7280" 
+          strokeWidth="2"
+          style={{ 
+            position: 'absolute',
+            right: '12px',
+            top: '50%',
+            transform: `translateY(-50%) ${isOpen ? 'rotate(180deg)' : ''}`,
+            transition: 'transform 0.15s ease',
+            pointerEvents: 'none'
+          }}
+        >
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </div>
+
+      {isOpen && (
+        <div 
+          className="gv-popover" 
+          style={{ 
+            left: 0, 
+            right: 'auto', 
+            width: '240px', 
+            maxHeight: '260px', 
+            overflowY: 'auto', 
+            padding: '8px', 
+            zIndex: 150, 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: '4px',
+            marginTop: '4px',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.1)'
+          }}
+        >
+          <label 
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px', 
+              padding: '6px 8px', 
+              borderRadius: '4px', 
+              cursor: 'pointer', 
+              fontSize: '12.5px',
+              fontWeight: isAllSelected ? '600' : 'normal',
+              background: isAllSelected ? '#f1f5f9' : 'transparent',
+              color: isAllSelected ? 'var(--primary)' : 'var(--text-primary)',
+              margin: 0
+            }}
+          >
+            <input 
+              type="checkbox" 
+              checked={isAllSelected}
+              onChange={() => handleToggleOption('All')}
+              style={{ accentColor: 'var(--primary)', cursor: 'pointer' }}
+            />
+            {allLabel}
+          </label>
+
+          <div style={{ height: '1px', background: '#e2e8f0', margin: '4px 0' }} />
+
+          {options.map((opt) => {
+            const isChecked = selectedValues.includes(opt.value);
+            return (
+              <label 
+                key={opt.value}
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '8px', 
+                  padding: '6px 8px', 
+                  borderRadius: '4px', 
+                  cursor: 'pointer', 
+                  fontSize: '12.5px',
+                  fontWeight: isChecked ? '600' : 'normal',
+                  background: isChecked ? '#eff6ff' : 'transparent',
+                  color: isChecked ? 'var(--primary)' : 'var(--text-primary)',
+                  margin: 0
+                }}
+              >
+                <input 
+                  type="checkbox" 
+                  checked={isChecked}
+                  onChange={() => handleToggleOption(opt.value)}
+                  style={{ accentColor: 'var(--primary)', cursor: 'pointer' }}
+                />
+                {opt.label}
+              </label>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 export default function FollowUps() {
   const { leads, activeRole, activeUser, selectedLeadId, setSelectedLeadId, setActiveView, showDetailModal, setShowDetailModal, logCall, pipelineStages, courses, counselors } = useCRM();
   const [activeTab, setActiveTab] = useState('overdue'); // Default to overdue as in the mockup
 
-  // New filtering state
+  // New filtering state (supporting multi-select)
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterCourse, setFilterCourse] = useState('');
-  const [filterStage, setFilterStage] = useState('');
-  const [filterSource, setFilterSource] = useState('');
-  const [filterCounselor, setFilterCounselor] = useState('');
+  const [filterCourse, setFilterCourse] = useState(['All']);
+  const [filterStage, setFilterStage] = useState(['All']);
+  const [filterSource, setFilterSource] = useState(['All']);
+  const [filterCounselor, setFilterCounselor] = useState(['All']);
 
   const [modalStep, setModalStep] = useState(1); // 1 = simple contact view, 2 = call outcome form
   const [callStatus, setCallStatus] = useState('');
@@ -117,20 +285,43 @@ export default function FollowUps() {
     const q = searchQuery.toLowerCase();
     followUpLeads = followUpLeads.filter(l => l.name?.toLowerCase().includes(q) || l.phone?.includes(q));
   }
-  if (filterCourse) {
-    followUpLeads = followUpLeads.filter(l => 
-      l.course === filterCourse || 
-      (l.course || '').toLowerCase().includes(filterCourse.toLowerCase())
-    );
+  if (filterCourse && filterCourse.length > 0 && !filterCourse.includes('All')) {
+    followUpLeads = followUpLeads.filter(l => {
+      const leadC = (l.course || '').trim().toLowerCase();
+      return filterCourse.some(val => {
+        const filterC = val.trim().toLowerCase();
+        return leadC === filterC || leadC.includes(filterC) || filterC.includes(leadC);
+      });
+    });
   }
-  if (filterStage) {
-    followUpLeads = followUpLeads.filter(l => l.stage === filterStage);
+  if (filterStage && filterStage.length > 0 && !filterStage.includes('All')) {
+    followUpLeads = followUpLeads.filter(l => {
+      const leadS = (l.stage || '').trim().toLowerCase();
+      return filterStage.some(val => {
+        const filterS = val.trim().toLowerCase();
+        return leadS === filterS;
+      });
+    });
   }
-  if (filterSource) {
-    followUpLeads = followUpLeads.filter(l => normalizeLeadSource(l.source) === filterSource);
+  if (filterSource && filterSource.length > 0 && !filterSource.includes('All')) {
+    followUpLeads = followUpLeads.filter(l => {
+      const leadSrc = normalizeLeadSource(l.source);
+      return filterSource.includes(leadSrc);
+    });
   }
-  if (filterCounselor && activeRole !== 'Counselor') {
-    followUpLeads = followUpLeads.filter(l => l.counselor === filterCounselor);
+  if (filterCounselor && filterCounselor.length > 0 && !filterCounselor.includes('All') && activeRole !== 'Counselor') {
+    followUpLeads = followUpLeads.filter(l => {
+      const leadCoun = l.counselor || 'Unassigned';
+      const counLower = leadCoun.trim().toLowerCase();
+      const isLeadUnassigned = counLower === '' || counLower === 'unassigned' || counLower === 'none';
+
+      return filterCounselor.some(val => {
+        if (val === 'Unassigned') {
+          return isLeadUnassigned;
+        }
+        return l.counselor === val;
+      });
+    });
   }
 
   // Group into overdue and upcoming
@@ -210,50 +401,38 @@ export default function FollowUps() {
           onChange={(e) => setSearchQuery(e.target.value)}
           style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', minWidth: '220px', fontSize: '13px', outline: 'none' }}
         />
-        <select 
-          value={filterCourse} 
-          onChange={(e) => setFilterCourse(e.target.value)}
-          style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', minWidth: '160px', fontSize: '13px', outline: 'none', backgroundColor: '#fff' }}
-        >
-          <option value="">All Courses</option>
-          {(courses || []).map(c => (
-            <option key={c.id || c.name} value={c.name}>{c.name}</option>
-          ))}
-        </select>
-        <select 
-          value={filterStage} 
-          onChange={(e) => setFilterStage(e.target.value)}
-          style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', minWidth: '160px', fontSize: '13px', outline: 'none', backgroundColor: '#fff' }}
-        >
-          <option value="">All Stages</option>
-          {pipelineStages.map(stage => (
-            <option key={stage.id} value={stage.name}>{stage.name}</option>
-          ))}
-        </select>
-        <select 
-          value={filterSource} 
-          onChange={(e) => setFilterSource(e.target.value)}
-          style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', minWidth: '160px', fontSize: '13px', outline: 'none', backgroundColor: '#fff' }}
-        >
-          <option value="">All Sources</option>
-          {Array.from(new Set(leads.map(l => normalizeLeadSource(l.source)).filter(Boolean))).map(source => (
-            <option key={source} value={source}>{source}</option>
-          ))}
-        </select>
+        <MultiSelectFilter
+          options={(courses || []).map(c => ({ value: c.name, label: c.name }))}
+          selectedValues={filterCourse}
+          onChange={setFilterCourse}
+          allLabel="All Courses"
+        />
+
+        <MultiSelectFilter
+          options={pipelineStages.map(s => ({ value: s.name, label: s.name }))}
+          selectedValues={filterStage}
+          onChange={setFilterStage}
+          allLabel="All Stages"
+        />
+
+        <MultiSelectFilter
+          options={Array.from(new Set(leads.map(l => normalizeLeadSource(l.source)).filter(Boolean))).map(source => ({ value: source, label: source }))}
+          selectedValues={filterSource}
+          onChange={setFilterSource}
+          allLabel="All Sources"
+        />
+
         {activeRole !== 'Counselor' && (
-          <select 
-            value={filterCounselor} 
-            onChange={(e) => setFilterCounselor(e.target.value)}
-            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', minWidth: '160px', fontSize: '13px', outline: 'none', backgroundColor: '#fff' }}
-          >
-            <option value="">All Counselors</option>
-            {Array.from(new Set([
+          <MultiSelectFilter
+            options={Array.from(new Set([
+              'Unassigned',
               ...(counselors || []).filter(c => c.status === 'Active' && c.role !== 'Admin' && c.name.toLowerCase() !== 'admin').map(c => c.name),
               ...leads.map(l => l.counselor).filter(Boolean)
-            ])).map(counselor => (
-              <option key={counselor} value={counselor}>{counselor}</option>
-            ))}
-          </select>
+            ])).map(counselor => ({ value: counselor, label: counselor }))}
+            selectedValues={filterCounselor}
+            onChange={setFilterCounselor}
+            allLabel="All Counselors"
+          />
         )}
       </div>
 
