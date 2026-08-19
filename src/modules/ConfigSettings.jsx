@@ -122,7 +122,8 @@ export default function ConfigSettings() {
     removeCounselor,
     updateCounselorStatus,
     changeBrandingColors,
-    activeRole
+    activeRole,
+    activeUser
   } = useCRM();
 
   // Switch tabs
@@ -1222,7 +1223,7 @@ export default function ConfigSettings() {
                         </div>
                       </div>
                       
-                      {activeRole === 'Admin' && c.role !== 'Admin' && (
+                      {activeRole === 'Admin' && c.name !== activeUser && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                           <label className="status-toggle-switch" style={{ position: 'relative', display: 'inline-block', width: '36px', height: '20px', margin: 0 }}>
                             <input 
@@ -1322,6 +1323,7 @@ export default function ConfigSettings() {
                       value={cRole}
                       onChange={(e) => setCRole(e.target.value)}
                     >
+                      <option value="Admin">Admin</option>
                       <option value="Counselor">Counselor</option>
                       <option value="Telecaller">Telecaller</option>
                     </select>
