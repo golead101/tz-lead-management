@@ -11,7 +11,7 @@ export const normalizeLeadSource = (rawSource) => {
   if (!trimmed) return '';
   const lower = trimmed.toLowerCase();
 
-  if (lower === 'meta' || lower === 'meta ads' || lower === 'facebook' || lower === 'facebook ads' || lower === 'meta-ads') {
+  if (lower === 'meta' || lower === 'meta ads' || lower === 'facebook' || lower === 'facebook ads' || lower === 'meta-ads' || lower === 'fb' || lower === 'fb_ads' || lower === 'meta_ads' || lower === 'facebook_ads') {
     return 'Meta Ads';
   }
   if (lower === 'walk-in' || lower === 'walkin' || lower === 'walk in' || lower === 'qr code walk-in' || lower === 'qr code' || lower === 'qr-code-walkin') {

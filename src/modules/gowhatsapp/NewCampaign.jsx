@@ -320,7 +320,7 @@ export default function NewCampaign({ setSubView }) {
     return getBaseLeads().filter(lead => {
       const leadCourse = (lead.course || '').trim().toLowerCase();
       const filterCourse = (campaignCourseFilter || '').trim().toLowerCase();
-      const matchCourse = filterCourse ? leadCourse === filterCourse : true;
+      const matchCourse = filterCourse ? (leadCourse === filterCourse || leadCourse.includes(filterCourse) || filterCourse.includes(leadCourse)) : true;
       const matchStage = campaignStageFilters.length > 0 ? campaignStageFilters.includes(lead.stage) : true;
       
       const leadNormSource = normalizeLeadSource(lead.source);
@@ -713,11 +713,8 @@ export default function NewCampaign({ setSubView }) {
     }
 
     let targetContacts = [];
-    if (selectedListId === 'crm-leads-all') {
+    if (selectedListId) {
       targetContacts = getFilteredLeads();
-    } else if (selectedListId) {
-      const allContacts = whatsappDb.getContacts();
-      targetContacts = allContacts[selectedListId] || [];
     } else {
       targetContacts = uploadedContacts;
     }
@@ -780,11 +777,8 @@ export default function NewCampaign({ setSubView }) {
 
     setSending(true);
     let targetContacts = [];
-    if (selectedListId === 'crm-leads-all') {
+    if (selectedListId) {
       targetContacts = getFilteredLeads();
-    } else if (selectedListId) {
-      const allContacts = whatsappDb.getContacts();
-      targetContacts = allContacts[selectedListId] || [];
     } else {
       targetContacts = uploadedContacts;
     }
