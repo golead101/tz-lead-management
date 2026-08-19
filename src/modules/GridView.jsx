@@ -303,6 +303,7 @@ export default function GridView() {
         }
         if (sourceOption === 'google') return srcLower.includes('google');
         if (sourceOption === 'whatsapp') return srcLower.includes('whatsapp');
+        if (sourceOption === 'instagram') return srcLower.includes('instagram');
         if (sourceOption === 'website') return srcLower.includes('website');
         if (sourceOption === 'call') return srcLower.includes('call') || srcLower.includes('phone');
         if (sourceOption === 'walkin') return srcLower.includes('walk-in') || srcLower.includes('walkin');
@@ -310,10 +311,11 @@ export default function GridView() {
           const isMeta = srcLower.includes('meta');
           const isGoogle = srcLower.includes('google');
           const isWhatsapp = srcLower.includes('whatsapp');
+          const isInstagram = srcLower.includes('instagram');
           const isWebsite = srcLower.includes('website');
           const isCall = srcLower.includes('call') || srcLower.includes('phone');
           const isWalkin = srcLower.includes('walk-in') || srcLower.includes('walkin');
-          return !(isMeta || isGoogle || isWhatsapp || isWebsite || isCall || isWalkin);
+          return !(isMeta || isGoogle || isWhatsapp || isInstagram || isWebsite || isCall || isWalkin);
         }
         return false;
       };
@@ -1028,6 +1030,7 @@ export default function GridView() {
             { value: 'meta', label: 'Meta' },
             { value: 'google', label: 'Google' },
             { value: 'whatsapp', label: 'WhatsApp' },
+            { value: 'instagram', label: 'Instagram' },
             { value: 'website', label: 'Website' },
             { value: 'call', label: 'Call' },
             { value: 'walkin', label: 'Walk-in' },
@@ -1315,7 +1318,9 @@ export default function GridView() {
                       {/* Student */}
                       <td>
                         {(() => {
-                          const displayName = (lead.name && lead.name !== 'Campaign Contact' && lead.name !== 'WhatsApp Student') ? lead.name : (lead.phone || 'Lead');
+                          const displayName = (lead.source === 'Instagram' && lead.name?.startsWith('Instagram User') && lead.instagramUsername)
+                            ? lead.instagramUsername
+                            : ((lead.name && lead.name !== 'Campaign Contact' && lead.name !== 'WhatsApp Student') ? lead.name : (lead.phone || 'Lead'));
                           const charCode = displayName.charCodeAt(0) || 65;
                           return (
                             <div className="gv-student-cell">

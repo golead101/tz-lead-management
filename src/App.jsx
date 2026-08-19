@@ -11,6 +11,7 @@ import DetailTimeline from './modules/DetailTimeline';
 import Analytics from './modules/Analytics';
 import BasicReports from './modules/BasicReports';
 import GoWhatsApp from './modules/gowhatsapp/GoWhatsApp';
+import InstagramInbox from './modules/instagram/InstagramInbox';
 import Sandbox from './modules/Sandbox';
 import ConfigSettings from './modules/ConfigSettings';
 import Integrations from './modules/Integrations';
@@ -97,6 +98,8 @@ function MainAppContent() {
         return <FollowUps />;
       case 'gowhatsapp':
         return <GoWhatsApp />;
+      case 'instagram-inbox':
+        return <InstagramInbox />;
       case 'analytics':
         return <Analytics />;
       case 'basic-reports':
@@ -149,11 +152,11 @@ function MainAppContent() {
       <Sidebar mobileMenuOpen={mobileMenuOpen} setMobileMenuOpen={setMobileMenuOpen} />
 
       {/* Core main dashboard panel */}
-      <div className="main-wrapper" style={activeView === 'gowhatsapp' ? { padding: 0 } : {}}>
-        {activeView !== 'gowhatsapp' && <Topbar />}
+      <div className="main-wrapper" style={['gowhatsapp', 'instagram-inbox'].includes(activeView) ? { padding: 0 } : {}}>
+        {!['gowhatsapp', 'instagram-inbox'].includes(activeView) && <Topbar />}
         {/* Responsive Scrolling Canvas */}
-        <main className="content-area" style={activeView === 'gowhatsapp' ? { padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' } : {}}>
-          <div className="fade-in" style={activeView === 'gowhatsapp' ? { height: '100%', display: 'flex', flexDirection: 'column', flex: 1 } : {}}>
+        <main className="content-area" style={['gowhatsapp', 'instagram-inbox'].includes(activeView) ? { padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' } : {}}>
+          <div className="fade-in" style={['gowhatsapp', 'instagram-inbox'].includes(activeView) ? { height: '100%', display: 'flex', flexDirection: 'column', flex: 1 } : {}}>
             {renderView()}
           </div>
         </main>

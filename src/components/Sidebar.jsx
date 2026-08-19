@@ -47,7 +47,7 @@ export default function Sidebar({ mobileMenuOpen, setMobileMenuOpen }) {
     const nextState = !isLeadsExpanded;
     setIsLeadsExpanded(nextState);
     sessionStorage.setItem('leads_expanded', nextState ? 'true' : 'false');
-    if (nextState && !['grid', 'followups'].includes(activeView)) {
+    if (nextState && !['grid', 'followups', 'history'].includes(activeView)) {
       setActiveView('grid');
     }
   };
@@ -141,9 +141,21 @@ export default function Sidebar({ mobileMenuOpen, setMobileMenuOpen }) {
       )
     },
     {
+      id: 'instagram-inbox',
+      target: 'instagram-inbox',
+      label: 'Instagram Inbox',
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+          <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+          <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+        </svg>
+      )
+    },
+    {
       id: 'history',
       target: 'history',
-      label: 'Activity History',
+      label: 'History',
       icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
@@ -169,12 +181,13 @@ export default function Sidebar({ mobileMenuOpen, setMobileMenuOpen }) {
   // Helper to check active state based on current context view
   const isItemActive = (item) => {
     if (item.id === 'dashboard') return activeView === 'dashboard';
-    if (item.id === 'leads') return activeView === 'grid' || activeView === 'detail' || activeView === 'followups';
+    if (item.id === 'leads') return activeView === 'grid' || activeView === 'detail';
     if (item.id === 'followups') return activeView === 'followups';
     if (item.id === 'integrations') return activeView === 'integrations';
     if (item.id === 'reports') return activeView === 'analytics' || activeView === 'basic-reports';
     if (item.id === 'automation') return activeView === 'whatsapp';
     if (item.id === 'history') return activeView === 'history';
+    if (item.id === 'instagram-inbox') return activeView === 'instagram-inbox';
     if (item.id === 'settings') return activeView === 'settings';
     return activeView === item.target;
   };
@@ -251,17 +264,17 @@ export default function Sidebar({ mobileMenuOpen, setMobileMenuOpen }) {
           if ((activeRole === 'Manager' || activeRole === 'Telecaller') && (item.id === 'settings' || item.id === 'reports' || item.id === 'integrations')) {
             return null;
           }
-          if (activeRole === 'Telecaller' && (item.id === 'automation' || item.id === 'gowhatsapp' || item.id === 'history')) {
+          if (activeRole === 'Telecaller' && (item.id === 'automation' || item.id === 'gowhatsapp' || item.id === 'instagram-inbox' || item.id === 'history')) {
             return null;
           }
 
           // Hide these as they are now sub-items of Leads
-          if (item.id === 'followups') {
+          if (item.id === 'followups' || item.id === 'history') {
             return null;
           }
 
           if (item.id === 'leads') {
-            const isActive = ['grid', 'followups'].includes(activeView);
+            const isActive = ['grid', 'followups', 'history'].includes(activeView);
             return (
               <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <button
@@ -296,8 +309,12 @@ export default function Sidebar({ mobileMenuOpen, setMobileMenuOpen }) {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '14px', borderLeft: '1px dashed rgba(255, 255, 255, 0.15)', marginLeft: '24px', marginTop: '2px', marginBottom: '6px' }}>
                     {[
                       { subTarget: 'grid', label: 'Total Leads' },
-                      { subTarget: 'followups', label: 'Follow-ups' }
+                      { subTarget: 'followups', label: 'Follow-ups' },
+                      { subTarget: 'history', label: 'Activity History' }
                     ].map(sub => {
+                      if (sub.subTarget === 'history') {
+                        if (activeRole === 'Telecaller') return null;
+                      }
 
                       const isSubActive = activeView === sub.subTarget;
                       return (

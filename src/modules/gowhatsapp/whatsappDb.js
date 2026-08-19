@@ -182,6 +182,13 @@ export function initWhatsappDb() {
   if (!localStorage.getItem('gowha_api_status')) {
     localStorage.setItem('gowha_api_status', JSON.stringify(SEED_API_STATUS));
   }
+  if (!localStorage.getItem('instagram_chatbot')) {
+    localStorage.setItem('instagram_chatbot', JSON.stringify({
+      enabled: false,
+      customReplies: [],
+      mediaFiles: []
+    }));
+  }
   if (!localStorage.getItem('gowha_conversations')) {
     localStorage.setItem('gowha_conversations', JSON.stringify(SEED_CONVERSATIONS));
   }
@@ -198,6 +205,13 @@ export function initWhatsappDb() {
     onSnapshot(doc(db, 'settings', 'whatsapp_chatbot'), (snapshot) => {
       if (snapshot.exists()) {
         localStorage.setItem('gowha_chatbot', JSON.stringify(snapshot.data()));
+      }
+    });
+
+    // Listen to Instagram Chatbot Settings
+    onSnapshot(doc(db, 'settings', 'instagram_chatbot'), (snapshot) => {
+      if (snapshot.exists()) {
+        localStorage.setItem('instagram_chatbot', JSON.stringify(snapshot.data()));
       }
     });
 
@@ -594,6 +608,14 @@ export const whatsappDb = {
   saveChatbotSettings: (settings) => {
     localStorage.setItem('gowha_chatbot', JSON.stringify(settings));
     setDoc(doc(db, 'settings', 'whatsapp_chatbot'), settings).catch(console.error);
+  },
+  getInstagramChatbotSettings: () => {
+    initWhatsappDb();
+    return JSON.parse(localStorage.getItem('instagram_chatbot') || '{}');
+  },
+  saveInstagramChatbotSettings: (settings) => {
+    localStorage.setItem('instagram_chatbot', JSON.stringify(settings));
+    setDoc(doc(db, 'settings', 'instagram_chatbot'), settings).catch(console.error);
   },
   getApiStatus: () => {
     initWhatsappDb();

@@ -4,7 +4,7 @@ import { db } from '../firebase';
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 
 export default function Integrations() {
-  const { leads, courses, integrations, updateIntegration, addLead, showToastMsg, setActiveView } = useCRM();
+  const { leads, integrations, updateIntegration, addLead, showToastMsg, setActiveView } = useCRM();
 
   const getCapturedCount = (platform) => {
     let sourceNames = [];
@@ -12,6 +12,7 @@ export default function Integrations() {
     else if (platform === 'google') sourceNames = ['Google Search', 'Google Ads', 'Google'];
     else if (platform === 'whatsapp') sourceNames = ['WhatsApp Inbound', 'WhatsApp'];
     else if (platform === 'webhooks') sourceNames = ['Website Form', 'Website'];
+    else if (platform === 'instagram') sourceNames = ['Instagram Direct', 'Instagram'];
 
     return leads.filter(l => sourceNames.includes(l.source)).length;
   };
@@ -23,6 +24,7 @@ export default function Integrations() {
   const [metaFields, setMetaFields] = useState({ appId: '', appSecret: '', webhookVerifyToken: '', verifyToken: '', redirectUri: '' });
   const [googleFields, setGoogleFields] = useState({ developerToken: '', customerId: '', managerCustomerId: '', clientId: '', clientSecret: '', refreshToken: '', webhookPasskey: '' });
   const [whatsappFields, setWhatsAppFields] = useState({ phoneNumberId: '', businessAccountId: '', systemToken: '', accessToken: '', apiVersion: 'v20.0', webhookVerifyToken: '' });
+  const [instagramFields, setInstagramFields] = useState({ instagramAccountId: '', pageId: '', accessToken: '', webhookVerifyToken: '', apiVersion: 'v20.0', enabled: false });
 
   // Google Ads API connection and sync statuses
   const [isValidating, setIsValidating] = useState(false);
@@ -65,6 +67,15 @@ export default function Integrations() {
       setWebhookFields({
         securitySecret: integrations.webhooks.securitySecret || '',
         webhookUrlSlug: integrations.webhooks.webhookUrlSlug || ''
+      });
+    } else if (selectedPlatform === 'instagram') {
+      setInstagramFields({
+        instagramAccountId: integrations.instagram?.instagramAccountId || '',
+        pageId: integrations.instagram?.pageId || '',
+        accessToken: integrations.instagram?.accessToken ? '••••••••••••••••' : '',
+        webhookVerifyToken: integrations.instagram?.webhookVerifyToken ? '••••••••••••••••' : '',
+        apiVersion: integrations.instagram?.apiVersion || 'v20.0',
+        enabled: integrations.instagram?.enabled || false
       });
     }
   }, [selectedPlatform, integrations]);
@@ -305,6 +316,45 @@ export default function Integrations() {
     } else if (selectedPlatform === 'webhooks') {
       fieldsToSave = { ...webhookFields };
       if (!webhookFields.securitySecret) activeStatus = 'Setup Required';
+    } else if (selectedPlatform === 'instagram') {
+      const trimmedAccountId = instagramFields.instagramAccountId.trim();
+      const trimmedPageId = instagramFields.pageId.trim();
+
+      // Resolve the access token:
+      // - If the field still shows the masked placeholder → user did not touch it → keep existing saved value.
+      // - If the field is empty AND a token is already saved → user accidentally cleared it → keep existing saved value.
+      // - If the field contains a new non-empty, non-placeholder string → user typed a new token → use the new value.
+      const existingToken = integrations.instagram?.accessToken || '';
+      let actualToken = instagramFields.accessToken.trim();
+      if (actualToken === '••••••••••••••••' || (actualToken === '' && existingToken !== '')) {
+        // Unchanged — restore the existing (encrypted) ciphertext from state.
+        actualToken = existingToken;
+      }
+      // If actualToken is still '' at this point the user intentionally left it blank (no prior token saved).
+
+      // Same logic for webhookVerifyToken.
+      const existingWebhookToken = integrations.instagram?.webhookVerifyToken || '';
+      let actualWebhookToken = instagramFields.webhookVerifyToken.trim();
+      if (actualWebhookToken === '••••••••••••••••' || (actualWebhookToken === '' && existingWebhookToken !== '')) {
+        actualWebhookToken = existingWebhookToken;
+      }
+
+      const hasAllRequired = !!(trimmedAccountId && trimmedPageId && actualToken && actualWebhookToken);
+      const finalStatus = hasAllRequired ? 'Connected' : 'Setup Required';
+
+      updateIntegration('instagram', {
+        instagramAccountId: trimmedAccountId,
+        pageId: trimmedPageId,
+        accessToken: actualToken,
+        webhookVerifyToken: actualWebhookToken,
+        apiVersion: instagramFields.apiVersion.trim() || 'v20.0',
+        enabled: instagramFields.enabled,
+        status: finalStatus
+      }, true);
+
+      showToastMsg('Instagram configuration saved successfully.');
+      setSelectedPlatform(null);
+      return;
     }
 
     const isSetupValid = activeStatus === 'Connected';
@@ -515,7 +565,7 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
           email: fields.email || '',
           phone: fields.phone_number || '',
           source: 'Meta Ads',
-          course: (courses && courses[0]?.name) || 'Course Inquiry',
+          course: 'Full-Stack Web Development',
           createdDate: new Date().toISOString(),
           stage: 'New Lead',
           timeline: [{
@@ -785,6 +835,71 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
           </div>
         </div>
 
+        {/* Instagram Business Card */}
+        <div className="db-source-card integrations-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', height: '100%', minHeight: '230px', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <div className="db-source-icon-wrap instagram" style={{ width: '42px', height: '42px', color: '#E1306C', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+                  <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.051.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z" />
+                </svg>
+              </div>
+            </div>
+
+            <h3 style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '6px' }}>Instagram Business</h3>
+            <p style={{ fontSize: '11.5px', color: 'var(--text-muted)', lineHeight: '1.4', marginBottom: '12px' }}>
+              Connect your Instagram Business account to receive Instagram DMs, manage conversations, and enable automated replies.
+            </p>
+          </div>
+
+          <div>
+            {/* Instagram status pill */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
+              <span className="db-source-badge" style={{
+                background: (integrations.instagram?.enabled && integrations.instagram?.pageId && integrations.instagram?.instagramAccountId && integrations.instagram?.accessToken && integrations.instagram?.webhookVerifyToken) ? 'rgba(16,185,129,0.08)' : 'rgba(249,115,22,0.08)',
+                color: (integrations.instagram?.enabled && integrations.instagram?.pageId && integrations.instagram?.instagramAccountId && integrations.instagram?.accessToken && integrations.instagram?.webhookVerifyToken) ? '#10b981' : '#f97316',
+                fontSize: '10px',
+                padding: '2px 8px',
+                borderRadius: '6px',
+                fontWeight: '700'
+              }}>
+                {(integrations.instagram?.enabled && integrations.instagram?.pageId && integrations.instagram?.instagramAccountId && integrations.instagram?.accessToken && integrations.instagram?.webhookVerifyToken) ? 'Connected' : 'Setup Required'}
+              </span>
+
+              <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>
+                {getCapturedCount('instagram').toLocaleString()} leads captured
+              </span>
+            </div>
+
+            {/* Masked Account ID if configured */}
+            {integrations.instagram?.instagramAccountId && (
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600', marginTop: '10px', textAlign: 'left' }}>
+                Instagram Account: {(() => {
+                  const id = integrations.instagram.instagramAccountId.trim();
+                  if (id.length <= 8) return id;
+                  return `${id.slice(0, 4)}••••${id.slice(-4)}`;
+                })()}
+              </div>
+            )}
+
+            <button
+              className="primary-btn w-full mt-3"
+              onClick={() => setSelectedPlatform('instagram')}
+              style={{
+                height: '32px',
+                fontSize: '11px',
+                fontWeight: '700',
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid var(--border-color)',
+                color: 'var(--text-primary)',
+                cursor: 'pointer'
+              }}
+            >
+              {(integrations.instagram?.enabled && integrations.instagram?.pageId && integrations.instagram?.instagramAccountId && integrations.instagram?.accessToken && integrations.instagram?.webhookVerifyToken) ? 'Manage Instagram' : 'Configure Instagram'}
+            </button>
+          </div>
+        </div>
+
       </div>
 
       {/* Sleek Centered Configuration Modal Panel (Production-Grade UI) */}
@@ -813,6 +928,7 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                   {selectedPlatform === 'google' && 'Google Ads Connector'}
                   {selectedPlatform === 'whatsapp' && 'WhatsApp API Credentials'}
                   {selectedPlatform === 'webhooks' && 'Webhooks & HTML Form Embeds'}
+                  {selectedPlatform === 'instagram' && 'Instagram Business Credentials'}
                 </h3>
                 <button
                   onClick={() => setSelectedPlatform(null)}
@@ -842,10 +958,11 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                 {selectedPlatform === 'google' && 'Fetch inquiries straight from Google Ads Search Form assets. Provide developer details to establish secure server-to-server mappings.'}
                 {selectedPlatform === 'whatsapp' && 'Map official Cloud API tokens to send automated welcome messages and map counselor outbound threads.'}
                 {selectedPlatform === 'webhooks' && 'Paste lightweight Javascript interceptors into Wix/WordPress forms, or copy pre-styled responsive widget HTML containers.'}
+                {selectedPlatform === 'instagram' && 'Connect your Instagram Business account to handle customer DMs, automated welcome flows, and custom integrations.'}
               </p>
 
               {/* Dynamic Interactive Config Forms */}
-              <form onSubmit={handleSaveConfig} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <form onSubmit={handleSaveConfig} autoComplete="off" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
                 {/* Meta Configuration Fields */}
                 {selectedPlatform === 'meta' && (
@@ -867,6 +984,7 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                       <input
                         type="password"
                         required
+                        autoComplete="new-password"
                         className="form-control"
                         style={{ height: '36px', fontSize: '12px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)' }}
                         placeholder="••••••••••••••••"
@@ -891,6 +1009,7 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                       <input
                         type="password"
                         required
+                        autoComplete="new-password"
                         className="form-control"
                         style={{ height: '36px', fontSize: '12px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)' }}
                         placeholder="••••••••••••••••"
@@ -1001,6 +1120,7 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                       <input
                         type="password"
                         required
+                        autoComplete="new-password"
                         className="form-control"
                         style={{ height: '36px', fontSize: '12px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)' }}
                         placeholder="••••••••••••••••••••"
@@ -1026,6 +1146,7 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                         <input
                           type="password"
                           required
+                          autoComplete="new-password"
                           className="form-control"
                           style={{ height: '36px', fontSize: '11px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)' }}
                           placeholder="client-secret"
@@ -1039,6 +1160,7 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                       <input
                         type="password"
                         required
+                        autoComplete="new-password"
                         className="form-control"
                         style={{ height: '36px', fontSize: '11px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)' }}
                         placeholder="OAuth 2.0 Refresh Token"
@@ -1275,6 +1397,111 @@ exports.metaWebhookHandler = functions.https.onRequest(async (req, res) => {
                         value={webhookFields.webhookUrlSlug}
                         onChange={(e) => setWebhookFields({ ...webhookFields, webhookUrlSlug: e.target.value })}
                       />
+                    </div>
+                  </>
+                )}
+
+                {/* Instagram Configuration Fields */}
+                {selectedPlatform === 'instagram' && (
+                  <>
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>Instagram Account ID</label>
+                      <input
+                        type="text"
+                        required
+                        className="form-control"
+                        style={{ height: '36px', fontSize: '12px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)' }}
+                        placeholder="e.g. 17841451155289766"
+                        value={instagramFields.instagramAccountId}
+                        onChange={(e) => setInstagramFields({ ...instagramFields, instagramAccountId: e.target.value })}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>Facebook Page ID</label>
+                      <input
+                        type="text"
+                        required
+                        className="form-control"
+                        style={{ height: '36px', fontSize: '12px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)' }}
+                        placeholder="e.g. 123456789012345"
+                        value={instagramFields.pageId}
+                        onChange={(e) => setInstagramFields({ ...instagramFields, pageId: e.target.value })}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>Instagram Access Token</label>
+                      <input
+                        type="password"
+                        required
+                        autoComplete="new-password"
+                        className="form-control"
+                        style={{ height: '36px', fontSize: '12px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)' }}
+                        placeholder="••••••••••••••••"
+                        value={instagramFields.accessToken}
+                        onChange={(e) => setInstagramFields({ ...instagramFields, accessToken: e.target.value })}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>Webhook Verify Token</label>
+                      <input
+                        type="password"
+                        required
+                        autoComplete="new-password"
+                        className="form-control"
+                        style={{ height: '36px', fontSize: '12px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)' }}
+                        placeholder="••••••••••••••••"
+                        value={instagramFields.webhookVerifyToken}
+                        onChange={(e) => setInstagramFields({ ...instagramFields, webhookVerifyToken: e.target.value })}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>Meta API Version</label>
+                      <input
+                        type="text"
+                        required
+                        className="form-control"
+                        style={{ height: '36px', fontSize: '12px', background: 'rgba(0,0,0,0.02)', borderColor: 'var(--border-color)' }}
+                        placeholder="v20.0"
+                        value={instagramFields.apiVersion}
+                        onChange={(e) => setInstagramFields({ ...instagramFields, apiVersion: e.target.value })}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px', padding: '12px 14px', borderRadius: '6px', background: 'rgba(0,0,0,0.015)', border: '1px solid var(--border-color)' }}>
+                      <div>
+                        <label className="form-label" style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-primary)', margin: 0 }}>Enable Instagram Integration</label>
+                        <span style={{ display: 'block', fontSize: '10px', color: 'var(--text-muted)' }}>Allow receiving and replying to DMs from the CRM</span>
+                      </div>
+                      <label className="status-toggle-switch" style={{ position: 'relative', display: 'inline-block', width: '36px', height: '20px', margin: 0 }}>
+                        <input 
+                          type="checkbox" 
+                          checked={instagramFields.enabled} 
+                          onChange={(e) => setInstagramFields({ ...instagramFields, enabled: e.target.checked })}
+                          style={{ opacity: 0, width: 0, height: 0 }}
+                        />
+                        <span className="status-toggle-slider" style={{
+                          position: 'absolute',
+                          cursor: 'pointer',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          backgroundColor: instagramFields.enabled ? 'var(--primary, #2F6BFF)' : '#cbd5e1',
+                          transition: '0.3s',
+                          borderRadius: '20px'
+                        }}>
+                          <span className="status-toggle-knob" style={{
+                            position: 'absolute',
+                            height: '14px',
+                            width: '14px',
+                            left: instagramFields.enabled ? '18px' : '4px',
+                            bottom: '3px',
+                            backgroundColor: 'white',
+                            transition: '0.3s',
+                            borderRadius: '50%'
+                          }}></span>
+                        </span>
+                      </label>
                     </div>
                   </>
                 )}

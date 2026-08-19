@@ -290,7 +290,6 @@ exports.googleAdsWebhook = functions.https.onRequest(async (req, res) => {
       stage: 'New Lead',
       counselor: 'Unassigned',
       createdDate: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
       lastContacted: new Date().toISOString(),
       customFields: {
         campaignId: campaignId,
@@ -451,7 +450,6 @@ exports.googleAdsSync = functions.https.onRequest((req, res) => {
           stage: 'New Lead',
           counselor: 'Unassigned',
           createdDate: submissionTime,
-          createdAt: submissionTime,
           lastContacted: new Date().toISOString(),
           customFields: {
             campaign: campaign,
@@ -566,13 +564,9 @@ exports.encryptMetaCredentials = functions.firestore
   .onWrite(async (change, context) => {
     if (!change.after.exists) return null;
     const data = change.after.data();
-    const meta = data.meta;
-    if (!meta) return null;
 
     let needsUpdate = false;
-    const updatedMeta = { ...meta };
-
-    const sensitiveFields = ['appSecret', 'verifyToken'];
+    const updatePayload = {};
 
     const isEncrypted = (val) => {
       if (!val) return true; // empty is fine
@@ -582,17 +576,51 @@ exports.encryptMetaCredentials = functions.firestore
       return iv.length === 32 && /^[0-9a-fA-F]+$/.test(iv) && /^[0-9a-fA-F]+$/.test(cipher);
     };
 
-    sensitiveFields.forEach(field => {
-      const val = meta[field];
-      if (val && !isEncrypted(val)) {
-        updatedMeta[field] = cryptoHelper.encrypt(val);
+    // 1. Process Meta credentials if they exist
+    const meta = data.meta;
+    if (meta) {
+      const updatedMeta = { ...meta };
+      const sensitiveMetaFields = ['appSecret', 'verifyToken'];
+      let metaNeedsUpdate = false;
+
+      sensitiveMetaFields.forEach(field => {
+        const val = meta[field];
+        if (val && !isEncrypted(val)) {
+          updatedMeta[field] = cryptoHelper.encrypt(val);
+          metaNeedsUpdate = true;
+        }
+      });
+
+      if (metaNeedsUpdate) {
+        updatePayload.meta = updatedMeta;
         needsUpdate = true;
       }
-    });
+    }
+
+    // 2. Process Instagram credentials if they exist
+    const instagram = data.instagram;
+    if (instagram) {
+      const updatedInstagram = { ...instagram };
+      const sensitiveInstagramFields = ['accessToken'];
+      let instagramNeedsUpdate = false;
+
+      sensitiveInstagramFields.forEach(field => {
+        const val = instagram[field];
+        if (val && !isEncrypted(val)) {
+          updatedInstagram[field] = cryptoHelper.encrypt(val);
+          instagramNeedsUpdate = true;
+        }
+      });
+
+      if (instagramNeedsUpdate) {
+        updatePayload.instagram = updatedInstagram;
+        needsUpdate = true;
+      }
+    }
 
     if (needsUpdate) {
-      console.log('Encrypting Meta credentials in Firestore trigger.');
-      return change.after.ref.set({ meta: updatedMeta }, { merge: true });
+      console.log('Encrypting Meta/Instagram credentials in Firestore trigger.');
+      return change.after.ref.set(updatePayload, { merge: true });
     }
 
     return null;
@@ -817,7 +845,6 @@ exports.metaWebhook = functions.https.onRequest(async (req, res) => {
         stage: 'New Lead',
         counselor: 'Unassigned',
         createdDate: metaLead.created_time || new Date().toISOString(),
-        createdAt: metaLead.created_time || new Date().toISOString(),
         lastContacted: new Date().toISOString(),
         customFields: {
           campaignId: campaignId,
@@ -957,6 +984,68 @@ async function getDecryptedWhatsAppCredentials() {
 }
 
 /**
+ * Helper to fetch decrypted Instagram integration credentials.
+ */
+async function getDecryptedInstagramCredentials() {
+  const integrationDoc = await db.collection('settings').doc('integrations').get();
+  if (!integrationDoc.exists) {
+    throw new Error('Integrations settings document does not exist.');
+  }
+  const data = integrationDoc.data();
+  const instagram = data.instagram;
+  if (!instagram) {
+    throw new Error('Instagram settings not found in integrations.');
+  }
+
+  // Support both encrypted and plaintext access tokens
+  const rawToken = instagram.accessToken || '';
+  let accessToken = rawToken;
+  let wasDecrypted = false;
+  let decryptionError = null;
+
+  if (rawToken && cryptoHelper && typeof cryptoHelper.decrypt === 'function') {
+    try {
+      const parts = rawToken.split(':');
+      if (parts.length === 2 && parts[0].length === 32) {
+        accessToken = cryptoHelper.decrypt(rawToken);
+        wasDecrypted = true;
+      }
+    } catch (e) {
+      decryptionError = e.message;
+      // ignore, use raw value (may be plaintext fallback)
+    }
+  }
+
+  // === SAFE DIAGNOSTIC LOGGING — no full token exposed ===
+  const tokenForLog = accessToken;
+  console.log('[InstaCreds Diagnostic]', JSON.stringify({
+    rawStoredLength: rawToken.length,
+    rawStoredIsEncryptedFormat: rawToken.includes(':') && rawToken.split(':')[0].length === 32,
+    decryptAttempted: wasDecrypted,
+    decryptionError: decryptionError || null,
+    resolvedTokenExists: !!tokenForLog,
+    resolvedTokenLength: tokenForLog.length,
+    resolvedTokenPrefix4: tokenForLog.length >= 4 ? tokenForLog.slice(0, 4) : '(short)',
+    resolvedTokenSuffix4: tokenForLog.length >= 4 ? tokenForLog.slice(-4) : '(short)',
+    enabled: instagram.enabled || false,
+    pageId: instagram.pageId || '',
+    instagramAccountId: instagram.instagramAccountId || '',
+    apiVersion: instagram.apiVersion || 'v20.0',
+    encryptionKeySource: process.env.ENCRYPTION_KEY ? 'env_var' : 'fallback_default',
+  }));
+  // ======================================================
+
+  return {
+    enabled: instagram.enabled || false,
+    pageId: instagram.pageId || '',
+    instagramAccountId: instagram.instagramAccountId || '',
+    accessToken: accessToken,
+    apiVersion: instagram.apiVersion || 'v20.0',
+    webhookVerifyToken: instagram.webhookVerifyToken || ''
+  };
+}
+
+/**
  * sendWhatsAppMessage
  * Dispatches an outbound WhatsApp text message via Meta's Graph API.
  */
@@ -967,9 +1056,9 @@ exports.sendWhatsAppMessage = functions.https.onRequest((req, res) => {
     }
 
     try {
-      const { leadId, recipientPhone, messageText, templateData, mediaData } = req.body;
-      if (!recipientPhone || (!messageText && !templateData && !mediaData)) {
-        return res.status(400).json({ error: 'recipientPhone and either messageText, templateData, or mediaData are required.' });
+      const { leadId, recipientPhone, messageText, templateData } = req.body;
+      if (!recipientPhone || (!messageText && !templateData)) {
+        return res.status(400).json({ error: 'recipientPhone and either messageText or templateData are required.' });
       }
 
       // 1. Load configuration
@@ -1003,19 +1092,6 @@ exports.sendWhatsAppMessage = functions.https.onRequest((req, res) => {
         payload.type = 'template';
         payload.template = templateData;
         console.log(`[WhatsApp CF] Dynamic template payload received. Template name: ${templateData.name}`);
-      } else if (mediaData && mediaData.url) {
-        const mediaType = mediaData.type || 'document';
-        payload.type = mediaType;
-        payload[mediaType] = {
-          link: mediaData.url
-        };
-        if (mediaType === 'document') {
-          payload.document.filename = mediaData.filename || mediaData.name || 'Brochure.pdf';
-        }
-        if (messageText && messageText.trim() && !messageText.startsWith('[Attached:')) {
-          payload[mediaType].caption = messageText.trim();
-        }
-        console.log(`[WhatsApp CF] Dynamic media payload received. Type: ${mediaType}, Link: ${mediaData.url}`);
       } else {
         // Normal conversation messaging layer
         payload.type = 'text';
@@ -1081,6 +1157,167 @@ exports.sendWhatsAppMessage = functions.https.onRequest((req, res) => {
         success: false,
         error: 'Failed to send WhatsApp message.',
         details: errorMsg
+      });
+    }
+  });
+});
+
+/**
+ * sendInstagramMessage
+ * Dispatches an outbound Instagram text message via Meta's Graph API.
+ */
+exports.sendInstagramMessage = functions.https.onRequest((req, res) => {
+  return cors(req, res, async () => {
+    if (req.method !== 'POST') {
+      return res.status(405).json({ error: 'Method not allowed' });
+    }
+
+    try {
+      const { leadId, instagramUserId, messageText, counselorName } = req.body;
+      if (!messageText) {
+        return res.status(400).json({ error: 'messageText is required.' });
+      }
+      if (!leadId && !instagramUserId) {
+        return res.status(400).json({ error: 'Either leadId or instagramUserId must be provided.' });
+      }
+
+      // 1. Load configuration
+      const creds = await getDecryptedInstagramCredentials();
+      if (!creds.enabled && !req.body.bypassEnabledCheck) {
+        return res.status(400).json({ error: 'Instagram integration is not enabled in settings.' });
+      }
+
+      if (!creds.pageId || !creds.accessToken) {
+        return res.status(400).json({ error: 'Instagram integration credentials (pageId, accessToken) are not fully configured.' });
+      }
+
+      // 2. Resolve destination ID and lead reference
+      let targetUserId = instagramUserId;
+      let leadRef = null;
+      let leadData = null;
+
+      if (leadId) {
+        leadRef = db.collection('leads').doc(leadId);
+        const leadSnap = await leadRef.get();
+        if (leadSnap.exists) {
+          leadData = leadSnap.data();
+          if (leadData.instagramUserId) {
+            targetUserId = leadData.instagramUserId;
+          }
+        }
+      }
+
+      if (!targetUserId) {
+        return res.status(400).json({ error: 'instagramUserId could not be resolved from lead or request.' });
+      }
+
+      // 3. Dispatch outbound HTTP call to Meta Instagram API
+      const payload = {
+        recipient: { id: targetUserId },
+        message: { text: messageText }
+      };
+
+      const url = `https://graph.instagram.com/${creds.apiVersion}/${creds.instagramAccountId}/messages`;
+
+      console.log('[Instagram Outbound CF] Target URL:', url);
+      console.log('[Instagram Outbound CF] Payload:', JSON.stringify(payload));
+
+      let messageId = null;
+      let apiError = null;
+
+      try {
+        const response = await axios.post(url, payload, {
+          headers: {
+            'Authorization': `Bearer ${creds.accessToken.trim()}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        console.log('[Instagram Outbound CF] Meta Success Response:', JSON.stringify(response.data));
+        messageId = response.data.message_id;
+      } catch (err) {
+        apiError = err.response ? JSON.stringify(err.response.data) : err.message;
+        console.error('[Instagram Outbound CF] Meta API Error Details:', apiError);
+      }
+
+      // 4. Update lead history records inside Firestore
+      if (leadRef && leadData) {
+        const outboundMsg = {
+          id: `msg-sent-${Date.now()}`,
+          sender: 'counselor',
+          text: messageText,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          igMessageId: messageId || null,
+          status: messageId ? 'sent' : 'failed',
+          timestamp: new Date().toISOString()
+        };
+
+        const updatedChat = [...(leadData.instagramMessages || []), outboundMsg];
+
+        // Log both successes and failures to timeline
+        const nextTimeline = [...(leadData.timeline || []), {
+          id: `log-ig-${Date.now()}`,
+          type: 'instagram',
+          title: messageId ? 'Instagram Message Dispatched' : 'Instagram Message Failed',
+          content: messageId ? messageText : `Failed to dispatch: "${messageText}". Error: ${apiError}`,
+          timestamp: new Date().toISOString(),
+          user: counselorName || 'Counselor'
+        }];
+
+        // Proactively fetch profile information on outbound message if name is raw placeholder
+        let finalUsername = leadData.instagramUsername || '';
+        let finalDisplayName = leadData.name || '';
+
+        if (!finalUsername || !finalDisplayName || finalDisplayName.startsWith('Instagram User')) {
+          try {
+            const profileUrl = `https://graph.facebook.com/${creds.apiVersion}/${targetUserId}`;
+            const profileRes = await axios.get(profileUrl, {
+              params: {
+                fields: 'name,username',
+                access_token: creds.accessToken.trim()
+              }
+            });
+            if (profileRes.data) {
+              finalUsername = profileRes.data.username || finalUsername;
+              finalDisplayName = profileRes.data.name || finalDisplayName;
+              console.log(`[Instagram Outbound CF] Fetched profile info on outbound. username = ${finalUsername}, name = ${finalDisplayName}`);
+            }
+          } catch (err) {
+            console.error('[Instagram Outbound CF] Failed to fetch Instagram profile details on outbound:', err.response ? JSON.stringify(err.response.data) : err.message);
+          }
+        }
+
+        const updateData = {
+          instagramMessages: updatedChat,
+          timeline: nextTimeline,
+          lastContacted: new Date().toISOString()
+        };
+
+        if (finalUsername) {
+          updateData.instagramUsername = finalUsername;
+        }
+        if (finalDisplayName && (!leadData.name || leadData.name.startsWith('Instagram User'))) {
+          updateData.name = finalDisplayName;
+        }
+
+        await leadRef.update(updateData);
+      }
+
+      if (apiError) {
+        return res.status(400).json({
+          success: false,
+          error: 'Failed to send Instagram message.',
+          details: apiError
+        });
+      }
+
+      return res.status(200).json({ success: true, messageId });
+
+    } catch (err) {
+      console.error('[Instagram Outbound CF] Critical error:', err.message);
+      return res.status(500).json({
+        success: false,
+        error: 'Internal server error while processing outbound Instagram message.',
+        details: err.message
       });
     }
   });
@@ -1340,6 +1577,1328 @@ exports.whatsappWebhook = functions.https.onRequest(async (req, res) => {
   return res.status(405).send('Method Not Allowed');
 });
 
+// ==================== INSTAGRAM STATEFUL CHATBOT HELPERS ====================
+
+const DEFAULT_FLOW = {
+  startNode: "welcome",
+  nodes: [
+    {
+      id: "welcome",
+      type: "Message",
+      name: "👋 Welcome",
+      data: {
+        message: "👋 Hello! Welcome to TechZone Academy.\n\nThank you for reaching out to us.\n\nTo assist you better, could you please share your:\n\n👤 Full Name"
+      },
+      nextNodeId: "collect_details"
+    },
+    {
+      id: "collect_details",
+      type: "CollectInfo",
+      name: "👤 Collect Details",
+      data: {
+        message: "Please share your Full Name and Mobile Number."
+      },
+      nextNodeId: "course_selection"
+    },
+    {
+      id: "course_selection",
+      type: "Choice",
+      name: "🎓 Course Selection",
+      data: {
+        message: "Thank you! 😊\n\nWhich course are you interested in?",
+        choices: [
+          { label: "Data Science", payload: "course_data_science", nextNodeId: "ds_info" },
+          { label: "Data Analytics", payload: "course_data_analytics", nextNodeId: "da_info" },
+          { label: "Artificial Intelligence", payload: "course_ai", nextNodeId: "ai_info" },
+          { label: "Digital Marketing", payload: "course_digital_marketing", nextNodeId: "dm_info" }
+        ]
+      }
+    },
+    // Data Science Flow
+    {
+      id: "ds_info",
+      type: "Choice",
+      name: "📚 Data Science Info",
+      data: {
+        message: "Excellent choice! 🎓\n\nWhat would you like to know about our Data Science program?",
+        choices: [
+          { label: "Fees", payload: "faq_fees", nextNodeId: "faq_fees" },
+          { label: "Duration", payload: "faq_duration", nextNodeId: "faq_duration" },
+          { label: "Syllabus", payload: "ds_syllabus", nextNodeId: "ds_syllabus" },
+          { label: "Demo Class", payload: "faq_demo", nextNodeId: "faq_demo" },
+          { label: "Placement Assistance", payload: "faq_placement", nextNodeId: "faq_placement" }
+        ]
+      }
+    },
+    {
+      id: "ds_syllabus",
+      type: "FAQ",
+      name: "📌 DS Syllabus",
+      data: {
+        course: "Data Science",
+        message: "Here’s a brief overview of our Data Science program:\n\n✅ Python\n✅ SQL\n✅ Statistics\n✅ Power BI\n✅ Machine Learning\n✅ Deep Learning\n\n🎓 You can also book a FREE Demo Class.\n\n📞 Or call us on +91 6304872757."
+      },
+      nextNodeId: "counselor_handoff"
+    },
+    // Data Analytics Flow
+    {
+      id: "da_info",
+      type: "Choice",
+      name: "📚 Data Analytics Info",
+      data: {
+        message: "Excellent choice! 🎓\n\nWhat would you like to know about our Data Analytics program?",
+        choices: [
+          { label: "Fees", payload: "faq_fees", nextNodeId: "faq_fees" },
+          { label: "Duration", payload: "faq_duration", nextNodeId: "faq_duration" },
+          { label: "Syllabus", payload: "da_syllabus", nextNodeId: "da_syllabus" },
+          { label: "Demo Class", payload: "faq_demo", nextNodeId: "faq_demo" },
+          { label: "Placement Assistance", payload: "faq_placement", nextNodeId: "faq_placement" }
+        ]
+      }
+    },
+    {
+      id: "da_syllabus",
+      type: "FAQ",
+      name: "📌 DA Syllabus",
+      data: {
+        course: "Data Analytics",
+        message: "Here’s a brief overview of our Data Analytics program:\n\n✅ Excel\n✅ Power BI / Tableau\n✅ SQL\n✅ Python\n✅ Statistics\n✅ Data Warehousing\n\n🎓 You can also book a FREE Demo Class.\n\n📞 Or call us on +91 6304872757."
+      },
+      nextNodeId: "counselor_handoff"
+    },
+    // AI Flow
+    {
+      id: "ai_info",
+      type: "Choice",
+      name: "📚 AI Info",
+      data: {
+        message: "Excellent choice! 🎓\n\nWhat would you like to know about our Artificial Intelligence program?",
+        choices: [
+          { label: "Fees", payload: "faq_fees", nextNodeId: "faq_fees" },
+          { label: "Duration", payload: "faq_duration", nextNodeId: "faq_duration" },
+          { label: "Syllabus", payload: "ai_syllabus", nextNodeId: "ai_syllabus" },
+          { label: "Demo Class", payload: "faq_demo", nextNodeId: "faq_demo" },
+          { label: "Placement Assistance", payload: "faq_placement", nextNodeId: "faq_placement" }
+        ]
+      }
+    },
+    {
+      id: "ai_syllabus",
+      type: "FAQ",
+      name: "📌 AI Syllabus",
+      data: {
+        course: "Artificial Intelligence",
+        message: "Here’s a brief overview of our Artificial Intelligence program:\n\n✅ Python & Mathematics\n✅ Machine Learning\n✅ Deep Learning\n✅ Natural Language Processing (NLP)\n✅ Computer Vision\n✅ Generative AI (LLMs)\n\n🎓 You can also book a FREE Demo Class.\n\n📞 Or call us on +91 6304872757."
+      },
+      nextNodeId: "counselor_handoff"
+    },
+    // Digital Marketing Flow
+    {
+      id: "dm_info",
+      type: "Choice",
+      name: "📚 DM Info",
+      data: {
+        message: "Excellent choice! 🎓\n\nWhat would you like to know about our Digital Marketing program?",
+        choices: [
+          { label: "Fees", payload: "faq_fees", nextNodeId: "faq_fees" },
+          { label: "Duration", payload: "faq_duration", nextNodeId: "faq_duration" },
+          { label: "Syllabus", payload: "dm_syllabus", nextNodeId: "dm_syllabus" },
+          { label: "Demo Class", payload: "faq_demo", nextNodeId: "faq_demo" },
+          { label: "Placement Assistance", payload: "faq_placement", nextNodeId: "faq_placement" }
+        ]
+      }
+    },
+    {
+      id: "dm_syllabus",
+      type: "FAQ",
+      name: "📌 DM Syllabus",
+      data: {
+        course: "Digital Marketing",
+        message: "Here’s a brief overview of our Digital Marketing program:\n\n✅ SEO (Search Engine Optimization)\n✅ SEM (Search Engine Marketing)\n✅ Social Media Marketing (SMM)\n✅ Content Marketing\n✅ Email Marketing\n✅ Web Analytics (GA4)\n\n🎓 You can also book a FREE Demo Class.\n\n📞 Or call us on +91 6304872757."
+      },
+      nextNodeId: "counselor_handoff"
+    },
+    {
+      id: "faq_fees",
+      type: "FAQ",
+      name: "📌 Fees Info",
+      data: {
+        message: "Our counselor will provide you with the latest fee structure and any ongoing offers.\n\n🎓 You can also book a FREE Demo Class.\n\n📞 Or call us on +91 6304872757."
+      },
+      nextNodeId: "counselor_handoff"
+    },
+    {
+      id: "faq_duration",
+      type: "FAQ",
+      name: "📌 Duration Info",
+      data: {
+        message: "The duration depends on the learning track you choose.\n\nOur counselor can explain the complete roadmap.\n\n🎓 You can also book a FREE Demo Class.\n\n📞 Or call us on +91 6304872757."
+      },
+      nextNodeId: "counselor_handoff"
+    },
+    {
+      id: "faq_demo",
+      type: "FAQ",
+      name: "📌 Demo Info",
+      data: {
+        message: "Great! 😊\n\nYour request for a FREE Demo Class has been received.\n\nOne of our counselors will contact you shortly.\n\n📞 For immediate assistance, call us on +91 6304872757.",
+        setFields: { "demoRequested": true }
+      },
+      nextNodeId: "counselor_handoff"
+    },
+    {
+      id: "faq_placement",
+      type: "Condition",
+      name: "📌 Placement Info Check",
+      data: {
+        conditionType: "check_crm_placement"
+      },
+      trueNodeId: "course_info", 
+      falseNodeId: "counselor_handoff"
+    },
+    {
+      id: "counselor_handoff",
+      type: "CounselorHandoff",
+      name: "👨💼 Counselor Handoff",
+      data: {
+        message: "Thank you for your question. 😊\n\nOne of our counselors will connect with you shortly and provide detailed information.\n\n📞 For immediate assistance, you can also call us on +91 6304872757."
+      }
+    }
+  ]
+};
+
+async function sendInstagramDirectMessage(recipientId, text, creds, quickReplies = null) {
+  const url = `https://graph.instagram.com/${creds.apiVersion}/${creds.instagramAccountId}/messages`;
+  
+  const messageObj = { text: text };
+  if (quickReplies && Array.isArray(quickReplies) && quickReplies.length > 0) {
+    messageObj.quick_replies = quickReplies.map(qr => ({
+      content_type: "text",
+      title: qr.title || qr.label || "",
+      payload: qr.payload || ""
+    }));
+  }
+
+  const payload = {
+    recipient: { id: recipientId },
+    message: messageObj
+  };
+  console.log(`[Instagram Chatbot] Sending DM to ${recipientId}: ${text} with ${quickReplies ? quickReplies.length : 0} quick replies`);
+  try {
+    const res = await axios.post(url, payload, {
+      headers: {
+        'Authorization': `Bearer ${creds.accessToken.trim()}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    console.log('[Instagram Chatbot] Meta API response:', res.data);
+    return res.data;
+  } catch (err) {
+    const errMsg = err.response ? JSON.stringify(err.response.data) : err.message;
+    console.error('[Instagram Chatbot] Failed to send message via Meta API:', errMsg);
+    throw err;
+  }
+}
+
+async function fetchCRMPlacementInfo(courseName) {
+  try {
+    const snap = await db.collection('courses').get();
+    for (const doc of snap.docs) {
+      const data = doc.data();
+      const dbName = (data.name || '').toLowerCase();
+      const targetName = courseName.toLowerCase();
+      if (dbName === targetName || dbName.includes(targetName) || targetName.includes(dbName)) {
+        return data.placement || data.placementInfo || data.placementAssistance || null;
+      }
+    }
+  } catch (err) {
+    console.error("[Instagram Chatbot] Error fetching course placement info:", err);
+  }
+  return null;
+}
+
+function matchCourseSelection(text) {
+  const normalized = text.toLowerCase().trim();
+  if (normalized === '1' || normalized.includes('one') || normalized.includes('science') || normalized.includes('data science')) {
+    return 'Data Science';
+  }
+  if (normalized === '2' || normalized.includes('two') || normalized.includes('analytics') || normalized.includes('data analytics')) {
+    return 'Data Analytics';
+  }
+  if (normalized === '3' || normalized.includes('three') || normalized.includes('artificial') || normalized.includes('intelligence') || normalized === 'ai') {
+    return 'Artificial Intelligence';
+  }
+  if (normalized === '4' || normalized.includes('four') || normalized.includes('digital') || normalized.includes('marketing')) {
+    return 'Digital Marketing';
+  }
+  return null;
+}
+
+function matchFAQChoice(text) {
+  const normalized = text.toLowerCase().trim();
+  if (normalized.includes('fee')) return 'Fees';
+  if (normalized.includes('duration') || normalized.includes('time') || normalized.includes('month') || normalized.includes('long')) return 'Duration';
+  if (normalized.includes('syllabus') || normalized.includes('module') || normalized.includes('topic') || normalized.includes('curriculum') || normalized.includes('learn')) return 'Syllabus';
+  if (normalized.includes('demo') || normalized.includes('class')) return 'Demo Class';
+  if (normalized.includes('placement') || normalized.includes('job') || normalized.includes('career') || normalized.includes('assistance')) return 'Placement Assistance';
+  return null;
+}
+
+function getCanonicalPhone(phoneStr) {
+  if (!phoneStr) return '';
+  // Remove all non-digits (spaces, hyphens, parentheses, plus sign, etc.)
+  const cleanDigits = String(phoneStr).replace(/\D/g, '');
+  // Take the last 10 digits to resolve +91, 91, 0, etc.
+  return cleanDigits.slice(-10);
+}
+
+async function deduplicateInstagramLead({ senderId, rawPhone, currentLeadData, currentLeadId, finalUsername, finalDisplayName }) {
+  const canonicalSearchPhone = getCanonicalPhone(rawPhone);
+  console.log(`[Instagram Lead Dedup] RAW_PHONE: ${rawPhone}`);
+  console.log(`[Instagram Lead Dedup] CANONICAL_PHONE: ${canonicalSearchPhone}`);
+  console.log(`[Instagram Lead Dedup] LEAD_LOOKUP_START: Searching for canonical phone ${canonicalSearchPhone}`);
+
+  if (!canonicalSearchPhone || canonicalSearchPhone.length < 10) {
+    console.log(`[Instagram Lead Dedup] Normalized phone too short: ${canonicalSearchPhone}. Skipping search.`);
+    console.log(`[Instagram Lead Dedup] CREATING_NEW_LEAD: true`);
+    return null;
+  }
+
+  // 1. Fetch all leads to find a match by canonical phone
+  const leadsSnap = await db.collection('leads').get();
+  console.log(`[Instagram Lead Dedup] LEAD_LOOKUP_RESULTS: Scanned ${leadsSnap.size} leads`);
+  let existingLeadDoc = null;
+  let existingLeadData = null;
+
+  leadsSnap.forEach((doc) => {
+    const data = doc.data();
+    if (data.phone) {
+      const canonicalLeadPhone = getCanonicalPhone(data.phone);
+      // Exclude the current temporary shell lead
+      if (canonicalLeadPhone === canonicalSearchPhone && doc.id !== currentLeadId) {
+        existingLeadDoc = doc;
+        existingLeadData = data;
+      }
+    }
+  });
+
+  const found = !!existingLeadDoc;
+  if (found) {
+    const existingLeadId = existingLeadDoc.id;
+    console.log(`[Instagram Lead Dedup] MATCHED_LEAD_ID: ${existingLeadId}`);
+    console.log(`[Instagram Lead Dedup] MATCHED_LEAD_PHONE: ${existingLeadData.phone}`);
+    console.log(`[Instagram Lead Dedup] MATCHED_LEAD_SOURCE: ${existingLeadData.source}`);
+    console.log(`[Instagram Lead Dedup] REUSING_EXISTING_LEAD: ${existingLeadId}`);
+
+    // 2. Perform merge using a transaction to avoid race conditions
+    await db.runTransaction(async (transaction) => {
+      // Get fresh data inside the transaction
+      const freshExistingSnap = await transaction.get(db.collection('leads').doc(existingLeadId));
+      if (!freshExistingSnap.exists) {
+        throw new Error('Existing lead not found during transaction');
+      }
+      const existingData = freshExistingSnap.data();
+
+      // Name handling: Preserve existing name if proper; otherwise use Instagram display name or username
+      let finalName = existingData.name || '';
+      const isNamePlaceholder = !finalName || 
+        finalName.toLowerCase().startsWith('instagram user') ||
+        ['test', 'student', 'walk-in', 'guest', 'unnamed', 'placeholder'].includes(finalName.toLowerCase().trim());
+      
+      if (isNamePlaceholder) {
+        if (finalDisplayName && !finalDisplayName.toLowerCase().startsWith('instagram user')) {
+          finalName = finalDisplayName;
+        } else if (finalUsername && !finalUsername.toLowerCase().startsWith('instagram user')) {
+          finalName = finalUsername;
+        } else if (currentLeadData && currentLeadData.name && !currentLeadData.name.toLowerCase().startsWith('instagram user')) {
+          finalName = currentLeadData.name;
+        }
+      }
+
+      // Source handling: Do not replace original source. Keep it.
+      const originalSource = existingData.source || 'Walk-in';
+      const existingChannels = existingData.channels || [originalSource];
+      const updatedChannels = Array.from(new Set([...existingChannels, 'Instagram']));
+
+      // Merge Instagram message history
+      const existingMsgs = existingData.instagramMessages || [];
+      const shellMsgs = currentLeadData ? (currentLeadData.instagramMessages || []) : [];
+      const mergedMsgs = [...existingMsgs];
+      shellMsgs.forEach(sMsg => {
+        const alreadyExists = mergedMsgs.some(eMsg => 
+          (sMsg.igMessageId && eMsg.igMessageId === sMsg.igMessageId) ||
+          (!sMsg.igMessageId && eMsg.text === sMsg.text && eMsg.time === sMsg.time)
+        );
+        if (!alreadyExists) {
+          mergedMsgs.push(sMsg);
+        }
+      });
+
+      // Merge timeline logs
+      const existingTimeline = existingData.timeline || [];
+      const shellTimeline = currentLeadData ? (currentLeadData.timeline || []) : [];
+      const mergedTimeline = [...existingTimeline];
+      shellTimeline.forEach(sLog => {
+        const alreadyExists = mergedTimeline.some(eLog => eLog.id === sLog.id);
+        if (!alreadyExists) {
+          mergedTimeline.push(sLog);
+        }
+      });
+
+      // Update fields
+      const updateData = {
+        name: finalName,
+        source: originalSource,
+        channels: updatedChannels,
+        instagramUserId: senderId,
+        instagramUsername: finalUsername || existingData.instagramUsername || '',
+        instagramMessages: mergedMsgs,
+        timeline: mergedTimeline,
+        lastContacted: new Date().toISOString(),
+        instagramSenderId: senderId,
+        instagramConversationId: senderId,
+        lastInstagramMessageAt: new Date().toISOString()
+      };
+
+      transaction.update(db.collection('leads').doc(existingLeadId), updateData);
+
+      if (currentLeadId && currentLeadId !== existingLeadId) {
+        transaction.delete(db.collection('leads').doc(currentLeadId));
+      }
+    });
+
+    return {
+      id: existingLeadId,
+      ref: db.collection('leads').doc(existingLeadId)
+    };
+  } else {
+    console.log(`[Instagram Lead Dedup] CREATING_NEW_LEAD: ${currentLeadId}`);
+    return null;
+  }
+}
+
+// ==================== END INSTAGRAM CHATBOT HELPERS ====================
+
+/**
+ * instagramWebhook
+ * Public webhook endpoint for receiving incoming Instagram verification handshakes (Phase 2A).
+ */
+exports.instagramWebhook = functions.https.onRequest(async (req, res) => {
+  if (req.method === 'GET') {
+    try {
+      const mode = req.query['hub.mode'];
+      const token = req.query['hub.verify_token'];
+      const challenge = req.query['hub.challenge'];
+
+      const docRef = await db.collection('settings').doc('integrations').get();
+      if (!docRef.exists) {
+        const errorMsg = 'Integrations settings document does not exist in Firestore';
+        console.error(JSON.stringify({
+          event: 'instagram_webhook_verification',
+          status: 'config_error',
+          error: errorMsg
+        }));
+        return res.status(500).send('Configuration Error');
+      }
+
+      const data = docRef.data();
+      const instagram = data.instagram;
+      if (!instagram || !instagram.webhookVerifyToken) {
+        const errorMsg = 'Instagram webhook verify token is not configured in integrations settings';
+        console.error(JSON.stringify({
+          event: 'instagram_webhook_verification',
+          status: 'config_error',
+          error: errorMsg
+        }));
+        return res.status(500).send('Configuration Error');
+      }
+
+      const expectedToken = instagram.webhookVerifyToken;
+
+      if (mode === 'subscribe' && token === expectedToken) {
+        console.log(JSON.stringify({
+          event: 'instagram_webhook_verification',
+          status: 'success',
+          mode: mode,
+          providedToken: token,
+          challenge: challenge
+        }));
+        return res.status(200).send(challenge);
+      } else {
+        console.warn(JSON.stringify({
+          event: 'instagram_webhook_verification',
+          status: 'failed',
+          mode: mode,
+          providedToken: token,
+          expectedToken: expectedToken,
+          challenge: challenge
+        }));
+        return res.status(403).send('Forbidden');
+      }
+    } catch (e) {
+      console.error(JSON.stringify({
+        event: 'instagram_webhook_verification',
+        status: 'error',
+        error: e.message
+      }));
+      return res.status(500).send('Verification Error');
+    }
+  }
+
+  if (req.method === 'POST') {
+    try {
+      const payload = req.body;
+
+      console.log('[Instagram Webhook] POST received. Payload:', JSON.stringify(payload));
+
+      // Basic payload validation
+      if (!payload || payload.object !== 'instagram' || !payload.entry) {
+        console.warn('[Instagram Webhook] Invalid Instagram webhook payload structure:', JSON.stringify(payload));
+        return res.status(400).send('Invalid Payload');
+      }
+
+      const entry = payload.entry?.[0];
+      let messaging = entry?.messaging?.[0];
+      let formatDetected = 'messaging';
+
+      // Fallback for Meta Developer Dashboard test payloads (changes/field/value)
+      if (!messaging && entry?.changes?.[0]) {
+        const change = entry.changes[0];
+        if (change.field === 'messages') {
+          messaging = change.value;
+          formatDetected = 'changes';
+        }
+      }
+
+      if (!messaging) {
+        console.log('[Instagram Webhook] No messaging or changes.messages event found in entry.');
+        return res.status(200).send('EVENT_RECEIVED');
+      }
+
+      console.log(`[Instagram Webhook] Payload format detected: "${formatDetected}"`);
+
+      const senderId = messaging.sender?.id;
+      const message = messaging.message;
+
+      if (!senderId || !message) {
+        console.log('[Instagram Webhook] Missing senderId or message details.');
+        return res.status(200).send('EVENT_RECEIVED');
+      }
+
+      console.log(`[Instagram Webhook] Processing message: senderId = ${senderId}, mid = ${message.mid}`);
+
+      // Ignore echoes (messages sent by our own business account)
+      if (message.is_echo) {
+        console.log(`[Instagram Webhook] Echo message ignored: mid = ${message.mid}`);
+        return res.status(200).send('EVENT_RECEIVED');
+      }
+
+      const messageId = message.mid;
+      const messageText = message.text || `[${(message.attachments?.[0]?.type) || 'attachment'} shared]`;
+      const fallbackUsername = messaging.sender?.username || '';
+
+      // Atomic Idempotency check using Firestore transaction to ignore duplicate webhook deliveries
+      if (messageId) {
+        const processedMsgRef = db.collection('instagramProcessedMessages').doc(messageId);
+        try {
+          await db.runTransaction(async (transaction) => {
+            const doc = await transaction.get(processedMsgRef);
+            if (doc.exists) {
+              throw new Error('DUPLICATE_MESSAGE');
+            }
+            transaction.set(processedMsgRef, { processedAt: new Date().toISOString() });
+          });
+        } catch (err) {
+          if (err.message === 'DUPLICATE_MESSAGE') {
+            console.log(`[Instagram Webhook] Duplicate message ignored via transaction: mid = ${messageId}`);
+            return res.status(200).send('EVENT_RECEIVED');
+          }
+          console.error('[Instagram Webhook] Transaction error checking processed messages:', err.message);
+        }
+      }
+
+      // 1. Fetch real Instagram profile details securely on the backend
+      console.log('[Instagram Profile] Looking up profile:', {
+        senderId,
+        endpoint: `https://graph.facebook.com/<apiVersion>/${senderId}?fields=name,username`
+      });
+
+      let apiUsername = '';
+      let apiDisplayName = '';
+      try {
+        const creds = await getDecryptedInstagramCredentials();
+        if (creds.enabled && creds.accessToken) {
+          const profileUrl = `https://graph.instagram.com/${creds.apiVersion}/${senderId}`;
+          const profileRes = await axios.get(profileUrl, {
+            params: {
+              fields: 'username',
+              access_token: creds.accessToken.trim()
+            }
+          });
+
+          console.log('[Instagram Profile] Response:', {
+            status: profileRes.status,
+            data: profileRes.data
+          });
+
+          if (profileRes.data) {
+            apiUsername = profileRes.data.username || '';
+            apiDisplayName = profileRes.data.name || '';
+          }
+        } else {
+          console.log('[Instagram Profile] Integration disabled or accessToken missing.');
+        }
+      } catch (err) {
+        const sanitizedErr = err.response ? JSON.stringify(err.response.data) : err.message;
+        console.error('[Instagram Profile] Error response:', sanitizedErr);
+      }
+
+      const finalUsername = apiUsername || fallbackUsername;
+      const finalDisplayName = apiDisplayName || '';
+
+      // 2. Query leads collection using optimized check to avoid collection scans
+      const expectedLeadId = `ig-${senderId}`;
+      const leadDocRef = db.collection('leads').doc(expectedLeadId);
+      const leadSnap = await leadDocRef.get();
+
+      let matchedLeadRef = null;
+      let matchedLeadData = null;
+      let isDuplicate = false;
+
+      if (leadSnap.exists) {
+        matchedLeadRef = leadDocRef;
+        matchedLeadData = leadSnap.data();
+
+        const messages = matchedLeadData.instagramMessages || [];
+        if (messages.some(m => m.igMessageId === messageId)) {
+          isDuplicate = true;
+        }
+      } else {
+        // Also query by instagramUserId index just in case a lead document was created manually or has a different ID
+        const querySnap = await db.collection('leads').where('instagramUserId', '==', senderId).limit(1).get();
+        if (!querySnap.empty) {
+          const matchedDoc = querySnap.docs[0];
+          matchedLeadRef = matchedDoc.ref;
+          matchedLeadData = matchedDoc.data();
+
+          const messages = matchedLeadData.instagramMessages || [];
+          if (messages.some(m => m.igMessageId === messageId)) {
+            isDuplicate = true;
+          }
+        }
+      }
+      
+      let activeLeadId = matchedLeadRef ? matchedLeadRef.id : expectedLeadId;
+
+      if (isDuplicate) {
+        console.log(`[Instagram Webhook] Duplicate message ignored: mid = ${messageId}`);
+        return res.status(200).send('EVENT_RECEIVED');
+      }
+
+      const inboundMsg = {
+        id: `msg-recv-${Date.now()}`,
+        sender: 'lead',
+        text: messageText,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        igMessageId: messageId || null,
+        timestamp: new Date().toISOString()
+      };
+
+      // Define priority: instagramUsername -> Instagram display name -> Existing valid lead name -> Instagram User <ID>
+      let nameToStore = '';
+      if (finalUsername) {
+        nameToStore = finalUsername;
+      } else if (finalDisplayName) {
+        nameToStore = finalDisplayName;
+      } else if (matchedLeadData && matchedLeadData.name && !matchedLeadData.name.startsWith('Instagram User')) {
+        nameToStore = matchedLeadData.name;
+      } else {
+        nameToStore = `Instagram User ${senderId}`;
+      }
+
+      console.log('[Instagram Webhook] Resolved lead identity name:', nameToStore);
+
+      if (matchedLeadRef && matchedLeadData) {
+        console.log(`[Instagram Webhook] Updating existing lead: ${nameToStore} with resolved identity`);
+
+        const updatedChat = [...(matchedLeadData.instagramMessages || []), inboundMsg];
+        const nextTimeline = [...(matchedLeadData.timeline || []), {
+          id: `log-ig-in-${Date.now()}`,
+          type: 'instagram',
+          title: 'Instagram Message Received',
+          content: messageText,
+          timestamp: new Date().toISOString(),
+          user: 'System'
+        }];
+
+        const updateData = {
+          name: nameToStore,
+          instagramUsername: finalUsername || matchedLeadData.instagramUsername || '',
+          instagramMessages: updatedChat,
+          timeline: nextTimeline,
+          lastContacted: new Date().toISOString()
+        };
+
+        if (!matchedLeadData.createdDate) {
+          updateData.createdDate = new Date().toISOString();
+        }
+
+        await matchedLeadRef.update(updateData);
+      } else {
+        console.log(`[Instagram Webhook] Creating new lead for Instagram User: ${senderId} with name: ${nameToStore}`);
+
+        const newLead = {
+          id: expectedLeadId,
+          name: nameToStore,
+          email: '',
+          phone: '',
+          location: 'Instagram Direct Message',
+          education: 'Not Provided',
+          course: '',
+          source: 'Instagram',
+          subSource: '',
+          counselor: 'Unassigned',
+          stage: 'New Lead',
+          temperature: 'Warm',
+          createdDate: new Date().toISOString(),
+          lastContacted: new Date().toISOString(),
+          customFields: {},
+          timeline: [
+            {
+              id: `log-${Date.now()}`,
+              type: 'system',
+              title: 'Lead Captured',
+              content: 'Inquiry successfully entered system via Instagram Message Webhook.',
+              timestamp: new Date().toISOString(),
+              user: 'System'
+            }
+          ],
+          whatsappMessages: [],
+          instagramUserId: senderId,
+          instagramUsername: finalUsername,
+          instagramMessages: [inboundMsg]
+        };
+
+        await db.collection('leads').doc(expectedLeadId).set(newLead);
+      }
+
+      // === INSTAGRAM CHATBOT AUTO-REPLY LOGIC ===
+      // Meta sends timestamps in Unix SECONDS (not ms). Convert to ms for Date.now() comparison.
+      // Prefer messaging.timestamp (per-message precision) over entry.time (entry-level approximation).
+      const rawTs = messaging.timestamp || entry.time;
+      const messageTimestamp = rawTs ? Number(rawTs) * 1000 : Date.now();
+      const isOldMessage = (Date.now() - messageTimestamp) > 2 * 60 * 1000; // Ignore > 2 mins old
+
+      if (messageText && !isOldMessage) {
+        try {
+          console.log('[Instagram Chatbot] Checking chatbot settings for message:', messageText);
+          const chatbotDoc = await db.collection('settings').doc('instagram_chatbot').get();
+
+          if (chatbotDoc.exists) {
+            const chatbotSettings = chatbotDoc.data();
+            console.log('[Instagram Chatbot] Loaded settings. Enabled:', chatbotSettings.enabled);
+
+            if (chatbotSettings.enabled) {
+              // Fetch latest lead data to ensure state is fresh
+              const freshLeadDoc = await db.collection('leads').doc(activeLeadId).get();
+              let currentLeadData = freshLeadDoc.exists ? freshLeadDoc.data() : null;
+
+              if (currentLeadData && (currentLeadData.botPaused || currentLeadData.handoffRequired)) {
+                console.log('[Instagram Chatbot] Chatbot is paused for this lead (counselor handoff active). Skipping.');
+              } else {
+                const lowerMsg = messageText.toLowerCase().trim();
+                const startTriggers = ["hi", "hello", "hey", "assalamualaikum"];
+                const isStartTrigger = startTriggers.includes(lowerMsg);
+                const quickReplyPayload = message.quick_reply?.payload || null;
+
+                // Priority Check: Active chatbotState -> Start triggers -> Quick Auto-Reply rules
+                const hasActiveState = currentLeadData && currentLeadData.chatbotState && currentLeadData.chatbotState.currentNodeId;
+
+                if (chatbotSettings.flowEnabled && (hasActiveState || isStartTrigger || quickReplyPayload === "ask_something_else")) {
+                  const flow = chatbotSettings.flow || DEFAULT_FLOW;
+                  const state = (currentLeadData && currentLeadData.chatbotState) ? currentLeadData.chatbotState : { 
+                    flowId: "main_lead_capture",
+                    currentNodeId: null, 
+                    collectedFields: {} 
+                  };
+                  
+                  let nextNodeId = state.currentNodeId;
+                  let replyText = "";
+                  let updatedFields = {};
+                  let updatedCollectedFields = { ...(state.collectedFields || {}) };
+
+                  if (isStartTrigger || !nextNodeId) {
+                    nextNodeId = flow.startNode || "welcome";
+                    updatedCollectedFields = {};
+                    updatedFields.course = ""; // Clear selected course context on restart
+                  }
+
+                  // Handle manual loop back via quick reply
+                  if (quickReplyPayload === "ask_something_else") {
+                    const activeCourseName = updatedFields.course || (currentLeadData && currentLeadData.course) || "Data Science";
+                    if (activeCourseName === "Data Science") nextNodeId = "ds_info";
+                    else if (activeCourseName === "Data Analytics") nextNodeId = "da_info";
+                    else if (activeCourseName === "Artificial Intelligence") nextNodeId = "ai_info";
+                    else if (activeCourseName === "Digital Marketing") nextNodeId = "dm_info";
+                    else nextNodeId = "course_info";
+                  }
+
+                  let isVirtualNode = nextNodeId === "collect_name" || nextNodeId === "collect_phone";
+                  let currentNode = flow.nodes.find(n => n.id === nextNodeId);
+                  
+                  if (!currentNode && !isVirtualNode) {
+                    nextNodeId = flow.startNode || "welcome";
+                    currentNode = flow.nodes.find(n => n.id === nextNodeId);
+                  }
+
+                  if (currentNode || isVirtualNode) {
+                    const nodeType = currentNode ? currentNode.type : (nextNodeId === "collect_name" ? "CollectName" : "CollectPhone");
+                    const nodeId = currentNode ? currentNode.id : nextNodeId;
+
+                    console.log(`[Instagram Chatbot] Executing node: ${nodeId} (${nodeType}) with payload: ${quickReplyPayload}`);
+
+                    if (currentNode && currentNode.type === "Trigger") {
+                      nextNodeId = currentNode.nextNodeId;
+                      currentNode = flow.nodes.find(n => n.id === nextNodeId);
+                    }
+
+                    if (currentNode && (currentNode.type === "Message" || currentNode.id === "welcome")) {
+                      replyText = "👋 Hello! Welcome to TechZone Academy.\n\nThank you for reaching out to us.\n\nTo assist you better, could you please share your:\n\n👤 Full Name";
+                      nextNodeId = "collect_name";
+                    } 
+                    else if (nodeId === "collect_name" || nodeType === "CollectName") {
+                      console.log('[Instagram Chatbot] collect_name state message received:', messageText);
+
+                      // Backward compatibility check: check if they sent name + phone in one message
+                      let searchText = messageText || '';
+                      if (message.attachments && Array.isArray(message.attachments)) {
+                        message.attachments.forEach(att => {
+                          if (att.title) searchText += ' ' + att.title;
+                          if (att.payload) {
+                            if (att.payload.phone_number) searchText += ' ' + att.payload.phone_number;
+                            if (att.payload.title) searchText += ' ' + att.payload.title;
+                            if (att.payload.url) searchText += ' ' + att.payload.url;
+                          }
+                        });
+                      }
+
+                      const phoneRegex = /(?:\+?91|0)?\s*-?\s*[6-9](?:\s*-?\s*\d){9}\b/;
+                      const match = searchText.match(phoneRegex);
+
+                      if (match) {
+                        console.log('[Instagram Chatbot] Phone number detected in collect_name. Processing combined message.');
+                        const rawPhone = match[0];
+                        const cleanDigits = rawPhone.replace(/\D/g, '');
+                        const tenDigits = cleanDigits.slice(-10);
+                        const normalizedPhone = `+91${tenDigits}`;
+
+                        let nameCandidate = messageText.replace(rawPhone, '').replace(/[,;:-]/g, '').trim().replace(/\s+/g, ' ');
+                        nameCandidate = nameCandidate.replace(/^(my name is|i am|this is|here is|name is)\s+/i, '').trim();
+
+                        updatedCollectedFields.phone = true;
+                        updatedCollectedFields.name = true;
+
+                        const finalName = (nameCandidate.length >= 2 && !/^\d+$/.test(nameCandidate))
+                          ? nameCandidate
+                          : ((currentLeadData && currentLeadData.name && !currentLeadData.name.startsWith('Instagram User') ? currentLeadData.name : null) || finalDisplayName || finalUsername || `Instagram User ${senderId}`);
+
+                        console.log(`[Instagram Chatbot] Extracted name: ${finalName}`);
+
+                        // Deduplicate lead before proceeding
+                        const dedupResult = await deduplicateInstagramLead({
+                          senderId,
+                          rawPhone,
+                          currentLeadData: { ...currentLeadData, name: finalName },
+                          currentLeadId: activeLeadId,
+                          finalUsername,
+                          finalDisplayName
+                        });
+
+                        if (dedupResult) {
+                          activeLeadId = dedupResult.id;
+                          matchedLeadRef = dedupResult.ref;
+                          const mergedDoc = await matchedLeadRef.get();
+                          currentLeadData = mergedDoc.exists ? mergedDoc.data() : null;
+                          updatedFields = {};
+                        } else {
+                          updatedFields.name = finalName;
+                          updatedFields.phone = normalizedPhone;
+                          updatedFields.source = "Instagram";
+                          updatedFields.stage = "New Lead";
+                        }
+
+                        console.log(`[Instagram Chatbot] Lead updated: ${activeLeadId}`);
+                        console.log(`[Instagram Lead Dedup] FINAL_ACTIVE_LEAD_ID: ${activeLeadId}`);
+                        console.log('[Instagram Chatbot] Advancing to Course Selection');
+
+                        nextNodeId = "course_selection";
+                        const nextNode = flow.nodes.find(n => n.id === nextNodeId);
+                        if (nextNode) {
+                          replyText = nextNode.data.message || "Thank you! 😊\n\nWhich course are you interested in?";
+                          nextNodeId = nextNode.id;
+                        }
+                      } else {
+                        // They only sent name (normal flow)
+                        let nameCandidate = messageText.replace(/[,;:-]/g, '').trim().replace(/\s+/g, ' ');
+                        nameCandidate = nameCandidate.replace(/^(my name is|i am|this is|here is|name is)\s+/i, '').trim();
+
+                        const finalName = (nameCandidate.length >= 2 && !/^\d+$/.test(nameCandidate))
+                          ? nameCandidate
+                          : ((currentLeadData && currentLeadData.name && !currentLeadData.name.startsWith('Instagram User') ? currentLeadData.name : null) || finalDisplayName || finalUsername || `Instagram User ${senderId}`);
+
+                        console.log(`[Instagram Chatbot] Extracted name: ${finalName}`);
+
+                        updatedCollectedFields.name = true;
+                        updatedFields.name = finalName;
+
+                        replyText = "Thank you! 😊\n\n📱 Now, please share your mobile number.";
+                        nextNodeId = "collect_phone";
+                      }
+                    }
+                    else if (nodeId === "collect_phone" || nodeType === "CollectPhone") {
+                      console.log('[Instagram Chatbot] collect_phone state message received:', messageText);
+
+                      let searchText = messageText || '';
+                      if (message.attachments && Array.isArray(message.attachments)) {
+                        message.attachments.forEach(att => {
+                          if (att.title) searchText += ' ' + att.title;
+                          if (att.payload) {
+                            if (att.payload.phone_number) searchText += ' ' + att.payload.phone_number;
+                            if (att.payload.title) searchText += ' ' + att.payload.title;
+                            if (att.payload.url) searchText += ' ' + att.payload.url;
+                          }
+                        });
+                      }
+
+                      const phoneRegex = /(?:\+?91|0)?\s*-?\s*[6-9](?:\s*-?\s*\d){9}\b/;
+                      const match = searchText.match(phoneRegex);
+                      
+                      console.log('[Instagram Chatbot] Phone detected:', !!match);
+
+                      if (match) {
+                        const rawPhone = match[0];
+                        const cleanDigits = rawPhone.replace(/\D/g, '');
+                        const tenDigits = cleanDigits.slice(-10);
+                        const normalizedPhone = `+91${tenDigits}`;
+
+                        updatedCollectedFields.phone = true;
+                        updatedCollectedFields.name = true;
+
+                        // Deduplicate lead before proceeding
+                        const dedupResult = await deduplicateInstagramLead({
+                          senderId,
+                          rawPhone,
+                          currentLeadData,
+                          currentLeadId: activeLeadId,
+                          finalUsername,
+                          finalDisplayName
+                        });
+
+                        if (dedupResult) {
+                          activeLeadId = dedupResult.id;
+                          matchedLeadRef = dedupResult.ref;
+                          const mergedDoc = await matchedLeadRef.get();
+                          currentLeadData = mergedDoc.exists ? mergedDoc.data() : null;
+                          updatedFields = {};
+                        } else {
+                          updatedFields.phone = normalizedPhone;
+                          updatedFields.source = "Instagram";
+                          updatedFields.stage = "New Lead";
+                        }
+
+                        console.log(`[Instagram Chatbot] Lead updated: ${activeLeadId}`);
+                        console.log(`[Instagram Lead Dedup] FINAL_ACTIVE_LEAD_ID: ${activeLeadId}`);
+                        console.log('[Instagram Chatbot] Advancing to Course Selection');
+
+                        nextNodeId = "course_selection";
+                        const nextNode = flow.nodes.find(n => n.id === nextNodeId);
+                        if (nextNode) {
+                          replyText = nextNode.data.message || "Thank you! 😊\n\nWhich course are you interested in?";
+                          nextNodeId = nextNode.id;
+                        }
+                      } else {
+                        // Re-prompt for phone
+                        replyText = "Please enter a valid 10-digit Indian mobile number (e.g., +91XXXXXXXXXX) to proceed.";
+                        nextNodeId = "collect_phone";
+                      }
+                    }
+                    else if (currentNode && (currentNode.type === "CollectInfo" || currentNode.id === "collect_details")) {
+                      // Fallback support for older visual nodes named collect_details
+                      console.log('[Instagram Chatbot] Collect Details message received (collect_details fallback)');
+                      
+                      let searchText = messageText || '';
+                      if (message.attachments && Array.isArray(message.attachments)) {
+                        message.attachments.forEach(att => {
+                          if (att.title) searchText += ' ' + att.title;
+                          if (att.payload) {
+                            if (att.payload.phone_number) searchText += ' ' + att.payload.phone_number;
+                            if (att.payload.title) searchText += ' ' + att.payload.title;
+                            if (att.payload.url) searchText += ' ' + att.payload.url;
+                          }
+                        });
+                      }
+
+                      const phoneRegex = /(?:\+?91|0)?\s*-?\s*[6-9](?:\s*-?\s*\d){9}\b/;
+                      const match = searchText.match(phoneRegex);
+                      
+                      console.log('[Instagram Chatbot] Phone detected:', !!match);
+
+                      if (match) {
+                        const rawPhone = match[0];
+                        const cleanDigits = rawPhone.replace(/\D/g, '');
+                        const tenDigits = cleanDigits.slice(-10);
+                        const normalizedPhone = `+91${tenDigits}`;
+
+                        let nameCandidate = messageText.replace(rawPhone, '').replace(/[,;:-]/g, '').trim().replace(/\s+/g, ' ');
+                        nameCandidate = nameCandidate.replace(/^(my name is|i am|this is|here is|name is)\s+/i, '').trim();
+
+                        updatedCollectedFields.phone = true;
+                        updatedCollectedFields.name = true;
+
+                        const finalName = (nameCandidate.length >= 2 && !/^\d+$/.test(nameCandidate))
+                          ? nameCandidate
+                          : ((currentLeadData && currentLeadData.name && !currentLeadData.name.startsWith('Instagram User') ? currentLeadData.name : null) || finalDisplayName || finalUsername || `Instagram User ${senderId}`);
+
+                        console.log(`[Instagram Chatbot] Extracted name: ${finalName}`);
+
+                        // Deduplicate lead before proceeding
+                        const dedupResult = await deduplicateInstagramLead({
+                          senderId,
+                          rawPhone,
+                          currentLeadData: { ...currentLeadData, name: finalName },
+                          currentLeadId: activeLeadId,
+                          finalUsername,
+                          finalDisplayName
+                        });
+
+                        if (dedupResult) {
+                          activeLeadId = dedupResult.id;
+                          matchedLeadRef = dedupResult.ref;
+                          const mergedDoc = await matchedLeadRef.get();
+                          currentLeadData = mergedDoc.exists ? mergedDoc.data() : null;
+                          updatedFields = {};
+                        } else {
+                          updatedFields.name = finalName;
+                          updatedFields.phone = normalizedPhone;
+                          updatedFields.source = "Instagram";
+                          updatedFields.stage = "New Lead";
+                        }
+
+                        console.log(`[Instagram Chatbot] Lead updated: ${activeLeadId}`);
+                        console.log(`[Instagram Lead Dedup] FINAL_ACTIVE_LEAD_ID: ${activeLeadId}`);
+                        console.log('[Instagram Chatbot] Advancing to Course Selection');
+
+                        nextNodeId = "course_selection";
+                        const nextNode = flow.nodes.find(n => n.id === nextNodeId);
+                        if (nextNode) {
+                          replyText = nextNode.data.message || "Thank you! 😊\n\nWhich course are you interested in?";
+                          nextNodeId = nextNode.id;
+                        }
+                      } else {
+                        const hasName = updatedCollectedFields.name || (currentLeadData && currentLeadData.name && !currentLeadData.name.startsWith('Instagram User'));
+                        if (!hasName) {
+                          updatedCollectedFields.name = true;
+                          replyText = "Thank you! 😊 Please share your 10-digit mobile number to proceed.";
+                        } else {
+                          replyText = "Please enter a valid 10-digit Indian mobile number (e.g., +91XXXXXXXXXX) to proceed.";
+                        }
+                        nextNodeId = "collect_details";
+                      }
+                    } 
+                    else if (currentNode && currentNode.type === "Choice" && currentNode.id === "course_selection") {
+                      let selection = null;
+                      // Match payload first
+                      if (quickReplyPayload) {
+                        const choices = currentNode.data?.choices || [];
+                        const matchedChoice = choices.find(c => c.payload === quickReplyPayload);
+                        if (matchedChoice) {
+                          selection = matchedChoice.value || matchedChoice.label;
+                        }
+                      }
+                      
+                      // Fallback to text matching
+                      if (!selection) {
+                        selection = matchCourseSelection(messageText);
+                      }
+
+                      if (selection) {
+                        updatedFields.course = selection;
+                        updatedCollectedFields.course = true;
+
+                        // Route to correct visual info node based on selection choices or standard fallback
+                        const choices = currentNode.data?.choices || [];
+                        const matchedChoice = choices.find(c => c.label.toLowerCase() === selection.toLowerCase() || c.payload === quickReplyPayload);
+                        if (matchedChoice && matchedChoice.nextNodeId) {
+                          nextNodeId = matchedChoice.nextNodeId;
+                        } else {
+                          if (selection === "Data Science") nextNodeId = "ds_info";
+                          else if (selection === "Data Analytics") nextNodeId = "da_info";
+                          else if (selection === "Artificial Intelligence") nextNodeId = "ai_info";
+                          else if (selection === "Digital Marketing") nextNodeId = "dm_info";
+                          else nextNodeId = "course_info";
+                        }
+
+                        const nextNode = flow.nodes.find(n => n.id === nextNodeId);
+                        if (nextNode) {
+                          replyText = nextNode.data.message || "Excellent choice! What would you like to know?";
+                        }
+                      } else {
+                        replyText = currentNode.data.message || "Please select a course:";
+                        nextNodeId = currentNode.id;
+                      }
+                    } 
+                    else if (currentNode && currentNode.type === "Choice" && ["course_info", "ds_info", "da_info", "ai_info", "dm_info"].includes(currentNode.id)) {
+                      let matchedPayload = quickReplyPayload;
+                      if (!matchedPayload) {
+                        // Fallback: translate text input to matching payload
+                        const choiceMatch = matchFAQChoice(messageText);
+                        if (choiceMatch === 'Fees') matchedPayload = 'faq_fees';
+                        else if (choiceMatch === 'Duration') matchedPayload = 'faq_duration';
+                        else if (choiceMatch === 'Syllabus') matchedPayload = 'faq_syllabus';
+                        else if (choiceMatch === 'Demo Class') matchedPayload = 'faq_demo';
+                        else if (choiceMatch === 'Placement Assistance') matchedPayload = 'faq_placement';
+                      }
+
+                      if (matchedPayload) {
+                        const choices = currentNode.data.choices || [];
+                        let choice = choices.find(c => c.payload === matchedPayload);
+                        
+                        // Fallback text helper mapping if choices array does not map correctly
+                        if (!choice) {
+                          if (matchedPayload === 'faq_fees') choice = { nextNodeId: 'faq_fees' };
+                          else if (matchedPayload === 'faq_duration') choice = { nextNodeId: 'faq_duration' };
+                          else if (matchedPayload === 'faq_demo') choice = { nextNodeId: 'faq_demo' };
+                          else if (matchedPayload === 'faq_placement') choice = { nextNodeId: 'faq_placement' };
+                          else if (matchedPayload === 'faq_syllabus') {
+                            const activeCourse = updatedFields.course || (currentLeadData && currentLeadData.course) || "Data Science";
+                            if (activeCourse === 'Data Analytics') choice = { nextNodeId: 'da_syllabus' };
+                            else if (activeCourse === 'Artificial Intelligence') choice = { nextNodeId: 'ai_syllabus' };
+                            else if (activeCourse === 'Digital Marketing') choice = { nextNodeId: 'dm_syllabus' };
+                            else choice = { nextNodeId: 'ds_syllabus' };
+                          }
+                        }
+
+                        if (choice && choice.nextNodeId) {
+                          nextNodeId = choice.nextNodeId;
+                          
+                          // Handle dynamic routing for Syllabus if the visual flow chose generic faq_syllabus
+                          if (nextNodeId === 'faq_syllabus') {
+                            const activeCourse = updatedFields.course || (currentLeadData && currentLeadData.course) || "Data Science";
+                            if (activeCourse === 'Data Analytics') nextNodeId = 'da_syllabus';
+                            else if (activeCourse === 'Artificial Intelligence') nextNodeId = 'ai_syllabus';
+                            else if (activeCourse === 'Digital Marketing') nextNodeId = 'dm_syllabus';
+                            else nextNodeId = 'ds_syllabus';
+                          }
+
+                          const targetNode = flow.nodes.find(n => n.id === nextNodeId);
+                          if (targetNode) {
+                            if (targetNode.type === "Condition" && targetNode.id === "faq_placement") {
+                              const selectedCourse = updatedFields.course || (currentLeadData && currentLeadData.course) || "Data Science";
+                              const placementInfo = await fetchCRMPlacementInfo(selectedCourse);
+                              if (placementInfo) {
+                                replyText = placementInfo;
+                                if (selectedCourse === "Data Science") nextNodeId = "ds_info";
+                                else if (selectedCourse === "Data Analytics") nextNodeId = "da_info";
+                                else if (selectedCourse === "Artificial Intelligence") nextNodeId = "ai_info";
+                                else if (selectedCourse === "Digital Marketing") nextNodeId = "dm_info";
+                                else nextNodeId = "course_info";
+                              } else {
+                                nextNodeId = "counselor_handoff";
+                                const handoffNode = flow.nodes.find(n => n.id === nextNodeId);
+                                if (handoffNode) {
+                                  replyText = handoffNode.data.message;
+                                  updatedFields.botPaused = true;
+                                  updatedFields.handoffRequired = true;
+                                }
+                              }
+                            } 
+                            else {
+                              replyText = targetNode.data.message;
+                              if (targetNode.data.setFields) {
+                                updatedFields = { ...updatedFields, ...targetNode.data.setFields };
+                              }
+
+                              if (targetNode.id === "counselor_handoff" || targetNode.id === "faq_demo") {
+                                updatedFields.botPaused = true;
+                                updatedFields.handoffRequired = true;
+                                nextNodeId = "counselor_handoff";
+                              } else {
+                                const activeCourse = updatedFields.course || (currentLeadData && currentLeadData.course) || "Data Science";
+                                if (activeCourse === "Data Science") nextNodeId = "ds_info";
+                                else if (activeCourse === "Data Analytics") nextNodeId = "da_info";
+                                else if (activeCourse === "Artificial Intelligence") nextNodeId = "ai_info";
+                                else if (activeCourse === "Digital Marketing") nextNodeId = "dm_info";
+                                else nextNodeId = "course_info";
+                              }
+                            }
+                          }
+                        }
+                      } else {
+                        replyText = currentNode.data.message || "Please select an option:";
+                        nextNodeId = currentNode.id;
+                      }
+                    }
+
+                    if (replyText) {
+                      const creds = await getDecryptedInstagramCredentials();
+                      if (creds.enabled && creds.accessToken) {
+                        
+                        // Dynamically build quick replies based on destination node
+                        let outgoingQuickReplies = null;
+                        
+                        if (nextNodeId === "course_selection") {
+                          console.log('[Instagram Chatbot] COURSE_SELECTION_SEND_START');
+                          console.log(`[Instagram Chatbot] COURSE_SELECTION_SEND_REASON: Transitioning to course selection after details ingestion`);
+                          console.log(`[Instagram Chatbot] COURSE_SELECTION_MESSAGE_ID: ${messageId}`);
+                          console.log(`[Instagram Chatbot] CHATBOT_STATE_BEFORE: ${state ? JSON.stringify(state) : 'null'}`);
+
+                          console.log('[Instagram Chatbot] Sending Course Selection quick replies');
+                          const selNode = flow.nodes.find(n => n.id === "course_selection");
+                          const choices = selNode?.data?.choices || [];
+                          outgoingQuickReplies = choices.map(c => ({
+                            title: c.label,
+                            payload: c.payload || `course_${c.label.toLowerCase().replace(/[^a-z0-9]/g, '_')}`
+                          }));
+
+                          console.log('[Instagram Chatbot] COURSE_SELECTION_SEND_END');
+                        } 
+                        else if (["course_info", "ds_info", "da_info", "ai_info", "dm_info"].includes(nextNodeId)) {
+                          const infoNode = flow.nodes.find(n => n.id === nextNodeId);
+                          const choices = infoNode?.data?.choices || [];
+                          const activeCourseName = updatedFields.course || (currentLeadData && currentLeadData.course) || "Data Science";
+                          replyText = replyText.replace("{{course}}", activeCourseName);
+                          
+                          outgoingQuickReplies = choices.map(c => ({
+                            title: c.label,
+                            payload: c.payload || `faq_${c.label.toLowerCase().replace(/[^a-z0-9]/g, '_')}`
+                          }));
+                        }
+                        else if (["faq_fees", "faq_duration", "faq_syllabus", "ds_syllabus", "da_syllabus", "ai_syllabus", "dm_syllabus"].includes(nextNodeId)) {
+                          // Loop back node, offer "Ask Something Else" button
+                          outgoingQuickReplies = [
+                            {
+                              title: "Ask Something Else",
+                              payload: "ask_something_else"
+                            }
+                          ];
+                        }
+
+                        const replyRes = await sendInstagramDirectMessage(senderId, replyText, creds, outgoingQuickReplies);
+                        const replyMessageId = replyRes?.message_id || `msg-sent-${Date.now()}`;
+
+                        const botMsg = {
+                          id: `msg-sent-${Date.now()}`,
+                          sender: 'counselor',
+                          text: replyText,
+                          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                          igMessageId: replyMessageId,
+                          status: 'sent',
+                          timestamp: new Date().toISOString()
+                        };
+
+                        const latestLeadDoc = await db.collection('leads').doc(activeLeadId).get();
+                        if (latestLeadDoc.exists) {
+                          const freshLeadData = latestLeadDoc.data();
+                          const updatedChat = [...(freshLeadData.instagramMessages || []), botMsg];
+                          const nextTimeline = [...(freshLeadData.timeline || []), {
+                            id: `log-ig-out-${Date.now()}`,
+                            type: 'instagram',
+                            title: 'Instagram Auto-Reply Dispatched',
+                            content: replyText,
+                            timestamp: new Date().toISOString(),
+                            user: 'System Automation'
+                          }];
+
+                          await db.collection('leads').doc(activeLeadId).update({
+                            ...updatedFields,
+                            instagramMessages: updatedChat,
+                            timeline: nextTimeline,
+                            lastContacted: new Date().toISOString(),
+                            chatbotState: {
+                              flowId: "main_lead_capture",
+                              currentNodeId: nextNodeId,
+                              collectedFields: updatedCollectedFields,
+                              lastInteractionAt: new Date().toISOString()
+                            }
+                          });
+                        }
+                      }
+                    }
+                  }
+                } 
+                else {
+                  // Fallback to Quick Auto-Reply Rules
+                  const replies = chatbotSettings.customReplies || [];
+                  const matchedReply = replies.find(r => {
+                    if (!r.trigger) return false;
+                    const triggers = r.trigger.split(',').map(t => t.trim().toLowerCase());
+                    return triggers.includes(lowerMsg);
+                  });
+
+                  if (matchedReply) {
+                    console.log(`[Instagram Chatbot] Quick Reply matched for "${lowerMsg}":`, matchedReply.reply);
+                    const creds = await getDecryptedInstagramCredentials();
+                    if (creds.enabled && creds.accessToken) {
+                      const replyRes = await sendInstagramDirectMessage(senderId, matchedReply.reply, creds);
+                      const replyMessageId = replyRes?.message_id || `msg-sent-${Date.now()}`;
+
+                      const botMsg = {
+                        id: `msg-sent-${Date.now()}`,
+                        sender: 'counselor',
+                        text: matchedReply.reply,
+                        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                        igMessageId: replyMessageId,
+                        status: 'sent',
+                        timestamp: new Date().toISOString()
+                      };
+
+                      const latestLeadDoc = await db.collection('leads').doc(activeLeadId).get();
+                      if (latestLeadDoc.exists) {
+                        const freshLeadData = latestLeadDoc.data();
+                        const updatedChat = [...(freshLeadData.instagramMessages || []), botMsg];
+                        const nextTimeline = [...(freshLeadData.timeline || []), {
+                          id: `log-ig-out-${Date.now()}`,
+                          type: 'instagram',
+                          title: 'Instagram Auto-Reply Dispatched',
+                          content: matchedReply.reply,
+                          timestamp: new Date().toISOString(),
+                          user: 'System Automation'
+                        }];
+
+                        await db.collection('leads').doc(activeLeadId).update({
+                          instagramMessages: updatedChat,
+                          timeline: nextTimeline,
+                          lastContacted: new Date().toISOString()
+                        });
+                      }
+                    }
+                  } else {
+                    console.log('[Instagram Chatbot] No quick reply trigger matched.');
+                  }
+                }
+              }
+            } else {
+              console.log('[Instagram Chatbot] Chatbot disabled.');
+            }
+          } else {
+            console.log('[Instagram Chatbot] Chatbot settings document not found.');
+          }
+        } catch (botErr) {
+          console.error('[Instagram Chatbot] Auto-reply error:', botErr.response ? JSON.stringify(botErr.response.data) : botErr.message);
+        }
+      }
+      // ==========================================
+
+      return res.status(200).send('EVENT_RECEIVED');
+    } catch (err) {
+      console.error('[Instagram Webhook] Critical webhook processing error:', err);
+      return res.status(500).send('Internal Server Error');
+    }
+  }
+
+  return res.status(405).send('Method Not Allowed');
+});
+
 /**
  * getWhatsAppTemplates
  * Fetches all message templates from the connected Meta WhatsApp Business Account
@@ -1551,7 +3110,7 @@ exports.deleteWhatsAppTemplate = functions.https.onRequest((req, res) => {
       });
 
       // Remove from Firestore cache too
-      await db.collection('whatsapp_templates').doc(name).delete().catch(() => {});
+      await db.collection('whatsapp_templates').doc(name).delete().catch(() => { });
 
       console.log('[deleteWhatsAppTemplate] Successfully deleted:', name);
       return res.status(200).json({ success: true, message: `Template "${name}" deleted from Meta.` });
@@ -1581,7 +3140,7 @@ exports.sendBulkWhatsAppCampaign = functions.runWith({ timeoutSeconds: 540, memo
 
     try {
       const { targetContacts, campaignName, messageType, selectedTemplate, templateLanguage, messageText, counselorName, existingCampaignId } = req.body;
-      
+
       if (!targetContacts || !Array.isArray(targetContacts) || targetContacts.length === 0) {
         return res.status(400).json({ error: 'targetContacts array is required.' });
       }
@@ -1602,11 +3161,11 @@ exports.sendBulkWhatsAppCampaign = functions.runWith({ timeoutSeconds: 540, memo
       const recipientDetails = [];
 
       // Chunk size to prevent exhausting resources / Meta API limits
-      const CHUNK_SIZE = 25; 
+      const CHUNK_SIZE = 25;
 
       for (let i = 0; i < targetContacts.length; i += CHUNK_SIZE) {
         const chunk = targetContacts.slice(i, i + CHUNK_SIZE);
-        
+
         // Process chunk concurrently
         const promises = chunk.map(async (contact, chunkIndex) => {
           const globalIndex = i + chunkIndex;
@@ -1614,25 +3173,29 @@ exports.sendBulkWhatsAppCampaign = functions.runWith({ timeoutSeconds: 540, memo
             // Helper to get phone
             const phone = contact.phone || contact.Phone || contact.PhoneNumber || contact.phone_number || contact['Phone Number'] || '';
             if (!phone) throw new Error('No phone number');
-            
+
             // Clean phone
             let cleanPhone = String(phone).replace(/[^0-9]/g, '').trim();
             if (cleanPhone.length === 10) cleanPhone = '91' + cleanPhone;
             if (cleanPhone.startsWith('00')) cleanPhone = cleanPhone.substring(2);
 
-            // Find or create lead safely
+            // Find or create lead
             let leadId = null;
-            let leadData = null;
             const leadsRef = db.collection('leads');
             const phoneSuffix = cleanPhone.slice(-10);
+            let snapshot;
+            if (phoneSuffix.length === 10) {
+              // Try to find lead ending with those 10 digits
+              snapshot = await leadsRef.where('phone', '>=', phoneSuffix).where('phone', '<=', phoneSuffix + '\uf8ff').limit(1).get();
+            } else {
+              snapshot = await leadsRef.where('phone', '==', cleanPhone).limit(1).get();
+            }
 
-            // 1. Check by contact.id if available
-            if (contact.id) {
-              const docSnap = await leadsRef.doc(String(contact.id)).get();
-              if (docSnap.exists) {
-                leadId = docSnap.id;
-                leadData = docSnap.data();
-              }
+            let leadData = null;
+
+            if (!snapshot.empty) {
+              leadId = snapshot.docs[0].id;
+              leadData = snapshot.docs[0].data();
             }
 
             // 2. Check by exact doc ID = cleanPhone or phoneSuffix
@@ -1693,8 +3256,7 @@ exports.sendBulkWhatsAppCampaign = functions.runWith({ timeoutSeconds: 540, memo
                 status: 'Active',
                 timeline: [],
                 whatsappMessages: [],
-                createdDate: contact.createdDate || contact.createdAt || nowISO,
-                createdAt: nowISO
+                createdAt: new Date().toISOString()
               };
 
               if (contact.course || contact.Course) {
@@ -1712,7 +3274,7 @@ exports.sendBulkWhatsAppCampaign = functions.runWith({ timeoutSeconds: 540, memo
               to: cleanPhone
             };
 
-            const msgToDeliver = contact._messageToDeliver || messageText || ''; 
+            const msgToDeliver = contact._messageToDeliver || messageText || '';
             const templateData = contact._templateData || null;
 
             if (messageType === 'template' && templateData) {
@@ -1811,8 +3373,8 @@ exports.sendBulkWhatsAppCampaign = functions.runWith({ timeoutSeconds: 540, memo
         totalRecipients: targetContacts.length,
         sent: sentCount,
         failed: failedCount,
-        delivered: 0, 
-        read: 0, 
+        delivered: 0,
+        read: 0,
         replied: 0,
         type: messageType,
         templateName: selectedTemplate || null,
@@ -1851,3 +3413,152 @@ exports.onLeadCreated = functions.firestore
     console.log(`[onLeadCreated] Automated welcome message sending is disabled per system configuration for lead ${context.params.leadId}.`);
     return null;
   });
+
+/**
+ * uploadMetaTemplateMedia
+ * Uploads a file to Meta's Resumable Upload API for Template creation.
+ */
+exports.uploadMetaTemplateMedia = functions.https.onRequest((req, res) => {
+  return cors(req, res, async () => {
+    if (req.method !== 'POST') {
+      return res.status(405).json({ error: 'Method not allowed' });
+    }
+
+    try {
+      const creds = await getDecryptedWhatsAppCredentials();
+      if (!creds.accessToken || !creds.appId) {
+        return res.status(400).json({ success: false, error: 'Meta integration missing App ID or Access Token.' });
+      }
+
+      const busboy = Busboy({ headers: req.headers });
+      let fileBuffer = null;
+      let mimeType = '';
+      let fileName = '';
+
+      busboy.on('file', (fieldname, file, info) => {
+        fileName = info.filename;
+        mimeType = info.mimeType;
+        const chunks = [];
+        file.on('data', (data) => chunks.push(data));
+        file.on('end', () => {
+          fileBuffer = Buffer.concat(chunks);
+        });
+      });
+
+      busboy.on('finish', async () => {
+        if (!fileBuffer) {
+          return res.status(400).json({ success: false, error: 'No file uploaded.' });
+        }
+
+        try {
+          // 1. Create Upload Session
+          const sessionUrl = `https://graph.facebook.com/v20.0/${creds.appId}/uploads?file_length=${fileBuffer.length}&file_type=${mimeType}`;
+          const sessionRes = await axios.post(sessionUrl, {}, {
+            headers: {
+              'Authorization': `OAuth ${creds.accessToken}`
+            }
+          });
+
+          const uploadId = sessionRes.data.id;
+          if (!uploadId) {
+            throw new Error('Meta did not return an upload session ID');
+          }
+
+          // 2. Upload file data
+          const uploadUrl = `https://graph.facebook.com/v20.0/${uploadId}`;
+          const uploadRes = await axios.post(uploadUrl, fileBuffer, {
+            headers: {
+              'Authorization': `OAuth ${creds.accessToken}`,
+              'file_offset': '0',
+              'Content-Type': 'application/octet-stream'
+            }
+          });
+
+          const handle = uploadRes.data.h;
+          if (!handle) {
+            throw new Error('Meta did not return a media handle');
+          }
+
+          return res.status(200).json({ success: true, handle });
+        } catch (error) {
+          console.error('[uploadMetaTemplateMedia] Error:', error.response?.data || error.message);
+          return res.status(500).json({ success: false, error: 'Failed to upload media to Meta' });
+        }
+      });
+
+      busboy.end(req.rawBody);
+    } catch (e) {
+      console.error('[uploadMetaTemplateMedia] Initialization Error:', e);
+      return res.status(500).json({ success: false, error: e.message });
+    }
+  });
+});
+
+/**
+ * processScheduledCampaigns
+ * Runs every 5 minutes to dispatch scheduled WhatsApp campaigns.
+ */
+exports.processScheduledCampaigns = functions.pubsub.schedule('every 5 minutes').onRun(async (context) => {
+  try {
+    const now = new Date().toISOString();
+    const campaignsRef = db.collection('whatsapp_campaigns');
+    const scheduledQuery = await campaignsRef
+      .where('status', '==', 'scheduled')
+      .where('scheduledFor', '<=', now)
+      .get();
+
+    if (scheduledQuery.empty) {
+      console.log('[processScheduledCampaigns] No scheduled campaigns due.');
+      return null;
+    }
+
+    const projectId = process.env.GCLOUD_PROJECT || (process.env.FIREBASE_CONFIG ? JSON.parse(process.env.FIREBASE_CONFIG).projectId : 'leads-management-tz');
+    const region = 'us-central1';
+
+    const baseUrl = process.env.FUNCTIONS_EMULATOR === 'true'
+      ? `http://127.0.0.1:5001/${projectId}/${region}/sendBulkWhatsAppCampaign`
+      : `https://${region}-${projectId}.cloudfunctions.net/sendBulkWhatsAppCampaign`;
+
+    for (const docSnapshot of scheduledQuery.docs) {
+      const camp = docSnapshot.data();
+      const campaignId = docSnapshot.id;
+      console.log(`[processScheduledCampaigns] Processing campaign: ${campaignId}`);
+
+      await campaignsRef.doc(campaignId).update({ status: 'processing' });
+
+      const recipientsDoc = await db.collection('whatsapp_recipients').doc(campaignId).get();
+      let recipientsList = [];
+      if (recipientsDoc.exists) {
+        recipientsList = recipientsDoc.data().recipients || [];
+      }
+
+      if (recipientsList.length === 0) {
+        await campaignsRef.doc(campaignId).update({ status: 'completed', sent: 0, failed: 0 });
+        continue;
+      }
+
+      console.log(`[processScheduledCampaigns] Dispatching ${recipientsList.length} messages for ${campaignId}`);
+      try {
+        await axios.post(baseUrl, {
+          targetContacts: recipientsList,
+          campaignName: camp.name,
+          messageType: camp.type,
+          selectedTemplate: camp.templateName,
+          templateLanguage: camp.languageCode,
+          messageText: camp.message,
+          counselorName: 'System Auto-Sender',
+          existingCampaignId: campaignId
+        });
+      } catch (err) {
+        console.error(`[processScheduledCampaigns] Failed to dispatch campaign ${campaignId}:`, err.message);
+        await campaignsRef.doc(campaignId).update({ status: 'failed' });
+      }
+    }
+  } catch (error) {
+    console.error('[processScheduledCampaigns] Fatal Error:', error);
+  }
+  return null;
+});
+exports.db = db;
+
+

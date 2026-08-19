@@ -50,7 +50,6 @@ const DEFAULT_STAGES = [
   { id: 'st-interest', name: 'Interested', color: '--color-interested', description: 'Expressed core interest' },
   { id: 'st-demosched', name: 'Demo Scheduled', color: '--color-demo-sched', description: 'Class scheduled' },
   { id: 'st-demoattend', name: 'Demo Attended', color: '--color-demo-attend', description: 'Attended the demo' },
-  { id: 'st-freeclass', name: 'Free Class', color: '--color-freeclass', description: 'Attended free trial class' },
   { id: 'st-followup', name: 'Follow-up', color: '--color-followup', description: 'Awaiting callback' },
   { id: 'st-notinterest', name: 'Not Interested', color: '--color-not-interested', description: 'Declined enrollment' },
   { id: 'st-converted', name: 'Converted', color: '--color-converted', description: 'Successfully enrolled' },
@@ -116,6 +115,15 @@ const DEFAULT_INTEGRATIONS = {
     webhookVerifyToken: import.meta.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || '',
     simulatedLeadsCount: 645
   },
+  instagram: {
+    enabled: false,
+    status: 'Setup Required',
+    pageId: '',
+    instagramAccountId: '',
+    accessToken: '',
+    webhookVerifyToken: '',
+    apiVersion: 'v20.0'
+  },
   webhooks: {
     enabled: false,
     status: 'Setup Required',
@@ -159,6 +167,9 @@ export const CRMProvider = ({ children }) => {
             lastContacted: lead.createdDate || new Date().toISOString(),
             timeline: [],
             customFields: {},
+            instagramUserId: lead.instagramUserId || '',
+            instagramUsername: lead.instagramUsername || '',
+            instagramMessages: lead.instagramMessages || [],
             ...lead,
             temperature: temp
           };
@@ -181,30 +192,15 @@ export const CRMProvider = ({ children }) => {
     const local = localStorage.getItem('crm_stages');
     let stages = local ? JSON.parse(local) : DEFAULT_STAGES;
     
-    // Migration for Follow-up name change & Free Class stage addition/renaming
+    // Migration for Follow-up name change
     let migrated = false;
     stages = stages.map(st => {
       if (st.name === 'Follow-up Pending') {
         migrated = true;
         return { ...st, name: 'Follow-up' };
       }
-      if (st.name === 'Free Class Attend' || st.id === 'st-freeclass') {
-        if (st.name !== 'Free Class') migrated = true;
-        return { ...st, name: 'Free Class' };
-      }
       return st;
     });
-
-    if (!stages.some(st => st.id === 'st-freeclass' || st.name === 'Free Class')) {
-      migrated = true;
-      const freeClassStage = { id: 'st-freeclass', name: 'Free Class', color: '--color-freeclass', description: 'Attended free trial class' };
-      const demoIdx = stages.findIndex(st => st.id === 'st-demoattend');
-      if (demoIdx !== -1) {
-        stages.splice(demoIdx + 1, 0, freeClassStage);
-      } else {
-        stages.push(freeClassStage);
-      }
-    }
     
     if (migrated) {
       localStorage.setItem('crm_stages', JSON.stringify(stages));
@@ -229,36 +225,42 @@ export const CRMProvider = ({ children }) => {
 
   useEffect(() => {
     let migrated = false;
-    let newStages = pipelineStages.map(st => {
+    const newStages = pipelineStages.map(st => {
       if (st.name === 'Follow-up Pending') {
         migrated = true;
         return { ...st, name: 'Follow-up' };
       }
-      if (st.name === 'Free Class Attend' || st.id === 'st-freeclass') {
-        if (st.name !== 'Free Class') migrated = true;
-        return { ...st, name: 'Free Class' };
-      }
       return st;
     });
-
-    if (!newStages.some(st => st.id === 'st-freeclass' || st.name === 'Free Class')) {
-      migrated = true;
-      const freeClassStage = { id: 'st-freeclass', name: 'Free Class', color: '--color-freeclass', description: 'Attended free trial class' };
-      const demoIdx = newStages.findIndex(st => st.id === 'st-demoattend');
-      if (demoIdx !== -1) {
-        newStages.splice(demoIdx + 1, 0, freeClassStage);
-      } else {
-        newStages.push(freeClassStage);
-      }
-    }
-
     if (migrated) {
       setPipelineStages(newStages);
-      localStorage.setItem('crm_stages', JSON.stringify(newStages));
     }
   }, [pipelineStages]);
 
   const [integrations, setIntegrations] = useState(() => {
+    const hasReset = localStorage.getItem('crm_integrations_seed_reset_v3');
+    if (!hasReset) {
+      localStorage.setItem('crm_integrations_seed_reset_v3', 'true');
+      const local = localStorage.getItem('crm_integrations');
+      if (local) {
+        try {
+          const parsed = JSON.parse(local);
+          const merged = {
+            meta: { ...DEFAULT_INTEGRATIONS.meta, ...parsed.meta },
+            google: { ...DEFAULT_INTEGRATIONS.google, ...parsed.google },
+            whatsapp: { ...DEFAULT_INTEGRATIONS.whatsapp, ...parsed.whatsapp },
+            instagram: { ...DEFAULT_INTEGRATIONS.instagram, ...parsed.instagram },
+            webhooks: { ...DEFAULT_INTEGRATIONS.webhooks, ...parsed.webhooks }
+          };
+          localStorage.setItem('crm_integrations', JSON.stringify(merged));
+          return merged;
+        } catch (e) {
+          console.error("Error merging integrations state:", e);
+        }
+      }
+      localStorage.setItem('crm_integrations', JSON.stringify(DEFAULT_INTEGRATIONS));
+      return DEFAULT_INTEGRATIONS;
+    }
     const local = localStorage.getItem('crm_integrations');
     if (local) {
       try {
@@ -267,10 +269,11 @@ export const CRMProvider = ({ children }) => {
           meta: { ...DEFAULT_INTEGRATIONS.meta, ...parsed.meta },
           google: { ...DEFAULT_INTEGRATIONS.google, ...parsed.google },
           whatsapp: { ...DEFAULT_INTEGRATIONS.whatsapp, ...parsed.whatsapp },
+          instagram: { ...DEFAULT_INTEGRATIONS.instagram, ...parsed.instagram },
           webhooks: { ...DEFAULT_INTEGRATIONS.webhooks, ...parsed.webhooks }
         };
       } catch (e) {
-        console.error("Error parsing crm_integrations from localStorage:", e);
+        console.error("Error merging local integrations state:", e);
       }
     }
     return DEFAULT_INTEGRATIONS;
@@ -415,14 +418,10 @@ export const CRMProvider = ({ children }) => {
             uniqueLeadsMap.set(lead.id, { ...lead, source: normSource || lead.source || '' });
         });
         
-        // Keep all leads in the CRM list
-        const uniqueLeads = Array.from(uniqueLeadsMap.values());
+        // Filter out WhatsApp Campaign leads from showing in the CRM list
+        const uniqueLeads = Array.from(uniqueLeadsMap.values()).filter(lead => lead.source !== 'WhatsApp Campaign');
         
-        uniqueLeads.sort((a, b) => {
-          const dateA = new Date(a.createdDate || a.createdAt || 0).getTime();
-          const dateB = new Date(b.createdDate || b.createdAt || 0).getTime();
-          return dateB - dateA;
-        });
+        uniqueLeads.sort((a, b) => new Date(b.createdDate) - new Date(a.createdDate));
         setLeads(uniqueLeads);
       };
 
@@ -437,16 +436,6 @@ export const CRMProvider = ({ children }) => {
         } else {
           mainLeads = snapshot.docs.map(doc => {
             const data = doc.data();
-            
-            // Auto-downgrade Hot to Warm after 6 days
-            let temp = data.temperature || 'Hot';
-            if (temp === 'Hot' && data.createdDate) {
-              const diffMs = new Date() - new Date(data.createdDate);
-              if (diffMs > 6 * 24 * 60 * 60 * 1000) {
-                temp = 'Warm';
-              }
-            }
-
             return {
               email: '',
               course: '',
@@ -457,9 +446,11 @@ export const CRMProvider = ({ children }) => {
               lastContacted: data.createdDate || new Date().toISOString(),
               timeline: [],
               customFields: {},
+              instagramUserId: '',
+              instagramUsername: '',
+              instagramMessages: [],
               id: doc.id,
-              ...data,
-              temperature: temp
+              ...data
             };
           });
           updateLeads();
@@ -477,15 +468,6 @@ export const CRMProvider = ({ children }) => {
         if (!snapshot.empty) {
           iframeLeads = snapshot.docs.map(doc => {
             const data = doc.data();
-            
-            let temp = data.temperature || 'Hot';
-            if (temp === 'Hot' && data.createdDate) {
-              const diffMs = new Date() - new Date(data.createdDate);
-              if (diffMs > 6 * 24 * 60 * 60 * 1000) {
-                temp = 'Warm';
-              }
-            }
-
             return {
               email: '',
               course: '',
@@ -496,9 +478,11 @@ export const CRMProvider = ({ children }) => {
               lastContacted: data.createdDate || new Date().toISOString(),
               timeline: [],
               customFields: {},
+              instagramUserId: '',
+              instagramUsername: '',
+              instagramMessages: [],
               id: doc.id,
-              ...data,
-              temperature: temp
+              ...data
             };
           });
           updateLeads();
@@ -560,15 +544,10 @@ export const CRMProvider = ({ children }) => {
         } else {
           const orderMap = {
             'st-new': 0, 'st-contact': 1, 'st-interest': 2, 'st-demosched': 3,
-            'st-demoattend': 4, 'st-freeclass': 5, 'st-followup': 6, 'st-notinterest': 7,
-            'st-converted': 8, 'st-closed': 9
+            'st-demoattend': 4, 'st-followup': 5, 'st-notinterest': 6,
+            'st-converted': 7, 'st-closed': 8
           };
           const stagesData = snapshot.docs.map(doc => doc.data());
-          if (!stagesData.some(st => st.id === 'st-freeclass' || st.name === 'Free Class')) {
-            const freeClassStage = { id: 'st-freeclass', name: 'Free Class', color: '--color-freeclass', description: 'Attended free trial class', order: 5 };
-            stagesData.push(freeClassStage);
-            setDoc(doc(db, 'pipelineStages', freeClassStage.id), freeClassStage).catch(err => console.error("Error adding st-freeclass to Firestore:", err));
-          }
           stagesData.sort((a, b) => {
             const aIndex = a.order !== undefined ? a.order : (orderMap[a.id] !== undefined ? orderMap[a.id] : 999);
             const bIndex = b.order !== undefined ? b.order : (orderMap[b.id] !== undefined ? orderMap[b.id] : 999);
@@ -621,10 +600,14 @@ export const CRMProvider = ({ children }) => {
         if (!active) return;
         if (snapshot.exists()) {
           const data = snapshot.data();
-          setIntegrations(data);
-          try {
-            localStorage.setItem('crm_integrations', JSON.stringify(data));
-          } catch(e){}
+          const merged = {
+            meta: { ...DEFAULT_INTEGRATIONS.meta, ...data.meta },
+            google: { ...DEFAULT_INTEGRATIONS.google, ...data.google },
+            whatsapp: { ...DEFAULT_INTEGRATIONS.whatsapp, ...data.whatsapp },
+            instagram: { ...DEFAULT_INTEGRATIONS.instagram, ...data.instagram },
+            webhooks: { ...DEFAULT_INTEGRATIONS.webhooks, ...data.webhooks }
+          };
+          setIntegrations(merged);
         } else {
           setDoc(doc(db, 'settings', 'integrations'), DEFAULT_INTEGRATIONS)
             .catch(err => console.error("Firestore settings/integrations initialization failed:", err));
@@ -656,8 +639,6 @@ export const CRMProvider = ({ children }) => {
     localStorage.setItem('crm_leads', JSON.stringify(leads));
   }, [leads]);
 
-  // NOTE: crm_courses localStorage is written directly by onSnapshot, removeCourse, and updateCourse.
-  // No separate useEffect needed here — that would cause a redundant double-write.
 
   useEffect(() => {
     localStorage.setItem('crm_stages', JSON.stringify(pipelineStages));
@@ -798,6 +779,7 @@ export const CRMProvider = ({ children }) => {
     
     if (finalSource) {
       const srcLower = finalSource.toLowerCase().trim();
+
       if (srcLower === 'qr code walk-in') {
         finalSource = 'Walk-in';
         finalSubSource = finalSubSource || 'QR Code';
@@ -806,17 +788,17 @@ export const CRMProvider = ({ children }) => {
 
     const newLead = {
       id: newLeadId,
-      name: leadData.name || '',
+      name: leadData.name || 'Anonymous Inquiry',
       email: leadData.email || '',
       phone: leadData.phone || '',
       location: leadData.location || 'Website Source',
       education: leadData.education || 'Not Provided',
-      course: leadData.course || '',
+      course: leadData.course || (courses[0] ? courses[0].name : ''),
       source: finalSource,
       subSource: finalSubSource,
       counselor: leadData.counselor || activeUser,
       stage: leadData.stage || 'New Lead',
-      temperature: leadData.temperature || 'Hot',
+      temperature: leadData.temperature || 'Warm',
       createdDate: new Date().toISOString(),
       lastContacted: new Date().toISOString(),
       customFields: leadData.customFields || {},
@@ -830,7 +812,10 @@ export const CRMProvider = ({ children }) => {
           user: 'System'
         }
       ],
-      whatsappMessages: []
+      whatsappMessages: [],
+      instagramUserId: leadData.instagramUserId || '',
+      instagramUsername: leadData.instagramUsername || '',
+      instagramMessages: leadData.instagramMessages || []
     };
 
     if (isFirebaseEnabled) {
@@ -895,7 +880,10 @@ export const CRMProvider = ({ children }) => {
             user: 'System'
           }
         ],
-        whatsappMessages: []
+        whatsappMessages: [],
+        instagramUserId: leadData.instagramUserId || '',
+        instagramUsername: leadData.instagramUsername || '',
+        instagramMessages: leadData.instagramMessages || []
       };
     });
 
@@ -934,7 +922,7 @@ export const CRMProvider = ({ children }) => {
         // Generate an audit log entry for changes
         const auditLogs = [];
         Object.keys(updatedFields).forEach(key => {
-          if (lead[key] !== undefined && lead[key] !== updatedFields[key] && key !== 'timeline' && key !== 'whatsappMessages') {
+          if (lead[key] !== undefined && lead[key] !== updatedFields[key] && key !== 'timeline' && key !== 'whatsappMessages' && key !== 'instagramMessages') {
             auditLogs.push({
               id: `log-${Date.now()}-${Math.random()}`,
               type: 'system',
@@ -1110,8 +1098,14 @@ export const CRMProvider = ({ children }) => {
         // Determine if outcome maps to a pipeline stage shift
         let targetStage = callDetails.updateStage;
         if (!targetStage || targetStage === '') {
-          if (callDetails.status) {
-            targetStage = callDetails.status;
+          if (callDetails.status === 'Converted') {
+            targetStage = 'Converted';
+          } else if (callDetails.status === 'Not Interested') {
+            targetStage = 'Not Interested';
+          } else if (callDetails.status === 'Interested') {
+            targetStage = 'Interested';
+          } else if (callDetails.status === 'Call Later') {
+            targetStage = 'Follow-up';
           }
         }
 
@@ -1186,11 +1180,9 @@ export const CRMProvider = ({ children }) => {
 
         // Setup dynamic follow-up inside lead profile if scheduled
         if (callDetails.scheduleFollowup && callDetails.followupDate) {
-          nextFollowupDate = new Date(callDetails.followupDate).toISOString();
+          nextFollowupDate = new Date(callDetails.scheduleFollowup && callDetails.followupDate).toISOString();
           nextFollowupReason = callDetails.followupReason || 'Scheduled callback';
-        } else {
-          nextFollowupDate = null;
-          nextFollowupReason = null;
+          // Removed the duplicate nextTimeline.push here to avoid double entries
         }
 
         updatedLead = {
@@ -1421,19 +1413,16 @@ export const CRMProvider = ({ children }) => {
   };
 
   // Sending custom WhatsApp logs & triggering bot automated simulated reply
-  const sendWhatsAppMsg = async (leadId, messageText, templateData = null, mediaData = null) => {
-    if (!messageText.trim() && !templateData && !mediaData) return false;
+  const sendWhatsAppMsg = async (leadId, messageText, templateData = null) => {
+    if (!messageText.trim() && !templateData) return false;
 
     // 1. Optimistic UI Update - Show immediately in the chat interface
     const outgoingMsg = {
       id: `msg-sent-${Date.now()}`,
       sender: 'counselor',
       text: messageText,
-      mediaData: mediaData || null,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      status: 'sent',
-      isTemplate: !!templateData,
-      isCampaign: !!templateData
+      status: 'sent'
     };
 
     let updatedLead = null;
@@ -1481,8 +1470,7 @@ export const CRMProvider = ({ children }) => {
             recipientPhone: normalizedPhone,
             messageText: messageText,
             counselorName: activeUser,
-            templateData: templateData,
-            mediaData: mediaData
+            templateData: templateData
           })
         });
 
@@ -1499,8 +1487,8 @@ export const CRMProvider = ({ children }) => {
     }
 
     // 3. Fallback / Mock Behavior
-    // Do NOT trigger simulated bot auto-reply when sending WhatsApp template or campaign messages!
-    if (!apiSuccess && !templateData) {
+    // If the API failed (e.g. not configured yet), trigger the simulated bot response so the UI still feels alive.
+    if (!apiSuccess) {
       setTimeout(() => {
         triggerSimulatedBotReply(leadId, updatedLead?.name || 'Student', messageText);
       }, 3000);
@@ -1509,12 +1497,99 @@ export const CRMProvider = ({ children }) => {
     return true;
   };
 
+  const sendInstagramMsg = async (leadId, messageText) => {
+    if (!messageText.trim() || !leadId) return false;
+
+    const activeLead = leads.find(lead => lead.id === leadId);
+    if (!activeLead) return false;
+
+    const instagramUserId = activeLead.instagramUserId;
+    if (!instagramUserId) {
+      showToastMsg('Instagram User ID is missing for this lead.', 'error');
+      return false;
+    }
+
+    // 1. Optimistic UI Update - Show immediately in the chat interface
+    // eslint-disable-next-line react-hooks/purity
+    const tempId = `msg-sent-${Date.now()}`;
+    const outgoingMsg = {
+      id: tempId,
+      sender: 'counselor',
+      text: messageText,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      status: 'sending',
+      timestamp: new Date().toISOString()
+    };
+
+    const nextLeads = leads.map(lead => {
+      if (lead.id === leadId) {
+        const updatedChat = [...(lead.instagramMessages || []), outgoingMsg];
+        return { ...lead, instagramMessages: updatedChat };
+      }
+      return lead;
+    });
+    setLeads(nextLeads);
+
+    // 2. Network Dispatch
+    const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'leads-management-tz';
+    const url = `https://us-central1-${projectId}.cloudfunctions.net/sendInstagramMessage`;
+
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leadId,
+          instagramUserId,
+          messageText,
+          counselorName: activeUser
+        })
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        showToastMsg('Instagram message delivered!', 'success');
+        return { success: true };
+      } else {
+        const errMsg = data.error || 'Meta API returned an error';
+        showToastMsg(`Failed to send Instagram message: ${errMsg}`, 'error');
+        
+        // Mark local message as failed
+        setLeads(prevLeads => prevLeads.map(lead => {
+          if (lead.id === leadId) {
+            const updatedChat = (lead.instagramMessages || []).map(msg => 
+              msg.id === tempId ? { ...msg, status: 'failed' } : msg
+            );
+            return { ...lead, instagramMessages: updatedChat };
+          }
+          return lead;
+        }));
+        
+        return { success: false, error: errMsg };
+      }
+    } catch (err) {
+      console.error('Error sending Instagram message:', err);
+      showToastMsg('Network error sending Instagram message.', 'error');
+      
+      // Mark local message as failed
+      setLeads(prevLeads => prevLeads.map(lead => {
+        if (lead.id === leadId) {
+          const updatedChat = (lead.instagramMessages || []).map(msg => 
+            msg.id === tempId ? { ...msg, status: 'failed' } : msg
+          );
+          return { ...lead, instagramMessages: updatedChat };
+        }
+        return lead;
+      }));
+
+      return { success: false, error: err.message };
+    }
+  };
+
   const triggerSimulatedBotReply = (leadId, studentName, outgoingText) => {
-    const activeCoursesList = courses && courses.length > 0 ? courses : DEFAULT_COURSES;
-    const courseListStr = activeCoursesList.map((c, i) => `${i + 1}. ${c.name}${c.duration ? ` (${c.duration})` : ''}`).join('\n');
-    let coursesText = `We offer the following programs:\n${courseListStr}\n\nReply with the course number to get fee details!`;
-    const feeListStr = activeCoursesList.map(c => `- ${c.name}: ${c.fee || 'Contact for fee'}`).join('\n');
-    let feeDetails = `Our program fee structures are:\n${feeListStr}\n\nScholarships and monthly installment plans are available. Let us know if you want to speak to a counselor.`;
+    let coursesText = 'We offer the following programs:\n1. Full-Stack Web Development (6 Months)\n2. Data Science & AI (8 Months)\n3. Cloud & DevOps Engineering (5 Months)\n4. Cyber Security (6 Months)\n5. UI/UX Product Design (4 Months)\n\nReply with the course number to get fee details!';
+    let feeDetails = 'Our program fee structures are:\n- Web Development: ₹75,000\n- Data Science & AI: ₹95,000\n- Cloud & DevOps: ₹80,000\n- Cyber Security: ₹85,000\n- UI/UX Design: ₹60,000\n\nScholarships and monthly installment plans (EMIs starting at ₹5,000/month) are available. Let us know if you want to speak to a counselor.';
     
     try {
       const storedSettings = localStorage.getItem('gowha_chatbot');
@@ -2062,16 +2137,14 @@ export const CRMProvider = ({ children }) => {
       }
     };
 
-    setIntegrations(nextIntegrations);
-    try {
-      localStorage.setItem('crm_integrations', JSON.stringify(nextIntegrations));
-    } catch(e){}
-
     if (isFirebaseEnabled) {
       setDoc(doc(db, 'settings', 'integrations'), nextIntegrations)
         .catch(err => {
           console.error("Firestore save integrations failed:", err);
+          setIntegrations(nextIntegrations);
         });
+    } else {
+      setIntegrations(nextIntegrations);
     }
 
     if (!silent) {
@@ -2128,6 +2201,7 @@ export const CRMProvider = ({ children }) => {
       scheduleDemo,
       logDemoAttendance,
       sendWhatsAppMsg,
+      sendInstagramMsg,
       bulkReassignLeads,
       bulkUpdateStage,
       bulkUpdateSource,
