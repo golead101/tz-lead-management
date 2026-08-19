@@ -112,7 +112,8 @@ const CustomNode = ({ data, id }) => {
               <div key={index} style={{ 
                 background: '#f8fafc', padding: '8px 12px', borderRadius: '8px', 
                 fontSize: '0.8rem', fontWeight: 600, color: '#475569',
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                position: 'relative'
               }}>
                 {btn}
                 {/* Specific output handle for this button */}
@@ -120,7 +121,7 @@ const CustomNode = ({ data, id }) => {
                   type="source" 
                   position={Position.Right} 
                   id={btn}
-                  style={{ top: 'auto', bottom: 'auto', right: -21, width: 10, height: 10, background: styles.color, border: '2px solid white' }} 
+                  style={{ top: '50%', transform: 'translateY(-50%)', right: -21, width: 10, height: 10, background: styles.color, border: '2px solid white' }} 
                 />
               </div>
             ))}

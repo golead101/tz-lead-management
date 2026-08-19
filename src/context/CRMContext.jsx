@@ -938,7 +938,8 @@ export const CRMProvider = ({ children }) => {
           ...lead,
           ...updatedFields,
           lastContacted: new Date().toISOString(),
-          timeline: [...(lead.timeline || []), ...auditLogs]
+          timeline: [...(lead.timeline || []), ...auditLogs],
+          convertedAt: updatedFields.stage === 'Converted' ? new Date().toISOString() : (updatedFields.stage && updatedFields.stage !== 'Converted' ? null : (lead.convertedAt || null))
         };
         return updatedLead;
       }
@@ -1057,7 +1058,8 @@ export const CRMProvider = ({ children }) => {
           stage: nextStage,
           lastContacted: new Date().toISOString(),
           timeline: logs,
-          whatsappMessages: whatsappHistory
+          whatsappMessages: whatsappHistory,
+          convertedAt: nextStage === 'Converted' ? new Date().toISOString() : (nextStage !== 'Converted' ? null : (lead.convertedAt || null))
         };
         return updatedLead;
       }
@@ -1192,7 +1194,8 @@ export const CRMProvider = ({ children }) => {
           followupReason: nextFollowupReason,
           lastContacted: new Date().toISOString(),
           timeline: nextTimeline,
-          whatsappMessages: whatsappHistory
+          whatsappMessages: whatsappHistory,
+          convertedAt: nextStage === 'Converted' ? new Date().toISOString() : (nextStage !== 'Converted' ? null : (lead.convertedAt || null))
         };
         return updatedLead;
       }

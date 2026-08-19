@@ -252,7 +252,6 @@ exports.googleAdsWebhook = functions.https.onRequest(async (req, res) => {
     if (email) {
       const emailLeads = await db.collection('leads')
         .where('email', '==', email)
-        .where('source', '==', 'Google Ads')
         .get();
 
       // Check if any was created in the last 48 hours
@@ -1422,10 +1421,6 @@ exports.whatsappWebhook = functions.https.onRequest(async (req, res) => {
 
       const cleanedSenderPhone = senderPhoneRaw.replace(/[^0-9]/g, '');
 
-      // Query both 'leads' and 'i-frame' collections to find a phone number match
-      const leadsSnap = await db.collection('leads').get();
-      const iframeSnap = await db.collection('i-frame').get();
-
       let matchedLeadRef = null;
       let matchedLeadData = null;
 
@@ -1447,8 +1442,41 @@ exports.whatsappWebhook = functions.https.onRequest(async (req, res) => {
         }
       };
 
-      leadsSnap.forEach(checkDoc);
-      if (!matchedLeadRef && !iframeSnap.empty) {
+      // 1. Direct document lookup by ID (highly optimized)
+      const directLeadDoc = await db.collection('leads').doc(cleanedSenderPhone).get();
+      if (directLeadDoc.exists) {
+        checkDoc(directLeadDoc);
+      }
+
+      // 2. Query matches by phone field if direct lookup missed (indexed query)
+      if (!matchedLeadRef) {
+        const last10Digits = cleanedSenderPhone.length >= 10 ? cleanedSenderPhone.slice(-10) : '';
+        const phoneVariants = [
+          senderPhoneRaw,
+          cleanedSenderPhone,
+          `+${cleanedSenderPhone}`,
+          last10Digits ? `+91 ${last10Digits.slice(0, 5)} ${last10Digits.slice(5)}` : null,
+          last10Digits ? `+91${last10Digits}` : null,
+          last10Digits
+        ].filter(Boolean);
+
+        const leadsSnap = await db.collection('leads').where('phone', 'in', phoneVariants.slice(0, 10)).get();
+        leadsSnap.forEach(checkDoc);
+      }
+
+      // 3. Fallback to i-frame check if still not found (indexed query)
+      if (!matchedLeadRef) {
+        const last10Digits = cleanedSenderPhone.length >= 10 ? cleanedSenderPhone.slice(-10) : '';
+        const phoneVariants = [
+          senderPhoneRaw,
+          cleanedSenderPhone,
+          `+${cleanedSenderPhone}`,
+          last10Digits ? `+91 ${last10Digits.slice(0, 5)} ${last10Digits.slice(5)}` : null,
+          last10Digits ? `+91${last10Digits}` : null,
+          last10Digits
+        ].filter(Boolean);
+
+        const iframeSnap = await db.collection('i-frame').where('phone', 'in', phoneVariants.slice(0, 10)).get();
         iframeSnap.forEach(checkDoc);
       }
 
@@ -1514,7 +1542,7 @@ exports.whatsappWebhook = functions.https.onRequest(async (req, res) => {
           const matchedReply = replies.find(r => {
             if (!r.trigger) return false;
             const triggers = r.trigger.split(',').map(t => t.trim().toLowerCase());
-            return triggers.includes(lowerMsg);
+            return triggers.some(t => lowerMsg.includes(t) || t === lowerMsg);
           });
 
           if (matchedReply) {
@@ -2829,10 +2857,11 @@ exports.instagramWebhook = functions.https.onRequest(async (req, res) => {
                 else {
                   // Fallback to Quick Auto-Reply Rules
                   const replies = chatbotSettings.customReplies || [];
+                  const lowerMsg = messageText.toLowerCase().trim();
                   const matchedReply = replies.find(r => {
                     if (!r.trigger) return false;
                     const triggers = r.trigger.split(',').map(t => t.trim().toLowerCase());
-                    return triggers.includes(lowerMsg);
+                    return triggers.some(t => lowerMsg.includes(t) || t === lowerMsg);
                   });
 
                   if (matchedReply) {
