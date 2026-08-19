@@ -829,7 +829,7 @@ export default function GridView() {
 
   const uniqueMetaCampaigns = [...new Set(
     leads.filter(l => (l.source || '').toLowerCase().includes('meta'))
-         .map(l => l.campaign || l.campaignName)
+         .map(l => l.campaign || l.campaignName || l.subSource)
          .filter(Boolean)
   )];
 

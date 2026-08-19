@@ -330,7 +330,7 @@ export default function NewCampaign({ setSubView }) {
 
       const hasMetaSourceSelected = campaignSourceFilters.some(s => s.toLowerCase().includes('meta'));
       const matchCampaign = campaignNameFilter && hasMetaSourceSelected 
-        ? (lead.campaign === campaignNameFilter || lead.campaignName === campaignNameFilter) 
+        ? (lead.campaign === campaignNameFilter || lead.campaignName === campaignNameFilter || lead.subSource === campaignNameFilter) 
         : true;
 
       return matchCourse && matchStage && matchSource && matchCampaign;
@@ -341,7 +341,7 @@ export default function NewCampaign({ setSubView }) {
   const uniqueCourses = (courses && courses.length > 0) ? courses.map(c => c.name) : [...new Set(baseLeads.map(l => l.course).filter(Boolean))];
   const uniqueStages = [...new Set(baseLeads.map(l => l.stage).filter(Boolean))];
   const uniqueSources = [...new Set(baseLeads.map(l => normalizeLeadSource(l.source)).filter(Boolean))];
-  const uniqueCampaigns = [...new Set(baseLeads.filter(l => (l.source || '').toLowerCase().includes('meta')).map(l => l.campaign || l.campaignName).filter(Boolean))];
+  const uniqueCampaigns = [...new Set(baseLeads.filter(l => (l.source || '').toLowerCase().includes('meta')).map(l => l.campaign || l.campaignName || l.subSource).filter(Boolean))];
 
   useEffect(() => {
     if (selectedListId) {
