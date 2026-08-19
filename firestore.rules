@@ -80,7 +80,7 @@ service cloud.firestore {
     // ─────────────────────────────────────────────
     match /settings/{documentId} {
       allow read: if documentId == 'live_form' || documentId == 'qr_form';
-      allow read: if isStaff() && (documentId == 'whatsapp_chatbot' || documentId == 'whatsapp_api' || documentId == 'instagram_chatbot');
+      allow read: if isStaff() && (documentId == 'whatsapp_chatbot' || documentId == 'whatsapp_api');
       allow read, write: if isAdmin();
     }
 

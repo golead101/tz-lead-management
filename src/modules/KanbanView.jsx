@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useCRM } from '../context/CRMContext';
+import { useCRM, normalizeLeadSource } from '../context/CRMContext';
 
 export default function KanbanView() {
   const {
@@ -22,7 +22,7 @@ export default function KanbanView() {
   const [selectedSource, setSelectedSource] = useState('All');
 
   // Dynamically extract unique lead sources from database to populate filter list
-  const uniqueSources = ['All', ...new Set(leads.map(l => l.source).filter(Boolean))];
+  const uniqueSources = ['All', ...new Set(leads.map(l => normalizeLeadSource(l.source)).filter(Boolean))];
 
   // Transition Modal State (for logging outcome notes manually)
   const [transitionPrompt, setTransitionPrompt] = useState(null); // { leadId, nextStage, leadName }
@@ -35,15 +35,20 @@ export default function KanbanView() {
 
     // Role-based security (Counselors only see assigned leads, plus global sources)
     if (activeRole === 'Counselor' && lead.counselor !== activeUser) {
-      const src = (lead.source || '').toLowerCase();
-      const isGlobal = src.includes('meta') || src.includes('google') || src.includes('website');
-      if (!isGlobal) return false;
+      return false;
     }
 
     // Dropdown filters
     if (selectedCourse !== 'All' && lead.course !== selectedCourse) return false;
-    if (selectedCounselor !== 'All' && lead.counselor !== selectedCounselor) return false;
-    if (selectedSource !== 'All' && lead.source !== selectedSource) return false;
+    if (selectedCounselor !== 'All') {
+      if (selectedCounselor === 'Unassigned') {
+        const coun = (lead.counselor || '').trim().toLowerCase();
+        if (coun !== '' && coun !== 'unassigned' && coun !== 'none') return false;
+      } else if (lead.counselor !== selectedCounselor) {
+        return false;
+      }
+    }
+    if (selectedSource !== 'All' && normalizeLeadSource(lead.source) !== selectedSource) return false;
 
     // Search query matches Name, Phone, Email
     if (searchQuery) {
@@ -133,21 +138,27 @@ export default function KanbanView() {
             ))}
           </select>
 
-          {/* Counselor filter */}
-          {activeRole !== 'Counselor' && (
-            <select 
-              value={selectedCounselor} 
-              onChange={(e) => setSelectedCounselor(e.target.value)}
-              className="filter-select"
-            >
-              <option value="All">All Counselors</option>
-              {counselors.map(c => (
-                <option key={c.id} value={c.name}>
-                  {c.name} {c.status === 'Deactivated' ? '(Deactivated)' : ''}
-                </option>
-              ))}
-            </select>
-          )}
+          {/* ASSIGNED TO filter */}
+          <select 
+            value={activeRole === 'Counselor' ? activeUser : selectedCounselor} 
+            onChange={(e) => setSelectedCounselor(e.target.value)}
+            className="filter-select"
+            disabled={activeRole === 'Counselor'}
+          >
+            {activeRole === 'Counselor' ? (
+              <option value={activeUser}>{activeUser}</option>
+            ) : (
+              <>
+                <option value="All">ASSIGNED TO: ALL</option>
+                <option value="Unassigned">Unassigned</option>
+                {counselors.map(c => (
+                  <option key={c.id} value={c.name}>
+                    {c.name} {c.status === 'Deactivated' ? '(Deactivated)' : ''}
+                  </option>
+                ))}
+              </>
+            )}
+          </select>
 
 
 
@@ -160,7 +171,7 @@ export default function KanbanView() {
             <option value="All">All Sources</option>
             {uniqueSources.filter(s => s !== 'All').map(source => (
               <option key={source} value={source}>
-                {source === 'Website Form' || source === 'Website Form Widget' || source === 'Website' ? 'Website Leads' : source}
+                {source}
               </option>
             ))}
           </select>
@@ -190,9 +201,7 @@ export default function KanbanView() {
                 }}
               >
                 <div className="card-top">
-                  <span className="card-title" title={lead.source === 'Instagram' && lead.name?.startsWith('Instagram User') && lead.instagramUsername ? lead.instagramUsername : lead.name}>
-                    {lead.source === 'Instagram' && lead.name?.startsWith('Instagram User') && lead.instagramUsername ? lead.instagramUsername : lead.name}
-                  </span>
+                  <span className="card-title" title={lead.name}>{lead.name}</span>
                 </div>
 
                 <div className="card-course">{lead.course}</div>

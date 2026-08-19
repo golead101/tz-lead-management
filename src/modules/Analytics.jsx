@@ -14,9 +14,7 @@ export default function Analytics() {
   // Filter leads based on counselor permissions
   const visibleLeads = leads.filter(lead => {
     if (activeRole === 'Counselor') {
-      const src = (lead.source || '').toLowerCase();
-      const isGlobal = src.includes('meta') || src.includes('google') || src.includes('website');
-      return lead.counselor === activeUser || isGlobal;
+      return lead.counselor === activeUser;
     }
     return true;
   });
@@ -139,7 +137,7 @@ export default function Analytics() {
   // --- New Analytical Metrics Calculations ---
   // 1. Funnel
   const funnelNew = visibleLeads.length;
-  const funnelDemo = visibleLeads.filter(l => ['Demo Scheduled', 'Demo Attended', 'Converted'].includes(l.stage)).length;
+  const funnelDemo = visibleLeads.filter(l => ['Demo Scheduled', 'Demo Attended', 'Free Class', 'Converted'].includes(l.stage)).length;
   const funnelConverted = visibleLeads.filter(l => l.stage === 'Converted').length;
 
   // 2. Velocity (Time to Conversion)
@@ -181,7 +179,7 @@ export default function Analytics() {
     const name = (c && c.name) || (c && c.email) || c || 'Unknown';
     const cLeads = visibleLeads.filter(l => l.counselor === name);
     const total = cLeads.length;
-    const demos = cLeads.filter(l => ['Demo Scheduled', 'Demo Attended', 'Converted'].includes(l.stage)).length;
+    const demos = cLeads.filter(l => ['Demo Scheduled', 'Demo Attended', 'Free Class', 'Converted'].includes(l.stage)).length;
     return {
       name,
       demoRate: total > 0 ? Math.round((demos / total) * 100) : 0,

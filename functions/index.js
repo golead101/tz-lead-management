@@ -1327,7 +1327,7 @@ exports.sendInstagramMessage = functions.https.onRequest((req, res) => {
  * whatsappWebhook
  * Public webhook endpoint for receiving incoming WhatsApp text replies and handshakes.
  */
-exports.whatsappWebhook = functions.https.onRequest((req, res) => {
+exports.whatsappWebhook = functions.https.onRequest(async (req, res) => {
   if (req.method === 'GET') {
     try {
       const mode = req.query['hub.mode'];
@@ -1384,164 +1384,190 @@ exports.whatsappWebhook = functions.https.onRequest((req, res) => {
 
       const senderPhoneRaw = message.from;
       const senderName = contact?.profile?.name || 'WhatsApp Student';
-      let messageText = message.text?.body || '';
-      if (message.type === 'interactive') {
+      let messageText = '';
+      if (message.text?.body) {
+        messageText = message.text.body;
+      } else if (typeof message.text === 'string') {
+        messageText = message.text;
+      } else if (message.type === 'interactive') {
         if (message.interactive?.button_reply) {
-          messageText = message.interactive.button_reply.title;
+          messageText = message.interactive.button_reply.title || message.interactive.button_reply.id || '';
         } else if (message.interactive?.list_reply) {
-          messageText = message.interactive.list_reply.title;
+          messageText = message.interactive.list_reply.title || message.interactive.list_reply.id || '';
         }
+      } else if (message.type === 'button') {
+        if (typeof message.button === 'string') {
+          messageText = message.button;
+        } else if (message.button) {
+          messageText = message.button.text || message.button.payload || '';
+        } else if (message.button_reply) {
+          messageText = message.button_reply.title || message.button_reply.id || '';
+        }
+      }
+
+      // Exhaustive fallback checks for button text across all WhatsApp webhook schemas
+      if (!messageText) {
+        messageText = message.button?.text ||
+                      message.button?.payload ||
+                      (typeof message.button === 'string' ? message.button : '') ||
+                      message.interactive?.button_reply?.title ||
+                      message.interactive?.button_reply?.id ||
+                      message.interactive?.list_reply?.title ||
+                      message.button_reply?.title ||
+                      message.button_reply?.id ||
+                      message.text?.body ||
+                      message.body ||
+                      '';
       }
 
       const cleanedSenderPhone = senderPhoneRaw.replace(/[^0-9]/g, '');
 
-      // Query leads collection to find a phone number match
-      return db.collection('leads').get()
-        .then(async (leadsSnap) => {
-          let matchedLeadRef = null;
-          let matchedLeadData = null;
+      // Query both 'leads' and 'i-frame' collections to find a phone number match
+      const leadsSnap = await db.collection('leads').get();
+      const iframeSnap = await db.collection('i-frame').get();
 
-          leadsSnap.forEach((doc) => {
-            const lead = doc.data();
-            if (lead.phone) {
-              const cleanedLeadPhone = String(lead.phone).replace(/[^0-9]/g, '');
-              if (cleanedLeadPhone === cleanedSenderPhone ||
-                (cleanedLeadPhone.length >= 10 && cleanedSenderPhone.length >= 10 &&
-                  cleanedLeadPhone.slice(-10) === cleanedSenderPhone.slice(-10))) {
-                matchedLeadRef = doc.ref;
-                matchedLeadData = lead;
-              }
-            }
-          });
+      let matchedLeadRef = null;
+      let matchedLeadData = null;
 
-          const inboundMsg = {
-            id: `msg-recv-${Date.now()}`,
-            sender: 'lead',
-            text: messageText || `[${message.type || 'attachment'} shared]`,
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            waMessageId: message.id || null,
-            timestamp: new Date().toISOString()
-          };
+      const checkDoc = (docSnap) => {
+        if (matchedLeadRef) return;
+        const lead = docSnap.data() || {};
+        const docId = docSnap.id || '';
 
-          if (matchedLeadRef && matchedLeadData) {
-            console.log(`[WhatsApp Webhook] Appending to lead: ${matchedLeadData.name}`);
+        const phoneVal = lead.phone || docId || '';
+        const cleanedLeadPhone = String(phoneVal).replace(/[^0-9]/g, '');
 
-            const updatedChat = [...(matchedLeadData.whatsappMessages || []), inboundMsg];
-            const nextTimeline = [...(matchedLeadData.timeline || []), {
-              id: `log-wa-in-${Date.now()}`,
-              type: 'whatsapp',
-              title: 'WhatsApp Received',
-              content: messageText || `[${message.type || 'attachment'} shared]`,
-              timestamp: new Date().toISOString(),
-              user: 'System'
-            }];
-
-            await matchedLeadRef.update({
-              whatsappMessages: updatedChat,
-              timeline: nextTimeline,
-              lastContacted: new Date().toISOString()
-            });
-
-          } else {
-            console.log(`[WhatsApp Webhook] Creating new lead for phone ${senderPhoneRaw}`);
-
-            let formattedPhone = senderPhoneRaw;
-            if (senderPhoneRaw.startsWith('91') && senderPhoneRaw.length === 12) {
-              formattedPhone = `+91 ${senderPhoneRaw.slice(2, 7)} ${senderPhoneRaw.slice(7)}`;
-            } else if (!senderPhoneRaw.startsWith('+')) {
-              formattedPhone = `+${senderPhoneRaw}`;
-            }
-
-            const newLeadId = cleanedSenderPhone || `lead-wa-inbound-${Date.now()}`;
-            const newLead = {
-              id: newLeadId,
-              name: senderName,
-              phone: formattedPhone,
-              whatsappMessages: [inboundMsg],
-              createdDate: new Date().toISOString()
-            };
-
-            await db.collection('leads').doc(newLeadId).set(newLead);
+        if (cleanedLeadPhone && cleanedSenderPhone) {
+          if (cleanedLeadPhone === cleanedSenderPhone ||
+            (cleanedLeadPhone.length >= 10 && cleanedSenderPhone.length >= 10 &&
+              cleanedLeadPhone.slice(-10) === cleanedSenderPhone.slice(-10))) {
+            matchedLeadRef = docSnap.ref;
+            matchedLeadData = lead;
           }
+        }
+      };
 
-          // === CHATBOT AUTO-REPLY LOGIC ===
-          const messageTimestamp = message.timestamp ? parseInt(message.timestamp, 10) * 1000 : Date.now();
-          const isOldMessage = (Date.now() - messageTimestamp) > 2 * 60 * 1000; // Ignore > 2 mins old
+      leadsSnap.forEach(checkDoc);
+      if (!matchedLeadRef && !iframeSnap.empty) {
+        iframeSnap.forEach(checkDoc);
+      }
 
-          if (messageText && !isOldMessage) {
-            try {
-              const chatbotDoc = await db.collection('settings').doc('whatsapp_chatbot').get();
-              if (chatbotDoc.exists) {
-                const chatbotSettings = chatbotDoc.data();
-                const replies = chatbotSettings.customReplies || [];
+      const inboundMsg = {
+        id: `msg-recv-${Date.now()}`,
+        sender: 'lead',
+        text: messageText || `[${message.type || 'attachment'} shared]`,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        waMessageId: message.id || null,
+        timestamp: new Date().toISOString()
+      };
 
-                // Find a match (case-insensitive)
-                const lowerMsg = messageText.toLowerCase().trim();
-                const matchedReply = replies.find(r => {
-                  if (!r.trigger) return false;
-                  const triggers = r.trigger.split(',').map(t => t.trim().toLowerCase());
-                  return triggers.includes(lowerMsg);
-                });
+      if (matchedLeadRef && matchedLeadData) {
+        console.log(`[WhatsApp Webhook] Appending to lead: ${matchedLeadData.name || matchedLeadData.id}`);
 
-                if (matchedReply) {
-                  console.log(`[WhatsApp Webhook] Trigger matched for "${lowerMsg}":`, matchedReply.responseType);
+        const updatedChat = [...(matchedLeadData.whatsappMessages || []), inboundMsg];
+        const nextTimeline = [...(matchedLeadData.timeline || []), {
+          id: `log-wa-in-${Date.now()}`,
+          type: 'whatsapp',
+          title: 'WhatsApp Received',
+          content: messageText || `[${message.type || 'attachment'} shared]`,
+          timestamp: new Date().toISOString(),
+          user: 'System'
+        }];
 
-                  const creds = await getDecryptedWhatsAppCredentials();
-                  if (creds.accessToken && creds.phoneNumberId) {
-                    let payload = {
-                      messaging_product: 'whatsapp',
-                      recipient_type: 'individual',
-                      to: senderPhoneRaw
-                    };
-
-                    if (matchedReply.responseType === 'Text') {
-                      payload.type = 'text';
-                      payload.text = { preview_url: false, body: matchedReply.preview };
-                    } else if (matchedReply.responseType === 'Template') {
-                      payload.type = 'template';
-                      payload.template = { name: matchedReply.preview, language: { code: 'en' } };
-                    } else if (matchedReply.responseType === 'Document') {
-                      const docFile = (chatbotSettings.mediaFiles || []).find(f => f.name === matchedReply.preview);
-                      if (docFile && docFile.url) {
-                        payload.type = 'document';
-                        payload.document = { link: docFile.url, filename: docFile.name };
-                      }
-                    } else if (matchedReply.responseType === 'Buttons') {
-                      payload.type = 'interactive';
-                      const buttons = (Array.isArray(matchedReply.buttons) ? matchedReply.buttons : []).map((btn, i) => ({
-                        type: 'reply',
-                        reply: { id: `btn_${i}`, title: btn.substring(0, 20) }
-                      }));
-                      payload.interactive = {
-                        type: 'button',
-                        body: { text: matchedReply.preview },
-                        action: { buttons }
-                      };
-                    }
-
-                    if (payload.type) {
-                      const url = `https://graph.facebook.com/${creds.apiVersion}/${creds.phoneNumberId}/messages`;
-                      await axios.post(url, payload, {
-                        headers: { 'Authorization': `Bearer ${creds.accessToken}`, 'Content-Type': 'application/json' }
-                      });
-                      console.log(`[WhatsApp Webhook] Chatbot auto-reply sent successfully!`);
-                    }
-                  }
-                }
-              }
-            } catch (botErr) {
-              console.error('[WhatsApp Webhook] Chatbot auto-reply error:', botErr.message);
-            }
-          }
-          // ===============================
-
-          return res.status(200).send('EVENT_RECEIVED');
-        })
-        .catch((err) => {
-          console.error('[WhatsApp Webhook] Query error:', err);
-          return res.status(500).send('Internal Server Error');
+        await matchedLeadRef.update({
+          whatsappMessages: updatedChat,
+          timeline: nextTimeline,
+          lastContacted: new Date().toISOString()
         });
 
+      } else {
+        console.log(`[WhatsApp Webhook] Creating new lead for phone ${senderPhoneRaw}`);
+
+        let formattedPhone = senderPhoneRaw;
+        if (senderPhoneRaw.startsWith('91') && senderPhoneRaw.length === 12) {
+          formattedPhone = `+91 ${senderPhoneRaw.slice(2, 7)} ${senderPhoneRaw.slice(7)}`;
+        } else if (!senderPhoneRaw.startsWith('+')) {
+          formattedPhone = `+${senderPhoneRaw}`;
+        }
+
+        const newLeadId = cleanedSenderPhone || `lead-wa-inbound-${Date.now()}`;
+        const newLead = {
+          id: newLeadId,
+          name: senderName,
+          phone: formattedPhone,
+          whatsappMessages: [inboundMsg],
+          createdDate: new Date().toISOString(),
+          createdAt: new Date().toISOString()
+        };
+
+        await db.collection('leads').doc(newLeadId).set(newLead);
+      }
+
+      try {
+        const chatbotDoc = await db.collection('settings').doc('whatsapp_chatbot').get();
+        if (chatbotDoc.exists) {
+          const chatbotSettings = chatbotDoc.data();
+          const replies = chatbotSettings.customReplies || [];
+          
+          // Find a match (case-insensitive)
+          const lowerMsg = messageText.toLowerCase().trim();
+          const matchedReply = replies.find(r => {
+            if (!r.trigger) return false;
+            const triggers = r.trigger.split(',').map(t => t.trim().toLowerCase());
+            return triggers.includes(lowerMsg);
+          });
+
+          if (matchedReply) {
+            console.log(`[WhatsApp Webhook] Trigger matched for "${lowerMsg}":`, matchedReply.responseType);
+            
+            const creds = await getDecryptedWhatsAppCredentials();
+            if (creds.accessToken && creds.phoneNumberId) {
+              let payload = {
+                messaging_product: 'whatsapp',
+                recipient_type: 'individual',
+                to: senderPhoneRaw
+              };
+
+              if (matchedReply.responseType === 'Text') {
+                payload.type = 'text';
+                payload.text = { preview_url: false, body: matchedReply.preview };
+              } else if (matchedReply.responseType === 'Template') {
+                payload.type = 'template';
+                payload.template = { name: matchedReply.preview, language: { code: 'en' } };
+              } else if (matchedReply.responseType === 'Document') {
+                const docFile = (chatbotSettings.mediaFiles || []).find(f => f.name === matchedReply.preview);
+                if (docFile && docFile.url) {
+                  payload.type = 'document';
+                  payload.document = { link: docFile.url, filename: docFile.name };
+                }
+              } else if (matchedReply.responseType === 'Buttons') {
+                payload.type = 'interactive';
+                const buttons = (Array.isArray(matchedReply.buttons) ? matchedReply.buttons : []).map((btn, i) => ({
+                  type: 'reply',
+                  reply: { id: `btn_${i}`, title: btn.substring(0, 20) }
+                }));
+                payload.interactive = {
+                  type: 'button',
+                  body: { text: matchedReply.preview },
+                  action: { buttons }
+                };
+              }
+
+              if (payload.type) {
+                const url = `https://graph.facebook.com/${creds.apiVersion}/${creds.phoneNumberId}/messages`;
+                await axios.post(url, payload, {
+                  headers: { 'Authorization': `Bearer ${creds.accessToken}`, 'Content-Type': 'application/json' }
+                });
+                console.log(`[WhatsApp Webhook] Chatbot auto-reply sent successfully!`);
+              }
+            }
+          }
+        }
+      } catch (botErr) {
+        console.error('[WhatsApp Webhook] Chatbot auto-reply error:', botErr.message);
+      }
+
+      return res.status(200).send('EVENT_RECEIVED');
     } catch (err) {
       console.error('[WhatsApp Webhook] Processing error:', err);
       return res.status(500).send('Internal Server Error');
@@ -1818,6 +1844,139 @@ function matchFAQChoice(text) {
   return null;
 }
 
+function getCanonicalPhone(phoneStr) {
+  if (!phoneStr) return '';
+  // Remove all non-digits (spaces, hyphens, parentheses, plus sign, etc.)
+  const cleanDigits = String(phoneStr).replace(/\D/g, '');
+  // Take the last 10 digits to resolve +91, 91, 0, etc.
+  return cleanDigits.slice(-10);
+}
+
+async function deduplicateInstagramLead({ senderId, rawPhone, currentLeadData, currentLeadId, finalUsername, finalDisplayName }) {
+  const canonicalSearchPhone = getCanonicalPhone(rawPhone);
+  console.log(`[Instagram Lead Dedup] RAW_PHONE: ${rawPhone}`);
+  console.log(`[Instagram Lead Dedup] CANONICAL_PHONE: ${canonicalSearchPhone}`);
+  console.log(`[Instagram Lead Dedup] LEAD_LOOKUP_START: Searching for canonical phone ${canonicalSearchPhone}`);
+
+  if (!canonicalSearchPhone || canonicalSearchPhone.length < 10) {
+    console.log(`[Instagram Lead Dedup] Normalized phone too short: ${canonicalSearchPhone}. Skipping search.`);
+    console.log(`[Instagram Lead Dedup] CREATING_NEW_LEAD: true`);
+    return null;
+  }
+
+  // 1. Fetch all leads to find a match by canonical phone
+  const leadsSnap = await db.collection('leads').get();
+  console.log(`[Instagram Lead Dedup] LEAD_LOOKUP_RESULTS: Scanned ${leadsSnap.size} leads`);
+  let existingLeadDoc = null;
+  let existingLeadData = null;
+
+  leadsSnap.forEach((doc) => {
+    const data = doc.data();
+    if (data.phone) {
+      const canonicalLeadPhone = getCanonicalPhone(data.phone);
+      // Exclude the current temporary shell lead
+      if (canonicalLeadPhone === canonicalSearchPhone && doc.id !== currentLeadId) {
+        existingLeadDoc = doc;
+        existingLeadData = data;
+      }
+    }
+  });
+
+  const found = !!existingLeadDoc;
+  if (found) {
+    const existingLeadId = existingLeadDoc.id;
+    console.log(`[Instagram Lead Dedup] MATCHED_LEAD_ID: ${existingLeadId}`);
+    console.log(`[Instagram Lead Dedup] MATCHED_LEAD_PHONE: ${existingLeadData.phone}`);
+    console.log(`[Instagram Lead Dedup] MATCHED_LEAD_SOURCE: ${existingLeadData.source}`);
+    console.log(`[Instagram Lead Dedup] REUSING_EXISTING_LEAD: ${existingLeadId}`);
+
+    // 2. Perform merge using a transaction to avoid race conditions
+    await db.runTransaction(async (transaction) => {
+      // Get fresh data inside the transaction
+      const freshExistingSnap = await transaction.get(db.collection('leads').doc(existingLeadId));
+      if (!freshExistingSnap.exists) {
+        throw new Error('Existing lead not found during transaction');
+      }
+      const existingData = freshExistingSnap.data();
+
+      // Name handling: Preserve existing name if proper; otherwise use Instagram display name or username
+      let finalName = existingData.name || '';
+      const isNamePlaceholder = !finalName || 
+        finalName.toLowerCase().startsWith('instagram user') ||
+        ['test', 'student', 'walk-in', 'guest', 'unnamed', 'placeholder'].includes(finalName.toLowerCase().trim());
+      
+      if (isNamePlaceholder) {
+        if (finalDisplayName && !finalDisplayName.toLowerCase().startsWith('instagram user')) {
+          finalName = finalDisplayName;
+        } else if (finalUsername && !finalUsername.toLowerCase().startsWith('instagram user')) {
+          finalName = finalUsername;
+        } else if (currentLeadData && currentLeadData.name && !currentLeadData.name.toLowerCase().startsWith('instagram user')) {
+          finalName = currentLeadData.name;
+        }
+      }
+
+      // Source handling: Do not replace original source. Keep it.
+      const originalSource = existingData.source || 'Walk-in';
+      const existingChannels = existingData.channels || [originalSource];
+      const updatedChannels = Array.from(new Set([...existingChannels, 'Instagram']));
+
+      // Merge Instagram message history
+      const existingMsgs = existingData.instagramMessages || [];
+      const shellMsgs = currentLeadData ? (currentLeadData.instagramMessages || []) : [];
+      const mergedMsgs = [...existingMsgs];
+      shellMsgs.forEach(sMsg => {
+        const alreadyExists = mergedMsgs.some(eMsg => 
+          (sMsg.igMessageId && eMsg.igMessageId === sMsg.igMessageId) ||
+          (!sMsg.igMessageId && eMsg.text === sMsg.text && eMsg.time === sMsg.time)
+        );
+        if (!alreadyExists) {
+          mergedMsgs.push(sMsg);
+        }
+      });
+
+      // Merge timeline logs
+      const existingTimeline = existingData.timeline || [];
+      const shellTimeline = currentLeadData ? (currentLeadData.timeline || []) : [];
+      const mergedTimeline = [...existingTimeline];
+      shellTimeline.forEach(sLog => {
+        const alreadyExists = mergedTimeline.some(eLog => eLog.id === sLog.id);
+        if (!alreadyExists) {
+          mergedTimeline.push(sLog);
+        }
+      });
+
+      // Update fields
+      const updateData = {
+        name: finalName,
+        source: originalSource,
+        channels: updatedChannels,
+        instagramUserId: senderId,
+        instagramUsername: finalUsername || existingData.instagramUsername || '',
+        instagramMessages: mergedMsgs,
+        timeline: mergedTimeline,
+        lastContacted: new Date().toISOString(),
+        instagramSenderId: senderId,
+        instagramConversationId: senderId,
+        lastInstagramMessageAt: new Date().toISOString()
+      };
+
+      transaction.update(db.collection('leads').doc(existingLeadId), updateData);
+
+      if (currentLeadId && currentLeadId !== existingLeadId) {
+        transaction.delete(db.collection('leads').doc(currentLeadId));
+      }
+    });
+
+    return {
+      id: existingLeadId,
+      ref: db.collection('leads').doc(existingLeadId)
+    };
+  } else {
+    console.log(`[Instagram Lead Dedup] CREATING_NEW_LEAD: ${currentLeadId}`);
+    return null;
+  }
+}
+
 // ==================== END INSTAGRAM CHATBOT HELPERS ====================
 
 /**
@@ -2028,6 +2187,8 @@ exports.instagramWebhook = functions.https.onRequest(async (req, res) => {
           }
         }
       }
+      
+      let activeLeadId = matchedLeadRef ? matchedLeadRef.id : expectedLeadId;
 
       if (isDuplicate) {
         console.log(`[Instagram Webhook] Duplicate message ignored: mid = ${messageId}`);
@@ -2139,7 +2300,7 @@ exports.instagramWebhook = functions.https.onRequest(async (req, res) => {
 
             if (chatbotSettings.enabled) {
               // Fetch latest lead data to ensure state is fresh
-              const freshLeadDoc = await db.collection('leads').doc(expectedLeadId).get();
+              const freshLeadDoc = await db.collection('leads').doc(activeLeadId).get();
               let currentLeadData = freshLeadDoc.exists ? freshLeadDoc.data() : null;
 
               if (currentLeadData && (currentLeadData.botPaused || currentLeadData.handoffRequired)) {
@@ -2243,12 +2404,31 @@ exports.instagramWebhook = functions.https.onRequest(async (req, res) => {
 
                         console.log(`[Instagram Chatbot] Extracted name: ${finalName}`);
 
-                        updatedFields.name = finalName;
-                        updatedFields.phone = normalizedPhone;
-                        updatedFields.source = "Instagram";
-                        updatedFields.stage = "New Lead";
+                        // Deduplicate lead before proceeding
+                        const dedupResult = await deduplicateInstagramLead({
+                          senderId,
+                          rawPhone,
+                          currentLeadData: { ...currentLeadData, name: finalName },
+                          currentLeadId: activeLeadId,
+                          finalUsername,
+                          finalDisplayName
+                        });
 
-                        console.log(`[Instagram Chatbot] Lead updated: ${expectedLeadId}`);
+                        if (dedupResult) {
+                          activeLeadId = dedupResult.id;
+                          matchedLeadRef = dedupResult.ref;
+                          const mergedDoc = await matchedLeadRef.get();
+                          currentLeadData = mergedDoc.exists ? mergedDoc.data() : null;
+                          updatedFields = {};
+                        } else {
+                          updatedFields.name = finalName;
+                          updatedFields.phone = normalizedPhone;
+                          updatedFields.source = "Instagram";
+                          updatedFields.stage = "New Lead";
+                        }
+
+                        console.log(`[Instagram Chatbot] Lead updated: ${activeLeadId}`);
+                        console.log(`[Instagram Lead Dedup] FINAL_ACTIVE_LEAD_ID: ${activeLeadId}`);
                         console.log('[Instagram Chatbot] Advancing to Course Selection');
 
                         nextNodeId = "course_selection";
@@ -2304,11 +2484,30 @@ exports.instagramWebhook = functions.https.onRequest(async (req, res) => {
                         updatedCollectedFields.phone = true;
                         updatedCollectedFields.name = true;
 
-                        updatedFields.phone = normalizedPhone;
-                        updatedFields.source = "Instagram";
-                        updatedFields.stage = "New Lead";
+                        // Deduplicate lead before proceeding
+                        const dedupResult = await deduplicateInstagramLead({
+                          senderId,
+                          rawPhone,
+                          currentLeadData,
+                          currentLeadId: activeLeadId,
+                          finalUsername,
+                          finalDisplayName
+                        });
 
-                        console.log(`[Instagram Chatbot] Lead updated: ${expectedLeadId}`);
+                        if (dedupResult) {
+                          activeLeadId = dedupResult.id;
+                          matchedLeadRef = dedupResult.ref;
+                          const mergedDoc = await matchedLeadRef.get();
+                          currentLeadData = mergedDoc.exists ? mergedDoc.data() : null;
+                          updatedFields = {};
+                        } else {
+                          updatedFields.phone = normalizedPhone;
+                          updatedFields.source = "Instagram";
+                          updatedFields.stage = "New Lead";
+                        }
+
+                        console.log(`[Instagram Chatbot] Lead updated: ${activeLeadId}`);
+                        console.log(`[Instagram Lead Dedup] FINAL_ACTIVE_LEAD_ID: ${activeLeadId}`);
                         console.log('[Instagram Chatbot] Advancing to Course Selection');
 
                         nextNodeId = "course_selection";
@@ -2362,12 +2561,31 @@ exports.instagramWebhook = functions.https.onRequest(async (req, res) => {
 
                         console.log(`[Instagram Chatbot] Extracted name: ${finalName}`);
 
-                        updatedFields.name = finalName;
-                        updatedFields.phone = normalizedPhone;
-                        updatedFields.source = "Instagram";
-                        updatedFields.stage = "New Lead";
+                        // Deduplicate lead before proceeding
+                        const dedupResult = await deduplicateInstagramLead({
+                          senderId,
+                          rawPhone,
+                          currentLeadData: { ...currentLeadData, name: finalName },
+                          currentLeadId: activeLeadId,
+                          finalUsername,
+                          finalDisplayName
+                        });
 
-                        console.log(`[Instagram Chatbot] Lead updated: ${expectedLeadId}`);
+                        if (dedupResult) {
+                          activeLeadId = dedupResult.id;
+                          matchedLeadRef = dedupResult.ref;
+                          const mergedDoc = await matchedLeadRef.get();
+                          currentLeadData = mergedDoc.exists ? mergedDoc.data() : null;
+                          updatedFields = {};
+                        } else {
+                          updatedFields.name = finalName;
+                          updatedFields.phone = normalizedPhone;
+                          updatedFields.source = "Instagram";
+                          updatedFields.stage = "New Lead";
+                        }
+
+                        console.log(`[Instagram Chatbot] Lead updated: ${activeLeadId}`);
+                        console.log(`[Instagram Lead Dedup] FINAL_ACTIVE_LEAD_ID: ${activeLeadId}`);
                         console.log('[Instagram Chatbot] Advancing to Course Selection');
 
                         nextNodeId = "course_selection";
@@ -2578,8 +2796,9 @@ exports.instagramWebhook = functions.https.onRequest(async (req, res) => {
                           timestamp: new Date().toISOString()
                         };
 
-                        if (freshLeadDoc.exists) {
-                          const freshLeadData = freshLeadDoc.data();
+                        const latestLeadDoc = await db.collection('leads').doc(activeLeadId).get();
+                        if (latestLeadDoc.exists) {
+                          const freshLeadData = latestLeadDoc.data();
                           const updatedChat = [...(freshLeadData.instagramMessages || []), botMsg];
                           const nextTimeline = [...(freshLeadData.timeline || []), {
                             id: `log-ig-out-${Date.now()}`,
@@ -2590,7 +2809,7 @@ exports.instagramWebhook = functions.https.onRequest(async (req, res) => {
                             user: 'System Automation'
                           }];
 
-                          await db.collection('leads').doc(expectedLeadId).update({
+                          await db.collection('leads').doc(activeLeadId).update({
                             ...updatedFields,
                             instagramMessages: updatedChat,
                             timeline: nextTimeline,
@@ -2633,8 +2852,9 @@ exports.instagramWebhook = functions.https.onRequest(async (req, res) => {
                         timestamp: new Date().toISOString()
                       };
 
-                      if (freshLeadDoc.exists) {
-                        const freshLeadData = freshLeadDoc.data();
+                      const latestLeadDoc = await db.collection('leads').doc(activeLeadId).get();
+                      if (latestLeadDoc.exists) {
+                        const freshLeadData = latestLeadDoc.data();
                         const updatedChat = [...(freshLeadData.instagramMessages || []), botMsg];
                         const nextTimeline = [...(freshLeadData.timeline || []), {
                           id: `log-ig-out-${Date.now()}`,
@@ -2645,7 +2865,7 @@ exports.instagramWebhook = functions.https.onRequest(async (req, res) => {
                           user: 'System Automation'
                         }];
 
-                        await db.collection('leads').doc(expectedLeadId).update({
+                        await db.collection('leads').doc(activeLeadId).update({
                           instagramMessages: updatedChat,
                           timeline: nextTimeline,
                           lastContacted: new Date().toISOString()
@@ -2976,43 +3196,75 @@ exports.sendBulkWhatsAppCampaign = functions.runWith({ timeoutSeconds: 540, memo
             if (!snapshot.empty) {
               leadId = snapshot.docs[0].id;
               leadData = snapshot.docs[0].data();
-            } else {
-              // Create lead
-              leadId = cleanPhone || `lead-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
-              let resolvedName = '';
-              const nameKeys = ['name', 'Name', 'first_name', 'First Name', 'full_name', 'Full Name', 'contact_name', 'Contact Name', 'student_name', 'Student Name'];
-              for (const key of nameKeys) {
-                if (contact[key]) {
-                  resolvedName = String(contact[key]).trim();
+            }
+
+            // 2. Check by exact doc ID = cleanPhone or phoneSuffix
+            if (!leadData && cleanPhone) {
+              let docSnap = await leadsRef.doc(cleanPhone).get();
+              if (docSnap.exists) {
+                leadId = docSnap.id;
+                leadData = docSnap.data();
+              } else if (phoneSuffix) {
+                docSnap = await leadsRef.doc(phoneSuffix).get();
+                if (docSnap.exists) {
+                  leadId = docSnap.id;
+                  leadData = docSnap.data();
+                }
+              }
+            }
+
+            // 3. Check by phone field matching (handles formatted strings with spaces/dashes)
+            if (!leadData && phoneSuffix.length === 10) {
+              const formattedPhoneVariants = [
+                cleanPhone,
+                phone,
+                phoneSuffix,
+                `+91${phoneSuffix}`,
+                `+91 ${phoneSuffix}`,
+                `${phoneSuffix.slice(0, 5)} ${phoneSuffix.slice(5)}`,
+                `+91 ${phoneSuffix.slice(0, 5)} ${phoneSuffix.slice(5)}`,
+                `91 ${phoneSuffix.slice(0, 5)} ${phoneSuffix.slice(5)}`,
+                `+91-${phoneSuffix.slice(0, 5)}-${phoneSuffix.slice(5)}`
+              ];
+
+              // Deduplicate variants
+              const uniqueVariants = [...new Set(formattedPhoneVariants.filter(Boolean))];
+              const phoneQueries = uniqueVariants.map(variant => leadsRef.where('phone', '==', variant).limit(1).get());
+
+              const querySnapshots = await Promise.all(phoneQueries);
+              for (const snap of querySnapshots) {
+                if (!snap.empty) {
+                  leadId = snap.docs[0].id;
+                  leadData = snap.docs[0].data();
                   break;
                 }
               }
-              if (!resolvedName) {
-                for (const key of Object.keys(contact)) {
-                  if (key.toLowerCase().includes('name') && contact[key]) {
-                    resolvedName = String(contact[key]).trim();
-                    break;
-                  }
-                }
-              }
-              if (!resolvedName) {
-                resolvedName = 'Campaign Contact';
-              }
-
-              leadData = {
-                name: resolvedName,
-                phone: phone,
-                course: contact.course || contact.Course || '',
-                source: 'WhatsApp Campaign',
+            }
+            
+            if (!leadData) {
+              // Create new lead only if strictly not found in CRM
+              leadId = cleanPhone || `lead-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+              const nowISO = new Date().toISOString();
+              
+              const newLeadObject = {
+                name: contact.name || contact.Name || 'Campaign Contact',
+                phone: phone || cleanPhone,
+                source: contact.source && contact.source !== 'WhatsApp Campaign' ? contact.source : 'Campaign Import',
                 subSource: campaignName || 'Bulk Campaign',
-                counselor: counselorName || 'Unassigned',
-                stage: 'New',
+                counselor: contact.counselor && contact.counselor !== 'Counselor' ? contact.counselor : (counselorName !== 'Counselor' ? counselorName : 'Unassigned'),
+                stage: contact.stage || 'New Lead',
                 status: 'Active',
                 timeline: [],
                 whatsappMessages: [],
                 createdAt: new Date().toISOString()
               };
-              await leadsRef.doc(leadId).set(leadData);
+
+              if (contact.course || contact.Course) {
+                newLeadObject.course = contact.course || contact.Course;
+              }
+
+              leadData = newLeadObject;
+              await leadsRef.doc(leadId).set(newLeadObject, { merge: true });
             }
 
             // Construct payload
@@ -3111,11 +3363,9 @@ exports.sendBulkWhatsAppCampaign = functions.runWith({ timeoutSeconds: 540, memo
           deliveryResults.push(success);
         });
 
-        // Small delay between chunks to prevent Meta rate limiting
         await new Promise(res => setTimeout(res, 200));
       }
 
-      // Save campaign records
       const newCamp = {
         id: campaignId,
         name: campaignName || `Campaign - ${new Date().toLocaleDateString()}`,
@@ -3155,74 +3405,12 @@ exports.sendBulkWhatsAppCampaign = functions.runWith({ timeoutSeconds: 540, memo
 /**
  * onLeadCreated
  * Triggered automatically when a new lead is added to Firestore.
- * Sends the 'thanks' template to the new lead via WhatsApp Cloud API.
+ * Automated welcome message sending disabled.
  */
 exports.onLeadCreated = functions.firestore
   .document('leads/{leadId}')
   .onCreate(async (snap, context) => {
-    const newLead = snap.data();
-    const leadId = context.params.leadId;
-
-    if (!newLead.phone) {
-      console.log(`[onLeadCreated] No phone number for lead ${leadId}. Skipping auto-reply.`);
-      return null;
-    }
-
-    try {
-      // 1. Load WhatsApp Config
-      const creds = await getDecryptedWhatsAppCredentials();
-      if (!creds.enabled || !creds.phoneNumberId || !creds.accessToken) {
-        console.log('[onLeadCreated] WhatsApp Integration not setup. Skipping auto-reply.');
-        return null;
-      }
-
-      // 2. Format phone number
-      let cleanPhone = newLead.phone.replace(/[^0-9]/g, '').trim();
-      if (cleanPhone.length === 10) cleanPhone = '91' + cleanPhone;
-      if (cleanPhone.startsWith('00')) cleanPhone = cleanPhone.substring(2);
-
-      // 3. Build Template Payload using the user's template
-      const payload = {
-        messaging_product: 'whatsapp',
-        recipient_type: 'individual',
-        to: cleanPhone,
-        type: 'template',
-        template: {
-          name: 'thanks',
-          language: { code: 'en' }
-        }
-      };
-
-      const url = `https://graph.facebook.com/${creds.apiVersion}/${creds.phoneNumberId}/messages`;
-
-      // 4. Send API Request
-      const response = await axios.post(url, payload, {
-        headers: {
-          'Authorization': `Bearer ${creds.accessToken.trim()}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      // 5. Update timeline in the CRM for this lead
-      const messageId = response.data.messages?.[0]?.id || `msg-sent-${Date.now()}`;
-      const outboundMsg = {
-        id: messageId,
-        type: 'whatsapp',
-        title: 'Auto-Reply Sent',
-        content: `Sent 'thanks' welcome template via automation.`,
-        user: 'System Automation',
-        timestamp: new Date().toISOString()
-      };
-
-      await db.collection('leads').doc(leadId).update({
-        timeline: admin.firestore.FieldValue.arrayUnion(outboundMsg),
-        lastAction: 'Welcome Template Sent',
-        lastActionDate: admin.firestore.FieldValue.serverTimestamp()
-      });
-
-    } catch (error) {
-      console.error(`[onLeadCreated] Error:`, error.response?.data || error.message);
-    }
+    console.log(`[onLeadCreated] Automated welcome message sending is disabled per system configuration for lead ${context.params.leadId}.`);
     return null;
   });
 

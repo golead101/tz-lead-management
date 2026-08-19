@@ -265,6 +265,207 @@ export function initWhatsappDb() {
   }
 }
 
+export async function autoRepairOverwrittenLeads() {
+  try {
+    const leadsSnap = await getDocs(collection(db, 'leads'));
+    if (leadsSnap.empty) return;
+
+    // Get recipient snapshots from whatsapp_recipients
+    const recipientsSnap = await getDocs(collection(db, 'whatsapp_recipients'));
+    const savedRecipientsMap = new Map();
+    recipientsSnap.docs.forEach(docSnap => {
+      const recs = docSnap.data().recipients || [];
+      recs.forEach(r => {
+        const phone = r.phone || r.Phone || '';
+        let cleanPhone = String(phone).replace(/[^0-9]/g, '').trim();
+        if (cleanPhone.length === 10) cleanPhone = '91' + cleanPhone;
+        if (cleanPhone) {
+          savedRecipientsMap.set(cleanPhone, r);
+          if (cleanPhone.slice(-10)) savedRecipientsMap.set(cleanPhone.slice(-10), r);
+        }
+      });
+    });
+
+    const updates = [];
+    leadsSnap.docs.forEach(docSnap => {
+      const data = docSnap.data();
+      const phone = data.phone || '';
+      let cleanPhone = String(phone).replace(/[^0-9]/g, '').trim();
+      const phone10 = cleanPhone.slice(-10);
+      const timeline = data.timeline || [];
+      const repairData = {};
+
+      const originalRecipient = savedRecipientsMap.get(cleanPhone) || savedRecipientsMap.get(phone10) || savedRecipientsMap.get(docSnap.id);
+
+      // 1. RESTORE SOURCE ONLY IF CORRUPTED TO "WhatsApp Campaign"
+      if (data.source === 'WhatsApp Campaign' || !data.source) {
+        let detectedSource = null;
+        for (const item of timeline) {
+          const text = `${item.title || ''} ${item.content || ''}`.toLowerCase();
+          if (text.includes('meta') || text.includes('facebook') || text.includes('instagram')) {
+            detectedSource = 'Meta Ads';
+            break;
+          } else if (text.includes('website')) {
+            detectedSource = 'Website Form';
+            break;
+          } else if (text.includes('walk-in') || text.includes('qr')) {
+            detectedSource = 'Walk-in';
+            break;
+          } else if (text.includes('google')) {
+            detectedSource = 'Google Ads';
+            break;
+          }
+        }
+        if (detectedSource || (originalRecipient && originalRecipient.source)) {
+          repairData.source = detectedSource || originalRecipient.source;
+        }
+      }
+
+      // 2. RESTORE COUNSELOR ONLY IF CORRUPTED TO GENERIC "Counselor" (Preserve genuine values like Syeda, Maaha, Admin, System)
+      if (data.counselor === 'Counselor') {
+        let detectedCounselor = null;
+        for (const item of timeline) {
+          if (item.title && item.title.includes('COUNSELOR Modified') && item.content) {
+            const match = item.content.match(/Changed from "([^"]+)"/i);
+            if (match && match[1] && match[1] !== 'Counselor') {
+              detectedCounselor = match[1];
+              break;
+            }
+          }
+          if (item.user && item.user !== 'Counselor') {
+            detectedCounselor = item.user;
+          }
+        }
+        if (detectedCounselor || (originalRecipient && originalRecipient.counselor)) {
+          repairData.counselor = detectedCounselor || originalRecipient.counselor;
+        }
+      }
+
+      // 3. RESTORE COURSE (Fix mismatched courses for Meta Ads leads)
+      const currentCampaignText = `${data.campaign || ''} ${data.campaignName || ''} ${data.subSource || ''}`.toLowerCase();
+      const isDigitalMarketingCampaign = currentCampaignText.includes('digital') || currentCampaignText.includes('102') || (originalRecipient && String(originalRecipient.course).toLowerCase().includes('digital'));
+      
+      if (!data.course || data.course === '' || (isDigitalMarketingCampaign && data.course.toLowerCase().includes('data science'))) {
+        repairData.course = 'Digital Marketing';
+      } else if (!data.course) {
+        let detectedCourse = (originalRecipient && originalRecipient.course);
+        if (!detectedCourse) {
+          for (const item of timeline) {
+            const text = `${item.title || ''} ${item.content || ''}`;
+            const match = text.match(/course:\s*([A-Za-z\s]+?)(?:via|\.|$)/i) || text.match(/for\s+([A-Za-z\s]+?)\s+via/i);
+            if (match && match[1] && match[1].trim()) {
+              detectedCourse = match[1].trim();
+              break;
+            }
+            if (text.toLowerCase().includes('digital marketing')) {
+              detectedCourse = 'Digital Marketing';
+              break;
+            }
+          }
+        }
+        if (detectedCourse) {
+          repairData.course = detectedCourse;
+        }
+      }
+
+      // 4. RESTORE STAGE ONLY IF WIPED TO "New" / "New Lead" AND AN AUDIT LOG EXISTS (Never guess or change existing stages like Follow-up, Busy, Interested)
+      if (data.stage === 'New' || data.stage === 'New Lead') {
+        let detectedStage = null;
+        for (const item of timeline) {
+          if (item.title && item.title.includes('STAGE Modified') && item.content) {
+            const match = item.content.match(/Changed from "([^"]+)"/i);
+            if (match && match[1] && match[1] !== 'New' && match[1] !== 'New Lead') {
+              detectedStage = match[1];
+              break;
+            }
+          }
+        }
+        if (detectedStage || (originalRecipient && originalRecipient.stage)) {
+          repairData.stage = detectedStage || originalRecipient.stage;
+        }
+      }
+
+      // 5. RESTORE CREATED DATE ONLY IF MISSING OR INVALID
+      if (!data.createdDate || data.createdDate === 'Invalid Date') {
+        let earliestTimestamp = null;
+        if (timeline.length > 0) {
+          const timestamps = timeline.map(t => t.timestamp).filter(Boolean);
+          if (timestamps.length > 0) {
+            timestamps.sort();
+            earliestTimestamp = timestamps[0];
+          }
+        }
+        if (earliestTimestamp || (originalRecipient && (originalRecipient.createdDate || originalRecipient.createdAt))) {
+          repairData.createdDate = earliestTimestamp || originalRecipient.createdDate || originalRecipient.createdAt;
+        }
+      }
+
+      // 6. RESTORE CAMPAIGN NAME ONLY IF DYNAMICALLY PRESENT IN RECIPIENT DATA OR TIMELINE
+      const currentCamp = data.campaign || data.campaignName || '';
+
+      if (currentCamp.includes('Digital_Marketing_102') || currentCamp.includes('Bulk Campaign')) {
+        let detectedCampaign = null;
+        if (originalRecipient && originalRecipient.campaign && !originalRecipient.campaign.includes('Digital_Marketing_102') && !originalRecipient.campaign.includes('Bulk Campaign')) {
+          detectedCampaign = originalRecipient.campaign;
+        }
+        if (!detectedCampaign) {
+          for (const item of timeline) {
+            const text = `${item.title || ''} ${item.content || ''}`;
+            const match = text.match(/campaign:\s*([A-Za-z0-9_\-\s]+?)(?:via|\.|$)/i);
+            if (match && match[1] && !match[1].includes('Digital_Marketing_102') && !match[1].includes('WhatsApp') && !match[1].includes('Bulk Campaign')) {
+              detectedCampaign = match[1].trim();
+              break;
+            }
+          }
+        }
+
+        repairData.campaign = detectedCampaign || '';
+        repairData.campaignName = detectedCampaign || '';
+        repairData.subSource = detectedCampaign || '';
+      }
+
+      // 7. RESTORE LEAD NAME ONLY IF WIPED TO "Campaign Contact" OR MISSING
+      if (!data.name || data.name === 'Campaign Contact' || data.name === 'WhatsApp Student') {
+        let detectedName = null;
+        if (originalRecipient && originalRecipient.name && originalRecipient.name !== 'Campaign Contact' && originalRecipient.name !== 'WhatsApp Student') {
+          detectedName = originalRecipient.name;
+        }
+        if (!detectedName) {
+          for (const item of timeline) {
+            if (item.title && item.title.includes('NAME Modified') && item.content) {
+              const match = item.content.match(/Changed from "([^"]+)"/i);
+              if (match && match[1] && match[1] !== 'Campaign Contact' && match[1] !== 'WhatsApp Student') {
+                detectedName = match[1];
+                break;
+              }
+            }
+            const text = `${item.title || ''} ${item.content || ''}`;
+            const matchName = text.match(/Name:\s*([A-Za-z\s]+?)(?:Phone|Email|Course|via|\.|$)/i) || text.match(/Inquiry submitted by\s*([A-Za-z\s]+?)(?:for|via|\.|$)/i);
+            if (matchName && matchName[1] && matchName[1].trim() && matchName[1].trim() !== 'Campaign Contact' && matchName[1].trim() !== 'WhatsApp Student') {
+              detectedName = matchName[1].trim();
+              break;
+            }
+          }
+        }
+        if (detectedName) {
+          repairData.name = detectedName;
+        }
+      }
+
+      if (Object.keys(repairData).length > 0) {
+        updates.push(setDoc(doc(db, 'leads', docSnap.id), repairData, { merge: true }));
+      }
+    });
+
+    if (updates.length > 0) {
+      await Promise.all(updates);
+      console.log(`[autoRepair] Successfully restored metadata for ${updates.length} leads in Firestore.`);
+    }
+  } catch (err) {
+    console.error('Failed to auto-repair overwritten leads:', err);
+  }
+}
+
 // ─── Direct delete helpers (bypass saveCampaigns/saveContactLists race condition) ───
 export async function deleteCampaignById(id) {
   // Remove from localStorage immediately

@@ -145,7 +145,7 @@ export default function NewCampaign({ setSubView }) {
   const [scheduleDate, setScheduleDate] = useState('');
   const [result, setResult] = useState(null);
 
-  const { leads, courses, addLead, addBulkLeads, sendWhatsAppMsg, prefilledCampaignLeads, setPrefilledCampaignLeads } = useCRM();
+  const { leads, courses, activeUser, addLead, addBulkLeads, sendWhatsAppMsg, prefilledCampaignLeads, setPrefilledCampaignLeads } = useCRM();
 
   useEffect(() => {
     if (prefilledCampaignLeads && prefilledCampaignLeads.length > 0) {
@@ -172,10 +172,18 @@ export default function NewCampaign({ setSubView }) {
 
   const getFilteredLeads = () => {
     return getBaseLeads().filter(lead => {
-      const matchCourse = campaignCourseFilter ? lead.course === campaignCourseFilter : true;
-      const matchStage = campaignStageFilter ? lead.stage === campaignStageFilter : true;
-      const matchSource = campaignSourceFilter ? lead.source === campaignSourceFilter : true;
-      const matchCampaign = campaignNameFilter && campaignSourceFilter.toLowerCase().includes('meta') 
+      const leadCourse = (lead.course || '').trim().toLowerCase();
+      const filterCourse = (campaignCourseFilter || '').trim().toLowerCase();
+      const matchCourse = filterCourse ? leadCourse === filterCourse : true;
+      const matchStage = campaignStageFilters.length > 0 ? campaignStageFilters.includes(lead.stage) : true;
+      
+      const leadNormSource = normalizeLeadSource(lead.source);
+      const matchSource = campaignSourceFilters.length > 0 
+        ? campaignSourceFilters.some(s => s === lead.source || s === leadNormSource) 
+        : true;
+
+      const hasMetaSourceSelected = campaignSourceFilters.some(s => s.toLowerCase().includes('meta'));
+      const matchCampaign = campaignNameFilter && hasMetaSourceSelected 
         ? (lead.campaign === campaignNameFilter || lead.campaignName === campaignNameFilter) 
         : true;
       return matchCourse && matchStage && matchSource && matchCampaign;
@@ -377,8 +385,8 @@ export default function NewCampaign({ setSubView }) {
     
     // Reset filters when changing lists
     setCampaignCourseFilter('');
-    setCampaignStageFilter('');
-    setCampaignSourceFilter('');
+    setCampaignStageFilters([]);
+    setCampaignSourceFilters([]);
     setCampaignNameFilter('');
     
     if (listId === 'crm-leads-all') {
@@ -683,7 +691,7 @@ export default function NewCampaign({ setSubView }) {
           selectedTemplate,
           templateLanguage,
           messageText: messageType === 'text' ? messageText : '',
-          counselorName: 'Counselor'
+          counselorName: activeUser || 'Counselor'
         })
       });
 

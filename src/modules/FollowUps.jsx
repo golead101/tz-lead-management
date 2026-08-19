@@ -1,15 +1,185 @@
 import React, { useState } from 'react';
-import { useCRM } from '../context/CRMContext';
+import { useCRM, normalizeLeadSource } from '../context/CRMContext';
 import DetailTimeline from './DetailTimeline';
 
+function MultiSelectFilter({ label, options, selectedValues, onChange, allLabel }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = React.useRef(null);
+
+  React.useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleToggleOption = (value) => {
+    if (value === 'All') {
+      onChange(['All']);
+    } else {
+      let newValues = selectedValues.filter(v => v !== 'All');
+      if (newValues.includes(value)) {
+        newValues = newValues.filter(v => v !== value);
+      } else {
+        newValues.push(value);
+      }
+      if (newValues.length === 0) {
+        newValues = ['All'];
+      }
+      onChange(newValues);
+    }
+  };
+
+  const isAllSelected = selectedValues.includes('All') || selectedValues.length === 0;
+
+  let labelText = allLabel;
+  if (!isAllSelected) {
+    if (selectedValues.length === 1) {
+      const opt = options.find(o => o.value === selectedValues[0]);
+      labelText = opt ? opt.label : selectedValues[0];
+    } else {
+      labelText = `${selectedValues.length} Selected`;
+    }
+  }
+
+  return (
+    <div ref={dropdownRef} style={{ position: 'relative' }}>
+      <div 
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          padding: '8px 30px 8px 12px',
+          borderRadius: '8px',
+          border: '1px solid #e2e8f0',
+          minWidth: '160px',
+          fontSize: '13px',
+          outline: 'none',
+          backgroundColor: '#fff',
+          cursor: 'pointer',
+          userSelect: 'none',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          color: '#1e293b',
+          fontWeight: '500',
+          boxSizing: 'border-box'
+        }}
+      >
+        <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '120px' }}>
+          {labelText}
+        </span>
+        <svg 
+          width="12" 
+          height="12" 
+          viewBox="0 0 24 24" 
+          fill="none" 
+          stroke="#6b7280" 
+          strokeWidth="2"
+          style={{ 
+            position: 'absolute',
+            right: '12px',
+            top: '50%',
+            transform: `translateY(-50%) ${isOpen ? 'rotate(180deg)' : ''}`,
+            transition: 'transform 0.15s ease',
+            pointerEvents: 'none'
+          }}
+        >
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </div>
+
+      {isOpen && (
+        <div 
+          className="gv-popover" 
+          style={{ 
+            left: 0, 
+            right: 'auto', 
+            width: '240px', 
+            maxHeight: '260px', 
+            overflowY: 'auto', 
+            padding: '8px', 
+            zIndex: 150, 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: '4px',
+            marginTop: '4px',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.1)'
+          }}
+        >
+          <label 
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px', 
+              padding: '6px 8px', 
+              borderRadius: '4px', 
+              cursor: 'pointer', 
+              fontSize: '12.5px',
+              fontWeight: isAllSelected ? '600' : 'normal',
+              background: isAllSelected ? '#f1f5f9' : 'transparent',
+              color: isAllSelected ? 'var(--primary)' : 'var(--text-primary)',
+              margin: 0
+            }}
+          >
+            <input 
+              type="checkbox" 
+              checked={isAllSelected}
+              onChange={() => handleToggleOption('All')}
+              style={{ accentColor: 'var(--primary)', cursor: 'pointer' }}
+            />
+            {allLabel}
+          </label>
+
+          <div style={{ height: '1px', background: '#e2e8f0', margin: '4px 0' }} />
+
+          {options.map((opt) => {
+            const isChecked = selectedValues.includes(opt.value);
+            return (
+              <label 
+                key={opt.value}
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '8px', 
+                  padding: '6px 8px', 
+                  borderRadius: '4px', 
+                  cursor: 'pointer', 
+                  fontSize: '12.5px',
+                  fontWeight: isChecked ? '600' : 'normal',
+                  background: isChecked ? '#eff6ff' : 'transparent',
+                  color: isChecked ? 'var(--primary)' : 'var(--text-primary)',
+                  margin: 0
+                }}
+              >
+                <input 
+                  type="checkbox" 
+                  checked={isChecked}
+                  onChange={() => handleToggleOption(opt.value)}
+                  style={{ accentColor: 'var(--primary)', cursor: 'pointer' }}
+                />
+                {opt.label}
+              </label>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 export default function FollowUps() {
-  const { leads, selectedLeadId, setSelectedLeadId, setActiveView, showDetailModal, setShowDetailModal, logCall, pipelineStages } = useCRM();
+  const { leads, activeRole, activeUser, selectedLeadId, setSelectedLeadId, setActiveView, showDetailModal, setShowDetailModal, logCall, pipelineStages, courses, counselors } = useCRM();
   const [activeTab, setActiveTab] = useState('overdue'); // Default to overdue as in the mockup
 
-  // New filtering state
+  // New filtering state (supporting multi-select)
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterStage, setFilterStage] = useState('');
-  const [filterSource, setFilterSource] = useState('');
+  const [filterCourse, setFilterCourse] = useState(['All']);
+  const [filterStage, setFilterStage] = useState(['All']);
+  const [filterSource, setFilterSource] = useState(['All']);
+  const [filterCounselor, setFilterCounselor] = useState(['All']);
 
   const [modalStep, setModalStep] = useState(1); // 1 = simple contact view, 2 = call outcome form
   const [callStatus, setCallStatus] = useState('');
@@ -29,13 +199,14 @@ export default function FollowUps() {
   };
 
   const handleSubmitCall = (leadId) => {
-    const isFollowupSched = (callStatus === 'Interested' || callStatus === 'Call Later' || callStatus === 'No Answer') && !!callFollowupDate;
+    const canFollowup = ['interested', 'busy', 'call later', 'answered', 'no answer'].includes((callStatus || '').toLowerCase());
+    const isFollowupSched = canFollowup && !!callFollowupDate;
     logCall(leadId, {
       status: callStatus,
       interest: callInterest,
       questions: callQuestions,
       notes: callNotes,
-      updateStage: callUpdateStage,
+      updateStage: callUpdateStage || callStatus,
       scheduleFollowup: isFollowupSched,
       followupDate: isFollowupSched ? callFollowupDate : '',
       followupReason: isFollowupSched ? (callNotes || 'Scheduled callback') : ''
@@ -53,19 +224,104 @@ export default function FollowUps() {
     setShowDetailModal(false);
   };
 
+  const getLeadFollowupList = (lead) => {
+    if (Array.isArray(lead.followupHistory) && lead.followupHistory.length > 0) {
+      return lead.followupHistory;
+    }
+
+    if (Array.isArray(lead.timeline) && lead.timeline.length > 0) {
+      const followupLogs = lead.timeline.filter(t => 
+        t.type === 'followup' || 
+        t.type === 'call' || 
+        (t.title && (t.title.includes('Follow-up') || t.title.includes('Call')))
+      );
+
+      if (followupLogs.length > 0) {
+        return followupLogs.map((log, index) => {
+          let text = log.content || '';
+          if (text.includes('Reason:')) {
+            text = text.split('Reason:')[1].trim();
+          } else if (text.includes('Detail:')) {
+            text = text.split('Detail:')[1].trim();
+          } else if (text.includes('Notes:')) {
+            text = text.split('Notes:')[1].trim();
+          } else if (text.includes('Call Outcome:')) {
+            text = text.split('Call Outcome:')[1].trim();
+          }
+
+          let dateStr = '';
+          if (log.timestamp) {
+            try {
+              dateStr = new Date(log.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            } catch(e) {}
+          }
+
+          return {
+            num: index + 1,
+            dateStr: index === 0 ? '' : dateStr,
+            text: text || lead.followupReason || 'Scheduled callback'
+          };
+        });
+      }
+    }
+
+    return [
+      {
+        num: 1,
+        dateStr: '',
+        text: lead.followupReason || 'Scheduled callback'
+      }
+    ];
+  };
+
   // Filter leads that have followupDate set OR stage is Follow-up
-  let followUpLeads = leads.filter(lead => lead.followupDate || lead.stage === 'Follow-up');
+  let followUpLeads = leads.filter(lead => {
+    if (activeRole === 'Counselor' && lead.counselor !== activeUser) return false;
+    return lead.followupDate || lead.stage === 'Follow-up';
+  });
 
   // Apply search and dropdown filters
   if (searchQuery.trim()) {
     const q = searchQuery.toLowerCase();
     followUpLeads = followUpLeads.filter(l => l.name?.toLowerCase().includes(q) || l.phone?.includes(q));
   }
-  if (filterStage) {
-    followUpLeads = followUpLeads.filter(l => l.stage === filterStage);
+  if (filterCourse && filterCourse.length > 0 && !filterCourse.includes('All')) {
+    followUpLeads = followUpLeads.filter(l => {
+      const leadC = (l.course || '').trim().toLowerCase();
+      return filterCourse.some(val => {
+        const filterC = val.trim().toLowerCase();
+        return leadC === filterC || leadC.includes(filterC) || filterC.includes(leadC);
+      });
+    });
   }
-  if (filterSource) {
-    followUpLeads = followUpLeads.filter(l => l.source === filterSource);
+  if (filterStage && filterStage.length > 0 && !filterStage.includes('All')) {
+    followUpLeads = followUpLeads.filter(l => {
+      const leadS = (l.stage || '').trim().toLowerCase();
+      return filterStage.some(val => {
+        const filterS = val.trim().toLowerCase();
+        return leadS === filterS;
+      });
+    });
+  }
+  if (filterSource && filterSource.length > 0 && !filterSource.includes('All')) {
+    followUpLeads = followUpLeads.filter(l => {
+      const leadSrc = normalizeLeadSource(l.source);
+      return filterSource.includes(leadSrc);
+    });
+  }
+  if (filterCounselor && filterCounselor.length > 0 && !filterCounselor.includes('All') && activeRole !== 'Counselor') {
+    followUpLeads = followUpLeads.filter(l => {
+      const leadCoun = l.counselor || 'Unassigned';
+      const counLower = leadCoun.trim().toLowerCase();
+      const isLeadUnassigned = counLower === '' || counLower === 'unassigned' || counLower === 'none';
+
+      return filterCounselor.some(val => {
+        if (val === 'Unassigned') {
+          return isLeadUnassigned;
+        }
+        return l.counselor === val;
+      });
+    });
   }
 
   // Group into overdue and upcoming
@@ -145,26 +401,39 @@ export default function FollowUps() {
           onChange={(e) => setSearchQuery(e.target.value)}
           style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', minWidth: '220px', fontSize: '13px', outline: 'none' }}
         />
-        <select 
-          value={filterStage} 
-          onChange={(e) => setFilterStage(e.target.value)}
-          style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', minWidth: '160px', fontSize: '13px', outline: 'none', backgroundColor: '#fff' }}
-        >
-          <option value="">All Stages</option>
-          {pipelineStages.map(stage => (
-            <option key={stage.id} value={stage.name}>{stage.name}</option>
-          ))}
-        </select>
-        <select 
-          value={filterSource} 
-          onChange={(e) => setFilterSource(e.target.value)}
-          style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', minWidth: '160px', fontSize: '13px', outline: 'none', backgroundColor: '#fff' }}
-        >
-          <option value="">All Sources</option>
-          {Array.from(new Set(leads.map(l => l.source).filter(Boolean))).map(source => (
-            <option key={source} value={source}>{source}</option>
-          ))}
-        </select>
+        <MultiSelectFilter
+          options={(courses || []).map(c => ({ value: c.name, label: c.name }))}
+          selectedValues={filterCourse}
+          onChange={setFilterCourse}
+          allLabel="All Courses"
+        />
+
+        <MultiSelectFilter
+          options={pipelineStages.map(s => ({ value: s.name, label: s.name }))}
+          selectedValues={filterStage}
+          onChange={setFilterStage}
+          allLabel="All Stages"
+        />
+
+        <MultiSelectFilter
+          options={Array.from(new Set(leads.map(l => normalizeLeadSource(l.source)).filter(Boolean))).map(source => ({ value: source, label: source }))}
+          selectedValues={filterSource}
+          onChange={setFilterSource}
+          allLabel="All Sources"
+        />
+
+        {activeRole !== 'Counselor' && (
+          <MultiSelectFilter
+            options={Array.from(new Set([
+              'Unassigned',
+              ...(counselors || []).filter(c => c.status === 'Active' && c.role !== 'Admin' && c.name.toLowerCase() !== 'admin').map(c => c.name),
+              ...leads.map(l => l.counselor).filter(Boolean)
+            ])).map(counselor => ({ value: counselor, label: counselor }))}
+            selectedValues={filterCounselor}
+            onChange={setFilterCounselor}
+            allLabel="All Counselors"
+          />
+        )}
       </div>
 
       <div className="followups-list-container">
@@ -215,7 +484,7 @@ export default function FollowUps() {
                         <svg viewBox="0 0 24 24" className="detail-icon" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: '13px', height: '13px', marginRight: '4px', color: '#9ca3af' }}>
                           <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
                         </svg>
-                        <span style={{ fontSize: '13px', color: '#6b7280' }}>{lead.phone}</span>
+                        <span style={{ fontSize: '13px', color: '#334155', fontWeight: '600' }}>{lead.phone}</span>
                       </div>
 
                       <div className="card-detail-inline" style={{ display: 'flex', alignItems: 'center' }}>
@@ -229,9 +498,27 @@ export default function FollowUps() {
                       </div>
                     </div>
 
-                    <p className="lead-note-line">
-                      {lead.followupReason || 'No special note provided.'}
-                    </p>
+                    <div className="followups-stacked-list" style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {getLeadFollowupList(lead).map((item, idx) => (
+                        <div 
+                          key={idx} 
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            background: 'rgba(37, 99, 235, 0.03)',
+                            borderLeft: '3px solid #2563eb',
+                            borderRadius: '0 6px 6px 0',
+                            padding: '6px 12px',
+                            fontSize: '12.5px',
+                            color: '#334155'
+                          }}
+                        >
+                          <strong style={{ color: '#0f172a', marginRight: '6px' }}>Follow-up {item.num || (idx + 1)}:</strong>
+                          {item.dateStr ? <span style={{ color: '#64748b', marginRight: '6px' }}>{item.dateStr}:</span> : null}
+                          <span style={{ color: '#475569' }}>{item.text || item.remark}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
 
                   <div className="card-right-actions" onClick={(e) => e.stopPropagation()}>
@@ -442,7 +729,7 @@ export default function FollowUps() {
                           }}
                         >
                           <span style={{ display: 'flex', alignItems: 'center' }}>
-                            {callStatus === '' && '— Select an outcome —'}
+                            {callStatus === '' && 'Call Outcome'}
                             {callStatus === 'Interested' && (
                               <>
                                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#22c55e" strokeWidth="2.5" style={{ marginRight: '8px' }}><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" /></svg>
@@ -506,10 +793,13 @@ export default function FollowUps() {
                           >
                             {[
                               { val: 'Interested', label: 'Interested', stroke: '#22c55e', path: <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" /> },
-                              { val: 'Converted', label: 'Converted / Won', stroke: '#f97316', path: <><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.45 1-1 1H4v2h16v-2h-5c-.55 0-1-.45-1-1v-2.34" /><path d="M12 2a7 7 0 0 0-7 7c0 2.62 1.34 4.5 3 5.34a8.26 8.26 0 0 0 8 0c1.66-.84 3-2.72 3-5.34a7 7 0 0 0-7-7z" /></> },
+                              { val: 'Busy', label: 'Busy', stroke: '#eab308', path: <><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></> },
                               { val: 'Call Later', label: 'Call Later / Follow up', stroke: '#2563eb', path: <><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /><path d="M12 14v4M10 16h4" /></> },
+                              { val: 'Answered', label: 'Answered', stroke: '#06b6d4', path: <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91" /> },
                               { val: 'Not Interested', label: 'Not Interested', stroke: '#ef4444', path: <><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></> },
-                              { val: 'No Answer', label: 'No Answer', stroke: '#ea580c', path: <><path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91" /><line x1="23" y1="1" x2="1" y2="23" /></> }
+                              { val: 'Wrong Number', label: 'Wrong Number', stroke: '#64748b', path: <><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></> },
+                              { val: 'No Answer', label: 'No Answer', stroke: '#ea580c', path: <><path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91" /><line x1="23" y1="1" x2="1" y2="23" /></> },
+                              { val: 'Converted', label: 'Converted / Won', stroke: '#f97316', path: <><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 1 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.45 1-1 1H4v2h16v-2h-5c-.55 0-1-.45-1-1v-2.34" /><path d="M12 2a7 7 0 0 0-7 7c0 2.62 1.34 4.5 3 5.34a8.26 8.26 0 0 0 8 0c1.66-.84 3-2.72 3-5.34a7 7 0 0 0-7-7z" /></> }
                             ].map(item => (
                               <div 
                                 key={item.val}
@@ -555,7 +845,7 @@ export default function FollowUps() {
                     </div>
 
                     {/* Schedule Follow-up card */}
-                    {(callStatus === 'Interested' || callStatus === 'Call Later' || callStatus === 'No Answer') && (
+                    {['interested', 'busy', 'call later', 'answered', 'no answer'].includes((callStatus || '').toLowerCase()) && (
                       <div 
                         className="fade-in" 
                         style={{ 

@@ -1,16 +1,47 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { db, auth } from '../firebase';
 import { collection, doc, setDoc, deleteDoc, onSnapshot, writeBatch, getDoc, getDocs } from 'firebase/firestore';
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
+import { autoRepairOverwrittenLeads } from '../modules/gowhatsapp/whatsappDb';
 const CRMContext = createContext();
 
-// Default configurations
+export const normalizeLeadSource = (rawSource) => {
+  if (!rawSource || typeof rawSource !== 'string') return rawSource || '';
+  const trimmed = rawSource.trim();
+  if (!trimmed) return '';
+  const lower = trimmed.toLowerCase();
+
+  if (lower === 'meta' || lower === 'meta ads' || lower === 'facebook' || lower === 'facebook ads' || lower === 'meta-ads') {
+    return 'Meta Ads';
+  }
+  if (lower === 'walk-in' || lower === 'walkin' || lower === 'walk in' || lower === 'qr code walk-in' || lower === 'qr code' || lower === 'qr-code-walkin') {
+    return 'Walk-in';
+  }
+  if (lower === 'whatsapp' || lower === 'whatsapp inbound' || lower === 'whatsapp-inbound') {
+    return 'WhatsApp Inbound';
+  }
+  if (lower === 'website' || lower === 'website form' || lower === 'website embedded form' || lower === 'website form widget' || lower === 'iframe') {
+    return 'Website Embedded Form';
+  }
+  if (lower === 'google' || lower === 'google ads' || lower === 'google-ads') {
+    return 'Google Ads';
+  }
+  if (lower === 'instagram' || lower === 'instagram ads') {
+    return 'Instagram';
+  }
+  if (lower === 'campaign upload' || lower === 'campaign-upload' || lower === 'campaign') {
+    return 'Campaign Upload';
+  }
+
+  return trimmed;
+};
+
+// Default configurations (ONLY the 4 active institute courses)
 const DEFAULT_COURSES = [
-  { id: 'c-1', name: 'Full-Stack Web Development', code: 'FSWD', duration: '6 Months', fee: '₹75,000', description: 'HTML, CSS, JS, React, Node.js, Express & MongoDB' },
-  { id: 'c-2', name: 'Data Science & Artificial Intelligence', code: 'DSAI', duration: '8 Months', fee: '₹95,000', description: 'Python, R, SQL, Machine Learning, Deep Learning, NLP' },
-  { id: 'c-3', name: 'Cloud & DevOps Engineering', code: 'CDE', duration: '5 Months', fee: '₹80,000', description: 'AWS, Azure, Docker, Kubernetes, CI/CD, Terraform' },
-  { id: 'c-4', name: 'Cyber Security & Ethical Hacking', code: 'CSEH', duration: '6 Months', fee: '₹85,000', description: 'Network Security, Pentesting, OWASP, Linux, Cryptography' },
-  { id: 'c-5', name: 'UI/UX Product Design', code: 'UIUX', duration: '4 Months', fee: '₹60,000', description: 'User Research, Wireframing, Prototyping, Figma, Adobe XD' }
+  { id: 'c-da', name: 'Data Analytics', code: 'DA', duration: '3 Months', fee: '₹50,000', description: 'Data Analytics' },
+  { id: 'c-ds', name: 'Data Science With GenAI', code: 'DS', duration: '6 Months', fee: '₹75,000', description: 'Data Science & GenAI' },
+  { id: 'c-aiml', name: 'AIML With GenAI', code: 'AIML', duration: '6 Months', fee: '₹75,000', description: 'AI & Machine Learning with GenAI' },
+  { id: 'c-dm', name: 'Digital Marketing', code: 'DM', duration: '3 Months', fee: '₹50,000', description: 'Digital Marketing & Growth Hacking' }
 ];
 
 const DEFAULT_STAGES = [
@@ -118,21 +149,31 @@ export const CRMProvider = ({ children }) => {
     if (local) {
       try {
         const parsed = JSON.parse(local);
-        return parsed.map(lead => ({
-          email: '',
-          course: '',
-          education: '',
-          source: 'WhatsApp Inbound',
-          stage: lead.stage === 'Follow-up Pending' ? 'Follow-up' : (lead.stage || 'New Lead'),
-          counselor: 'Unassigned',
-          lastContacted: lead.createdDate || new Date().toISOString(),
-          timeline: [],
-          customFields: {},
-          instagramUserId: lead.instagramUserId || '',
-          instagramUsername: lead.instagramUsername || '',
-          instagramMessages: lead.instagramMessages || [],
-          ...lead
-        }));
+        return parsed.map(lead => {
+          let temp = lead.temperature || 'Hot';
+          if (temp === 'Hot' && lead.createdDate) {
+            const diffMs = new Date() - new Date(lead.createdDate);
+            if (diffMs > 6 * 24 * 60 * 60 * 1000) {
+              temp = 'Warm';
+            }
+          }
+          return {
+            email: '',
+            course: '',
+            education: '',
+            source: lead.source || '',
+            stage: lead.stage === 'Follow-up Pending' ? 'Follow-up' : (lead.stage || 'New Lead'),
+            counselor: lead.counselor || 'Unassigned',
+            lastContacted: lead.createdDate || new Date().toISOString(),
+            timeline: [],
+            customFields: {},
+            instagramUserId: lead.instagramUserId || '',
+            instagramUsername: lead.instagramUsername || '',
+            instagramMessages: lead.instagramMessages || [],
+            ...lead,
+            temperature: temp
+          };
+        });
       } catch (e) {
         console.error(e);
       }
@@ -144,6 +185,8 @@ export const CRMProvider = ({ children }) => {
     const local = localStorage.getItem('crm_courses');
     return local ? JSON.parse(local) : DEFAULT_COURSES;
   });
+  // Track IDs being deleted so onSnapshot doesn't race-restore them
+  const deletingCourseIds = useRef(new Set());
 
   const [pipelineStages, setPipelineStages] = useState(() => {
     const local = localStorage.getItem('crm_stages');
@@ -371,7 +414,8 @@ export const CRMProvider = ({ children }) => {
         const combined = [...mainLeads, ...iframeLeads];
         const uniqueLeadsMap = new Map();
         combined.forEach(lead => {
-            uniqueLeadsMap.set(lead.id, lead);
+            const normSource = normalizeLeadSource(lead.source);
+            uniqueLeadsMap.set(lead.id, { ...lead, source: normSource || lead.source || '' });
         });
         
         // Filter out WhatsApp Campaign leads from showing in the CRM list
@@ -396,9 +440,9 @@ export const CRMProvider = ({ children }) => {
               email: '',
               course: '',
               education: '',
-              source: 'WhatsApp Inbound',
-              stage: 'New Lead',
-              counselor: 'Unassigned',
+              source: data.source || '',
+              stage: data.stage || 'New Lead',
+              counselor: data.counselor || 'Unassigned',
               lastContacted: data.createdDate || new Date().toISOString(),
               timeline: [],
               customFields: {},
@@ -411,6 +455,7 @@ export const CRMProvider = ({ children }) => {
           });
           updateLeads();
           setIsFirebaseEnabled(true);
+          autoRepairOverwrittenLeads();
         }
       }, (err) => {
         console.error("Firestore leads subscription error:", err);
@@ -427,9 +472,9 @@ export const CRMProvider = ({ children }) => {
               email: '',
               course: '',
               education: '',
-              source: 'Website Embedded Form',
-              stage: 'New Lead',
-              counselor: 'Unassigned',
+              source: data.source || 'Website Embedded Form',
+              stage: data.stage || 'New Lead',
+              counselor: data.counselor || 'Unassigned',
               lastContacted: data.createdDate || new Date().toISOString(),
               timeline: [],
               customFields: {},
@@ -446,22 +491,44 @@ export const CRMProvider = ({ children }) => {
         console.error("Firestore iframe subscription error:", err);
       });
 
-      // 2. Courses
+      // 2. Courses (Firestore subscription — respects user additions and deletions)
       coursesUnsub = onSnapshot(collection(db, 'courses'), (snapshot) => {
         if (!active) return;
         if (snapshot.empty) {
-          console.log("Firestore courses collection is empty. Seeding with DEFAULT courses...");
-          const batch = writeBatch(db);
-          DEFAULT_COURSES.forEach((course) => {
-            batch.set(doc(db, 'courses', course.id), course);
-          });
-          batch.commit().catch(err => console.error("Firestore seeding courses failed:", err));
+          // Only seed DEFAULT_COURSES on true first install — not if user deliberately deleted all courses
+          const hasEverSeeded = localStorage.getItem('crm_courses_seeded');
+          if (!hasEverSeeded) {
+            console.log('[courses] First install — seeding DEFAULT courses...');
+            const batch = writeBatch(db);
+            DEFAULT_COURSES.forEach((course) => {
+              batch.set(doc(db, 'courses', course.id), course);
+            });
+            batch.commit()
+              .then(() => localStorage.setItem('crm_courses_seeded', '1'))
+              .catch(err => console.error('[courses] Seeding failed:', err));
+          } else {
+            console.log('[courses] Collection is empty — user deleted all courses. Not re-seeding.');
+            setCourses([]);
+            try { localStorage.setItem('crm_courses', JSON.stringify([])); } catch (e) {}
+          }
         } else {
-          const coursesData = snapshot.docs.map(doc => doc.data());
+          // Mark as seeded once we have real data
+          if (!localStorage.getItem('crm_courses_seeded')) {
+            localStorage.setItem('crm_courses_seeded', '1');
+          }
+          const coursesData = snapshot.docs
+            .filter(docSnap => !deletingCourseIds.current.has(docSnap.id))
+            .map(docSnap => ({
+              id: docSnap.id,
+              ...docSnap.data()
+            }));
           setCourses(coursesData);
+          try {
+            localStorage.setItem('crm_courses', JSON.stringify(coursesData));
+          } catch (e) {}
         }
       }, (err) => {
-        console.error("Firestore courses subscription error:", err);
+        console.error('[courses] Firestore subscription error:', err);
       });
 
       // 3. Pipeline Stages
@@ -572,9 +639,6 @@ export const CRMProvider = ({ children }) => {
     localStorage.setItem('crm_leads', JSON.stringify(leads));
   }, [leads]);
 
-  useEffect(() => {
-    localStorage.setItem('crm_courses', JSON.stringify(courses));
-  }, [courses]);
 
   useEffect(() => {
     localStorage.setItem('crm_stages', JSON.stringify(pipelineStages));
@@ -710,20 +774,15 @@ export const CRMProvider = ({ children }) => {
     // New Lead Creation
     const newLeadId = cleanPhone ? cleanPhone : `lead-${Date.now()}`;
 
-    let finalSource = leadData.source || 'Website Form';
+    let finalSource = leadData.source || '';
     let finalSubSource = leadData.subSource || '';
     
     if (finalSource) {
       const srcLower = finalSource.toLowerCase().trim();
-      const standardSources = ['meta', 'whatsapp', 'google', 'website', 'call', 'facebook', 'instagram', 'walk-in', 'walkin', 'campaign upload'];
-      const isStandard = standardSources.some(s => srcLower.includes(s));
-      
+
       if (srcLower === 'qr code walk-in') {
         finalSource = 'Walk-in';
         finalSubSource = finalSubSource || 'QR Code';
-      } else if (!isStandard) {
-        finalSubSource = finalSource;
-        finalSource = 'Walk-in';
       }
     }
 
@@ -794,25 +853,29 @@ export const CRMProvider = ({ children }) => {
       const cleanPhone = leadData.phone ? String(leadData.phone).replace(/\D/g, '') : '';
       return {
         id: cleanPhone ? cleanPhone : `lead-${Date.now()}-${index}`,
-        name: leadData.name || 'Anonymous Inquiry',
+        name: leadData.name || (cleanPhone ? cleanPhone : 'Lead'),
         email: leadData.email || '',
         phone: leadData.phone || '',
-        location: leadData.location || 'Campaign Upload',
+        location: leadData.location || 'Not Provided',
         education: leadData.education || 'Not Provided',
-        course: leadData.course || (courses[0] ? courses[0].name : ''),
-        source: leadData.source || 'Campaign Upload',
-        subSource: leadData.subSource || '',
-        counselor: leadData.counselor || activeUser,
+        course: leadData.course || '',
+        source: leadData.source || 'CSV Import',
+        subSource: leadData.subSource || leadData.campaign || '',
+        counselor: leadData.counselor || 'Unassigned',
         stage: leadData.stage || 'New Lead',
-        createdDate: new Date().toISOString(),
-        lastContacted: new Date().toISOString(),
+        temperature: leadData.temperature || 'Hot',
+        createdDate: leadData.createdDate || new Date().toISOString(),
+        lastContacted: leadData.createdDate || new Date().toISOString(),
+        skipAutoReply: true,
+        isBulkImport: true,
+        disableAutoWelcome: true,
         customFields: leadData.customFields || {},
         timeline: [
           {
             id: `log-${Date.now()}-${index}`,
             type: 'system',
             title: 'Lead Captured',
-            content: 'Inquiry successfully entered system via Campaign Upload.',
+            content: `Inquiry successfully entered system via ${leadData.source || 'CSV Import'}.`,
             timestamp: new Date().toISOString(),
             user: 'System'
           }
@@ -833,7 +896,7 @@ export const CRMProvider = ({ children }) => {
             const chunk = newLeads.slice(i, i + CHUNK_SIZE);
             const batch = writeBatch(db);
             chunk.forEach(lead => {
-              batch.set(doc(db, 'leads', lead.id), lead);
+              batch.set(doc(db, 'leads', lead.id), lead, { merge: true });
             });
             await batch.commit();
           }
@@ -1686,6 +1749,109 @@ export const CRMProvider = ({ children }) => {
     showToastMsg(`Bulk shifted ${leadIds.length} inquiries to ${nextStage}`);
   };
 
+  // Bulk Source Shift
+  const bulkUpdateSource = (leadIds, nextSource) => {
+    const normSource = normalizeLeadSource(nextSource);
+    const targetSource = normSource || nextSource;
+    const nextLeads = leads.map(lead => {
+      if (leadIds.includes(lead.id)) {
+        return {
+          ...lead,
+          source: targetSource,
+          timeline: [
+            ...(lead.timeline || []),
+            {
+              id: `log-bulk-src-${Date.now()}-${Math.random()}`,
+              type: 'system',
+              title: 'Bulk Source Shift',
+              content: `Lead source updated collectively to "${targetSource}"`,
+              timestamp: new Date().toISOString(),
+              user: activeUser
+            }
+          ]
+        };
+      }
+      return lead;
+    });
+
+    if (isFirebaseEnabled) {
+      const CHUNK_SIZE = 450;
+      const processBatches = async () => {
+        try {
+          const leadsToUpdate = nextLeads.filter(l => leadIds.includes(l.id));
+          for (let i = 0; i < leadsToUpdate.length; i += CHUNK_SIZE) {
+            const chunk = leadsToUpdate.slice(i, i + CHUNK_SIZE);
+            const batch = writeBatch(db);
+            chunk.forEach(lead => {
+              batch.set(doc(db, 'leads', lead.id), lead);
+            });
+            await batch.commit();
+          }
+          setLeads(nextLeads);
+        } catch (err) {
+          console.error("Firestore bulkUpdateSource failed, falling back to local update:", err);
+          setLeads(nextLeads);
+        }
+      };
+      processBatches();
+    } else {
+      setLeads(nextLeads);
+    }
+    showToastMsg(`Bulk updated source for ${leadIds.length} inquiries to ${targetSource}`);
+  };
+
+  // Bulk Course Update
+  const bulkUpdateCourse = (leadIds, nextCourse) => {
+    const targetCourse = (nextCourse || '').trim();
+    if (!targetCourse) return;
+
+    const nextLeads = leads.map(lead => {
+      if (leadIds.includes(lead.id)) {
+        return {
+          ...lead,
+          course: targetCourse,
+          timeline: [
+            ...(lead.timeline || []),
+            {
+              id: `log-bulk-course-${Date.now()}-${Math.random()}`,
+              type: 'system',
+              title: 'Bulk Course Change',
+              content: `Lead course updated collectively to "${targetCourse}"`,
+              timestamp: new Date().toISOString(),
+              user: activeUser
+            }
+          ]
+        };
+      }
+      return lead;
+    });
+
+    if (isFirebaseEnabled) {
+      const CHUNK_SIZE = 450;
+      const processBatches = async () => {
+        try {
+          const leadsToUpdate = nextLeads.filter(l => leadIds.includes(l.id));
+          for (let i = 0; i < leadsToUpdate.length; i += CHUNK_SIZE) {
+            const chunk = leadsToUpdate.slice(i, i + CHUNK_SIZE);
+            const batch = writeBatch(db);
+            chunk.forEach(lead => {
+              batch.set(doc(db, 'leads', lead.id), lead);
+            });
+            await batch.commit();
+          }
+          setLeads(nextLeads);
+        } catch (err) {
+          console.error('Firestore bulkUpdateCourse failed, falling back to local update:', err);
+          setLeads(nextLeads);
+        }
+      };
+      processBatches();
+    } else {
+      setLeads(nextLeads);
+    }
+    showToastMsg(`Bulk updated course for ${leadIds.length} lead(s) to "${targetCourse}"`);
+  };
+
   // Bulk Delete
   const bulkDeleteLeads = (leadIds) => {
     if (isFirebaseEnabled) {
@@ -1723,11 +1889,21 @@ export const CRMProvider = ({ children }) => {
     showToastMsg(`Custom field "${field.name}" added successfully.`);
   };
 
-  // Course Adder
+  // Course Adder (with duplicate name guard)
   const addCourse = (courseData) => {
+    const newName = (courseData.name || '').trim();
+    const newNameLower = newName.toLowerCase();
+
+    // Bug 4 fix: Reject duplicate course names (case-insensitive)
+    const isDuplicate = courses.some(c => (c.name || '').trim().toLowerCase() === newNameLower);
+    if (isDuplicate) {
+      showToastMsg(`Course "${newName}" already exists. Please use a different name.`, 'error');
+      return;
+    }
+
     const newCourse = {
       id: `c-${Date.now()}`,
-      name: courseData.name,
+      name: newName,
       code: courseData.code,
       duration: courseData.duration,
       fee: courseData.fee,
@@ -1743,21 +1919,101 @@ export const CRMProvider = ({ children }) => {
     } else {
       setCourses(prev => [...prev, newCourse]);
     }
-    showToastMsg(`Course "${courseData.name}" added to list.`);
+    showToastMsg(`Course "${newName}" added to list.`);
   };
 
-  // Course Remover
-  const removeCourse = (courseId) => {
+  // Course Remover — deletes by real Firestore docSnap.id (always reliable)
+  const removeCourse = async (courseId, courseName) => {
+    const targetId = courseId;
+    const targetName = (courseName || '').trim().toLowerCase();
+
+    // 1. Mark as deleting so onSnapshot won't race-restore this course
+    deletingCourseIds.current.add(targetId);
+
+    // 2. Immediately remove from local state + localStorage
+    setCourses(prev => {
+      const updated = prev.filter(c => {
+        if (targetId && c.id === targetId) return false;
+        if (targetName && (c.name || '').trim().toLowerCase() === targetName) return false;
+        return true;
+      });
+      try { localStorage.setItem('crm_courses', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+
     if (isFirebaseEnabled) {
-      deleteDoc(doc(db, 'courses', courseId))
-        .catch(err => {
-          console.error("Firestore removeCourse failed, falling back to local delete:", err);
-          setCourses(prev => prev.filter(c => c.id !== courseId));
+      try {
+        // Fetch all courses from Firestore and delete every doc that matches by path-id, data-id, or name
+        const snap = await getDocs(collection(db, 'courses'));
+        const batch = writeBatch(db);
+        let matchCount = 0;
+
+        snap.docs.forEach(docSnap => {
+          const data = docSnap.data();
+          const docFirestoreId = docSnap.id;
+          const docDataId = (data.id || '').toString();
+          const docName = (data.name || '').trim().toLowerCase();
+
+          if (
+            docFirestoreId === targetId ||
+            docDataId === targetId ||
+            (targetName && docName === targetName)
+          ) {
+            // Also mark the Firestore path ID for snapshot protection
+            deletingCourseIds.current.add(docFirestoreId);
+            batch.delete(doc(db, 'courses', docFirestoreId));
+            matchCount++;
+          }
         });
-    } else {
-      setCourses(prev => prev.filter(c => c.id !== courseId));
+
+        if (matchCount > 0) {
+          await batch.commit();
+        }
+      } catch (err) {
+        console.error('[removeCourse] Firestore error:', err);
+      }
     }
     showToastMsg('Course removed successfully.', 'error');
+
+    // Bug 1 fix: Clean up deletingCourseIds after 5s to prevent Set growing forever
+    setTimeout(() => {
+      deletingCourseIds.current.delete(targetId);
+    }, 5000);
+  };
+
+  // Course Updater — saves edits to Firestore by Firestore doc path ID
+  const updateCourse = async (courseId, updatedData) => {
+    const updated = {
+      id: courseId,
+      name: updatedData.name || '',
+      code: updatedData.code || '',
+      duration: updatedData.duration || '',
+      fee: updatedData.fee || '',
+      description: updatedData.description || ''
+    };
+
+    setCourses(prev => {
+      const next = prev.map(c => c.id === courseId ? { ...c, ...updated } : c);
+      try { localStorage.setItem('crm_courses', JSON.stringify(next)); } catch (e) {}
+      return next;
+    });
+
+    if (isFirebaseEnabled) {
+      try {
+        // Also find by name match in case Firestore ID differs
+        const snap = await getDocs(collection(db, 'courses'));
+        const batch = writeBatch(db);
+        snap.docs.forEach(docSnap => {
+          if (docSnap.id === courseId || (docSnap.data().id || '') === courseId) {
+            batch.set(doc(db, 'courses', docSnap.id), updated, { merge: true });
+          }
+        });
+        await batch.commit();
+      } catch (err) {
+        console.error('[updateCourse] Firestore error:', err);
+      }
+    }
+    showToastMsg(`Course "${updated.name}" updated successfully.`);
   };
 
   // Stage Adder
@@ -1920,6 +2176,7 @@ export const CRMProvider = ({ children }) => {
       addCounselor,
       removeCounselor,
       removeCourse,
+      updateCourse,
       updateCounselorStatus,
       
       login,
@@ -1947,6 +2204,8 @@ export const CRMProvider = ({ children }) => {
       sendInstagramMsg,
       bulkReassignLeads,
       bulkUpdateStage,
+      bulkUpdateSource,
+      bulkUpdateCourse,
       bulkDeleteLeads,
       addCustomField,
       addCourse,

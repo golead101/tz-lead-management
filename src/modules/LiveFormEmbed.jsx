@@ -50,10 +50,10 @@ export default function LiveFormEmbed() {
     const data = Object.fromEntries(formData.entries());
 
     // Auto-populate system fields for CRM compatibility
-    data.stage = 'New Lead';
-    data.createdDate = new Date().toISOString();
-    data.lastContacted = new Date().toISOString();
-    data.source = 'Website Embedded Form';
+    data.stage = data.stage || 'New Lead';
+    data.createdDate = data.createdDate || new Date().toISOString();
+    data.lastContacted = data.lastContacted || new Date().toISOString();
+    data.source = data.source || 'Website Embedded Form';
     data.timeline = [{
       id: 'log-' + Date.now(),
       type: 'system',

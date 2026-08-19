@@ -123,11 +123,15 @@ export default function InboxPage() {
         return acc;
       }, 0);
 
+      const displayName = (lead.name && lead.name !== 'Campaign Contact' && lead.name !== 'WhatsApp Student')
+        ? lead.name
+        : formatPhone(lead.phone || lead.id);
+
       return {
         id: lead.id,
         phone: lead.phone,
-        contactName: lead.name,
-        lastMessage: lastMsg ? lastMsg.text : 'No messages yet',
+        contactName: displayName,
+        lastMessage: lastMsg ? (lastMsg.text || lastMsg.content || 'Message') : 'No messages yet',
         lastMessageAt,
         lastDirection: lastMsg ? (lastMsg.sender === 'counselor' ? 'outbound' : 'inbound') : null,
         unreadCount,
@@ -143,8 +147,16 @@ export default function InboxPage() {
     });
   }, [leads, activeRole, activeUser]);
 
-  const selectedConvo = conversations.find(c => c.id === selectedLeadId);
-  const messages = selectedConvo?.lead?.whatsappMessages || [];
+  const targetLead = leads.find(l => l.id === selectedLeadId);
+  const selectedConvo = conversations.find(c => c.id === selectedLeadId) || (targetLead ? {
+    id: targetLead.id,
+    phone: targetLead.phone,
+    contactName: (targetLead.name && targetLead.name !== 'Campaign Contact' && targetLead.name !== 'WhatsApp Student') ? targetLead.name : formatPhone(targetLead.phone || targetLead.id),
+    lastMessage: 'No messages yet',
+    unreadCount: 0,
+    lead: targetLead
+  } : null);
+  const messages = targetLead?.whatsappMessages || selectedConvo?.lead?.whatsappMessages || [];
 
   // Automatically select first contact if none is active and there are contacts (desktop only)
   useEffect(() => {

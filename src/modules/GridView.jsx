@@ -4,6 +4,169 @@ import DetailTimeline from './DetailTimeline';
 import * as XLSX from 'xlsx';
 
 
+function MultiSelectFilter({ label, icon, options, selectedValues, onChange, allLabel = "ALL" }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = React.useRef(null);
+
+  React.useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleToggleOption = (value) => {
+    if (value === 'All') {
+      onChange(['All']);
+    } else {
+      let newValues = selectedValues.filter(v => v !== 'All');
+      if (newValues.includes(value)) {
+        newValues = newValues.filter(v => v !== value);
+      } else {
+        newValues.push(value);
+      }
+      if (newValues.length === 0) {
+        newValues = ['All'];
+      }
+      onChange(newValues);
+    }
+  };
+
+  const isAllSelected = selectedValues.includes('All') || selectedValues.length === 0;
+
+  let labelText = allLabel;
+  if (!isAllSelected) {
+    if (selectedValues.length === 1) {
+      const opt = options.find(o => o.value === selectedValues[0]);
+      labelText = opt ? opt.label : selectedValues[0];
+    } else {
+      labelText = `${selectedValues.length} Selected`;
+    }
+  }
+
+  return (
+    <div className="gv-filter-group" ref={dropdownRef} style={{ position: 'relative' }}>
+      <label className="gv-filter-label">
+        {icon}
+        {label}
+      </label>
+      <div 
+        className="gv-filter-select"
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          cursor: 'pointer',
+          userSelect: 'none',
+          backgroundImage: 'none',
+          paddingRight: '12px'
+        }}
+      >
+        <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+          {labelText}
+        </span>
+        <svg 
+          width="12" 
+          height="12" 
+          viewBox="0 0 24 24" 
+          fill="none" 
+          stroke="#6b7280" 
+          strokeWidth="2"
+          style={{ 
+            marginLeft: '8px', 
+            transition: 'transform 0.15s ease', 
+            transform: isOpen ? 'rotate(180deg)' : 'none',
+            flexShrink: 0
+          }}
+        >
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </div>
+
+      {isOpen && (
+        <div 
+          className="gv-popover" 
+          style={{ 
+            left: 0, 
+            right: 'auto', 
+            width: '240px', 
+            maxHeight: '300px', 
+            overflowY: 'auto', 
+            padding: '8px', 
+            zIndex: 150, 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: '4px',
+            marginTop: '4px',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.1)'
+          }}
+        >
+          <label 
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px', 
+              padding: '6px 8px', 
+              borderRadius: '4px', 
+              cursor: 'pointer', 
+              fontSize: '12.5px',
+              fontWeight: isAllSelected ? '600' : 'normal',
+              background: isAllSelected ? '#f1f5f9' : 'transparent',
+              color: isAllSelected ? 'var(--primary)' : 'var(--text-primary)',
+              margin: 0
+            }}
+          >
+            <input 
+              type="checkbox" 
+              checked={isAllSelected}
+              onChange={() => handleToggleOption('All')}
+              style={{ accentColor: 'var(--primary)', cursor: 'pointer' }}
+            />
+            {allLabel}
+          </label>
+
+          <div style={{ height: '1px', background: '#e2e8f0', margin: '4px 0' }} />
+
+          {options.map((opt) => {
+            const isChecked = selectedValues.includes(opt.value);
+            return (
+              <label 
+                key={opt.value}
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '8px', 
+                  padding: '6px 8px', 
+                  borderRadius: '4px', 
+                  cursor: 'pointer', 
+                  fontSize: '12.5px',
+                  fontWeight: isChecked ? '600' : 'normal',
+                  background: isChecked ? '#eff6ff' : 'transparent',
+                  color: isChecked ? 'var(--primary)' : 'var(--text-primary)',
+                  margin: 0
+                }}
+              >
+                <input 
+                  type="checkbox" 
+                  checked={isChecked}
+                  onChange={() => handleToggleOption(opt.value)}
+                  style={{ accentColor: 'var(--primary)', cursor: 'pointer' }}
+                />
+                {opt.label}
+              </label>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 export default function GridView() {
   const {
     leads,
@@ -14,6 +177,8 @@ export default function GridView() {
     activeUser,
     bulkReassignLeads,
     bulkUpdateStage,
+    bulkUpdateSource,
+    bulkUpdateCourse,
     bulkDeleteLeads,
     addLead,
     searchQuery,
@@ -32,13 +197,13 @@ export default function GridView() {
     setPrefilledCampaignLeads
   } = useCRM();
 
-  // Filter States
-  const [selectedCourse, setSelectedCourse] = useState('All');
-  const [selectedStage, setSelectedStage] = useState('All');
-  const [selectedCounselor, setSelectedCounselor] = useState('All');
-  const [selectedSource, setSelectedSource] = useState('All');
-  const [selectedCampaign, setSelectedCampaign] = useState('All');
-  const [selectedTemperature, setSelectedTemperature] = useState('All');
+  // Filter States (now supporting multi-select as arrays)
+  const [selectedCourse, setSelectedCourse] = useState(['All']);
+  const [selectedStage, setSelectedStage] = useState(['All']);
+  const [selectedCounselor, setSelectedCounselor] = useState(['All']);
+  const [selectedSource, setSelectedSource] = useState(['All']);
+  const [selectedCampaign, setSelectedCampaign] = useState(['All']);
+  const [selectedTemperature, setSelectedTemperature] = useState(['All']);
 
   const [dateRangeFilter, setDateRangeFilter] = useState('All Time');
   const [customStartDate, setCustomStartDate] = useState('');
@@ -48,7 +213,7 @@ export default function GridView() {
 
   // Sorting State
   const [sortBy, setSortBy] = useState('createdDate');
-  const [sortOrder, setSortOrder] = useState('desc');
+  const [sortOrder, setSortOrder] = useState('asc');
 
   // Selection State for Bulk Actions
   const [selectedIds, setSelectedIds] = useState([]);
@@ -61,8 +226,12 @@ export default function GridView() {
   // Bulk operation popovers
   const [bulkReassignOpen, setBulkReassignOpen] = useState(false);
   const [bulkStageOpen, setBulkStageOpen] = useState(false);
+  const [bulkSourceOpen, setBulkSourceOpen] = useState(false);
   const [bulkCounselorName, setBulkCounselorName] = useState(counselors.filter(c => c.status === 'Active')[0]?.name || '');
   const [bulkStageName, setBulkStageName] = useState('Contacted');
+  const [bulkSourceName, setBulkSourceName] = useState('Meta Ads');
+  const [bulkCourseOpen, setBulkCourseOpen] = useState(false);
+  const [bulkCourseName, setBulkCourseName] = useState(courses[0]?.name || '');
 
   React.useEffect(() => {
     const activeCouns = counselors.filter(c => c.status === 'Active');
@@ -78,41 +247,81 @@ export default function GridView() {
   // Filter Leads
   const filteredLeads = leads.filter(lead => {
     if (activeRole === 'Counselor' && lead.counselor !== activeUser) {
-      const src = (lead.source || '').toLowerCase();
-      const isGlobal = src.includes('meta') || src.includes('google') || src.includes('website');
-      if (!isGlobal) return false;
+      return false;
     }
-    if (selectedCourse !== 'All' && lead.course !== selectedCourse) return false;
-    if (selectedStage !== 'All' && lead.stage !== selectedStage) return false;
-    if (selectedTemperature !== 'All' && (lead.temperature || 'Warm') !== selectedTemperature) return false;
-    if (selectedCounselor !== 'All' && lead.counselor !== selectedCounselor) return false;
-    if (selectedSource !== 'All') {
-      const srcLower = (lead.source || '').toLowerCase();
-      if (selectedSource === 'meta') {
-        if (!srcLower.includes('meta')) return false;
-        if (selectedCampaign !== 'All') {
-          const leadCampaign = lead.campaign || lead.campaignName || '';
-          if (leadCampaign !== selectedCampaign) return false;
+    // Course Multi-select filter
+    if (selectedCourse && selectedCourse.length > 0 && !selectedCourse.includes('All')) {
+      const leadC = (lead.course || '').trim().toLowerCase();
+      const match = selectedCourse.some(val => {
+        const filterC = val.trim().toLowerCase();
+        return leadC === filterC || leadC.includes(filterC) || filterC.includes(leadC);
+      });
+      if (!match) return false;
+    }
+    // Stage Multi-select filter
+    if (selectedStage && selectedStage.length > 0 && !selectedStage.includes('All')) {
+      const leadS = (lead.stage || '').trim().toLowerCase();
+      const match = selectedStage.some(val => {
+        const filterS = val.trim().toLowerCase();
+        return leadS === filterS;
+      });
+      if (!match) return false;
+    }
+    // Temperature Multi-select filter
+    if (selectedTemperature && selectedTemperature.length > 0 && !selectedTemperature.includes('All')) {
+      const leadTemp = lead.temperature || 'Warm';
+      if (!selectedTemperature.includes(leadTemp)) return false;
+    }
+    // Counselor Multi-select filter
+    if (selectedCounselor && selectedCounselor.length > 0 && !selectedCounselor.includes('All')) {
+      const leadCoun = lead.counselor || 'Unassigned';
+      const counLower = leadCoun.trim().toLowerCase();
+      const isLeadUnassigned = counLower === '' || counLower === 'unassigned' || counLower === 'none';
+      
+      const match = selectedCounselor.some(val => {
+        if (val === 'Unassigned') {
+          return isLeadUnassigned;
         }
-      } else if (selectedSource === 'google') {
-        if (!srcLower.includes('google')) return false;
-      } else if (selectedSource === 'whatsapp') {
-        if (!srcLower.includes('whatsapp')) return false;
-      } else if (selectedSource === 'website') {
-        if (!srcLower.includes('website')) return false;
-      } else if (selectedSource === 'call') {
-        if (!srcLower.includes('call') && !srcLower.includes('phone')) return false;
-      } else if (selectedSource === 'walkin') {
-        if (!srcLower.includes('walk-in') && !srcLower.includes('walkin')) return false;
-      } else if (selectedSource === 'other') {
-        const isMeta = srcLower.includes('meta');
-        const isGoogle = srcLower.includes('google');
-        const isWhatsapp = srcLower.includes('whatsapp');
-        const isWebsite = srcLower.includes('website');
-        const isCall = srcLower.includes('call') || srcLower.includes('phone');
-        const isWalkin = srcLower.includes('walk-in') || srcLower.includes('walkin');
-        if (isMeta || isGoogle || isWhatsapp || isWebsite || isCall || isWalkin) return false;
-      }
+        return lead.counselor === val;
+      });
+      if (!match) return false;
+    }
+    // Source Multi-select filter
+    if (selectedSource && selectedSource.length > 0 && !selectedSource.includes('All')) {
+      const matchesSingleSource = (sourceOption) => {
+        const srcLower = (lead.source || '').toLowerCase();
+        if (sourceOption === 'meta') {
+          if (!srcLower.includes('meta')) return false;
+          if (selectedCampaign && selectedCampaign.length > 0 && !selectedCampaign.includes('All')) {
+            const leadCampaign = (lead.campaign || lead.campaignName || lead.subSource || '').trim().toLowerCase();
+            const campaignMatch = selectedCampaign.some(camp => {
+              return leadCampaign === camp.trim().toLowerCase();
+            });
+            if (!campaignMatch) return false;
+          }
+          return true;
+        }
+        if (sourceOption === 'google') return srcLower.includes('google');
+        if (sourceOption === 'whatsapp') return srcLower.includes('whatsapp');
+        if (sourceOption === 'instagram') return srcLower.includes('instagram');
+        if (sourceOption === 'website') return srcLower.includes('website');
+        if (sourceOption === 'call') return srcLower.includes('call') || srcLower.includes('phone');
+        if (sourceOption === 'walkin') return srcLower.includes('walk-in') || srcLower.includes('walkin');
+        if (sourceOption === 'other') {
+          const isMeta = srcLower.includes('meta');
+          const isGoogle = srcLower.includes('google');
+          const isWhatsapp = srcLower.includes('whatsapp');
+          const isInstagram = srcLower.includes('instagram');
+          const isWebsite = srcLower.includes('website');
+          const isCall = srcLower.includes('call') || srcLower.includes('phone');
+          const isWalkin = srcLower.includes('walk-in') || srcLower.includes('walkin');
+          return !(isMeta || isGoogle || isWhatsapp || isInstagram || isWebsite || isCall || isWalkin);
+        }
+        return false;
+      };
+
+      const match = selectedSource.some(srcOpt => matchesSingleSource(srcOpt));
+      if (!match) return false;
     }
 
     if (dateRangeFilter !== 'All Time') {
@@ -186,6 +395,10 @@ export default function GridView() {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedLeads = sortedLeads.slice(startIndex, startIndex + itemsPerPage);
 
+  const currentPageIds = paginatedLeads.map(l => l.id);
+  const isAllPageSelected = paginatedLeads.length > 0 && currentPageIds.every(id => selectedIds.includes(id));
+  const isSomePageSelected = currentPageIds.some(id => selectedIds.includes(id));
+
   const handleSort = (field) => {
     if (sortBy === field) {
       setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -200,12 +413,11 @@ export default function GridView() {
     return sortOrder === 'asc' ? '↑' : '↓';
   };
 
-  // Row Selection helpers
   const handleSelectAll = (e) => {
     if (e.target.checked) {
-      setSelectedIds(paginatedLeads.map(l => l.id));
+      setSelectedIds(prev => Array.from(new Set([...prev, ...currentPageIds])));
     } else {
-      setSelectedIds([]);
+      setSelectedIds(prev => prev.filter(id => !currentPageIds.includes(id)));
     }
   };
 
@@ -231,6 +443,18 @@ export default function GridView() {
     setBulkStageOpen(false);
   };
 
+  const executeBulkCourseUpdate = () => {
+    bulkUpdateCourse(selectedIds, bulkCourseName);
+    setSelectedIds([]);
+    setBulkCourseOpen(false);
+  };
+
+  const executeBulkSourceUpdate = () => {
+    bulkUpdateSource(selectedIds, bulkSourceName);
+    setSelectedIds([]);
+    setBulkSourceOpen(false);
+  };
+
   const executeBulkDelete = () => {
     if (confirm(`Are you sure you want to completely delete ${selectedIds.length} selected lead(s)? This cannot be undone.`)) {
       bulkDeleteLeads(selectedIds);
@@ -246,93 +470,225 @@ export default function GridView() {
     setWhatsappSubView('new-campaign');
   };
 
-  // CSV Import Parser with Deduplication Algorithm
+  // CSV / Excel Import Parser
   const handleCsvImport = () => {
     const dataToProcess = uploadedFileData || csvText;
     if (!dataToProcess || typeof dataToProcess !== 'string' || !dataToProcess.trim()) return;
-    const lines = dataToProcess.split('\n');
-    let addedCount = 0;
-    let dupCount = 0;
 
-    lines.forEach((line, index) => {
-      if (index === 0 && (line.toLowerCase().includes('name') || line.toLowerCase().includes('email') || line.toLowerCase().includes('phone'))) {
-        return;
+    // Helper to parse a single CSV line respecting quotes
+    const parseCsvLine = (line) => {
+      const result = [];
+      let current = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === '"') {
+          inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+          result.push(current.trim().replace(/^"|"$/g, ''));
+          current = '';
+        } else {
+          current += char;
+        }
       }
-    });
+      result.push(current.trim().replace(/^"|"$/g, ''));
+      return result;
+    };
 
-    let nameIdx = 0, emailIdx = 1, phoneIdx = 2, courseIdx = 3, sourceIdx = 4, campaignIdx = 5;
+    const lines = dataToProcess.split('\n').filter(l => l.trim() !== '');
+    if (lines.length === 0) return;
+
+    let nameIdx = -1, emailIdx = -1, phoneIdx = -1, courseIdx = -1, statusIdx = -1, sourceIdx = -1, counselorIdx = -1, tempIdx = -1, createdDateIdx = -1, campaignIdx = -1;
     let hasHeader = false;
 
-    if (lines.length > 0) {
-      const headerLine = lines[0].toLowerCase();
-      if (headerLine.includes('name') || headerLine.includes('email') || headerLine.includes('phone') || headerLine.includes('program')) {
-        hasHeader = true;
-        const headers = lines[0].split(',').map(p => p.trim().toLowerCase());
-        
-        nameIdx = headers.findIndex(h => h.includes('name') && !h.includes('campaign'));
-        emailIdx = headers.findIndex(h => h.includes('email'));
-        phoneIdx = headers.findIndex(h => h.includes('phone') || h.includes('contact') || h.includes('mobile'));
-        courseIdx = headers.findIndex(h => h.includes('course') || h.includes('program'));
-        sourceIdx = headers.findIndex(h => h.includes('source') || h.includes('platform'));
-        campaignIdx = headers.findIndex(h => h.includes('campaign'));
-      }
+    const firstLineParts = parseCsvLine(lines[0]);
+    const firstLineLower = lines[0].toLowerCase();
+
+    if (firstLineLower.includes('name') || firstLineLower.includes('email') || firstLineLower.includes('phone') || firstLineLower.includes('status') || firstLineLower.includes('assigned') || firstLineLower.includes('course')) {
+      hasHeader = true;
+      const headers = firstLineParts.map(h => h.trim().toLowerCase());
+
+      nameIdx = headers.findIndex(h => h === 'name' || (h.includes('name') && !h.includes('campaign')));
+      emailIdx = headers.findIndex(h => h.includes('email'));
+      phoneIdx = headers.findIndex(h => h.includes('phone') || h.includes('contact') || h.includes('mobile'));
+      courseIdx = headers.findIndex(h => h.includes('course') || h.includes('program'));
+      statusIdx = headers.findIndex(h => h.includes('status') || h.includes('stage'));
+      sourceIdx = headers.findIndex(h => h.includes('source') || h.includes('platform'));
+      counselorIdx = headers.findIndex(h => h.includes('assigned') || h.includes('counselor') || h.includes('owner'));
+      tempIdx = headers.findIndex(h => h.includes('temperature') || h.includes('temp') || h.includes('priority'));
+      createdDateIdx = headers.findIndex(h => h.includes('created') || h.includes('date'));
+      campaignIdx = headers.findIndex(h => h.includes('campaign'));
     }
+
+    const mapCsvStage = (raw) => {
+      if (!raw) return 'New Lead';
+      const trimmed = raw.trim();
+      const lower = trimmed.toLowerCase();
+      if (lower === 'free class attend' || lower === 'free class' || lower === 'st-freeclass') return 'Free Class';
+      if (lower === 'follow-up pending' || lower === 'followup pending' || lower === 'follow up') return 'Follow-up';
+      if (lower === 'new lead' || lower === 'new') return 'New Lead';
+      if (lower === 'contacted') return 'Contacted';
+      if (lower === 'interested') return 'Interested';
+      if (lower === 'demo scheduled' || lower === 'demo') return 'Demo Scheduled';
+      if (lower === 'demo attended') return 'Demo Attended';
+      if (lower === 'admission taken' || lower === 'converted' || lower === 'enrolled') return 'Converted';
+      if (lower === 'not interested' || lower === 'lost') return 'Not Interested';
+      return trimmed;
+    };
+
+    const mapCsvCounselor = (raw) => {
+      if (!raw) return activeUser || 'Unassigned';
+      const trimmed = raw.trim();
+      if (trimmed.toLowerCase() === 'unassigned' || trimmed.toLowerCase() === 'none' || trimmed === '') {
+        return 'Unassigned';
+      }
+      return trimmed;
+    };
+
+    const parseCsvDate = (raw) => {
+      if (!raw || !raw.trim()) return new Date().toISOString();
+      const str = raw.trim();
+      try {
+        const parsed = new Date(str);
+        if (!isNaN(parsed.getTime())) {
+          return parsed.toISOString();
+        }
+      } catch (e) {}
+
+      const parts = str.split(/[\/\-\s,:]+/);
+      if (parts.length >= 3) {
+        const d1 = parseInt(parts[0], 10);
+        const d2 = parseInt(parts[1], 10);
+        const y = parseInt(parts[2], 10);
+        if (!isNaN(d1) && !isNaN(d2) && !isNaN(y)) {
+          const fullYear = y < 100 ? 2000 + y : y;
+          const d = new Date(fullYear, d2 - 1, d1);
+          if (!isNaN(d.getTime())) return d.toISOString();
+        }
+      }
+      return str;
+    };
+
+    let addedCount = 0;
+    let updatedCount = 0;
 
     lines.forEach((line, index) => {
       if (index === 0 && hasHeader) return;
-      
-      const parts = line.split(',').map(p => p.trim());
+
+      const parts = parseCsvLine(line);
       if (parts.length < 2) return;
-      
-      let name = '', email = '', phone = '', course = '', source = '', campaign = '';
-      
+
+      let name = '', email = '', phone = '', course = '', rawStatus = '', source = '', rawCounselor = '', rawTemp = '', rawCreatedDate = '', campaign = '';
+
       if (hasHeader) {
-         name = nameIdx !== -1 && nameIdx < parts.length ? parts[nameIdx] : '';
-         email = emailIdx !== -1 && emailIdx < parts.length ? parts[emailIdx] : '';
-         phone = phoneIdx !== -1 && phoneIdx < parts.length ? parts[phoneIdx] : '';
-         course = courseIdx !== -1 && courseIdx < parts.length ? parts[courseIdx] : '';
-         source = sourceIdx !== -1 && sourceIdx < parts.length ? parts[sourceIdx] : '';
-         campaign = campaignIdx !== -1 && campaignIdx < parts.length ? parts[campaignIdx] : '';
+        name = nameIdx !== -1 && nameIdx < parts.length ? parts[nameIdx] : '';
+        email = emailIdx !== -1 && emailIdx < parts.length ? parts[emailIdx] : '';
+        phone = phoneIdx !== -1 && phoneIdx < parts.length ? parts[phoneIdx] : '';
+        course = courseIdx !== -1 && courseIdx < parts.length ? parts[courseIdx] : '';
+        rawStatus = statusIdx !== -1 && statusIdx < parts.length ? parts[statusIdx] : '';
+        source = sourceIdx !== -1 && sourceIdx < parts.length ? parts[sourceIdx] : '';
+        rawCounselor = counselorIdx !== -1 && counselorIdx < parts.length ? parts[counselorIdx] : '';
+        rawTemp = tempIdx !== -1 && tempIdx < parts.length ? parts[tempIdx] : '';
+        rawCreatedDate = createdDateIdx !== -1 && createdDateIdx < parts.length ? parts[createdDateIdx] : '';
+        campaign = campaignIdx !== -1 && campaignIdx < parts.length ? parts[campaignIdx] : '';
       } else {
-         name = parts[0];
-         email = parts[1];
-         phone = parts[2];
-         course = parts[3];
-         source = parts[4];
-         campaign = parts.length > 5 ? parts[5] : '';
+        if (parts.length === 4) {
+          name = parts[0];
+          phone = parts[1];
+          source = parts[2];
+          campaign = parts[3];
+        } else if (parts.length === 5) {
+          name = parts[0];
+          phone = parts[1];
+          source = parts[2];
+          campaign = parts[3];
+          rawCreatedDate = parts[4];
+        } else if (parts.length === 6) {
+          name = parts[0];
+          phone = parts[1];
+          source = parts[2];
+          campaign = parts[3];
+          rawCreatedDate = parts[4];
+          rawCounselor = parts[5];
+        } else {
+          name = parts[0];
+          email = parts[1];
+          phone = parts[2];
+          course = parts[3];
+          rawStatus = parts.length > 4 ? parts[4] : '';
+          source = parts.length > 5 ? parts[5] : '';
+          campaign = parts.length > 6 ? parts[6] : '';
+          rawCreatedDate = parts.length > 7 ? parts[7] : '';
+        }
       }
-      
-      if (!name && !email && !phone) return; // Skip completely empty rows
+
+      if (!name && !email && !phone) return;
 
       const cleanPhone = phone ? String(phone).replace(/[^0-9]/g, '') : '';
-      const cleanEmail = email ? email.toLowerCase() : '';
+      const cleanEmail = email ? email.toLowerCase().trim() : '';
 
-      const duplicateExists = leads.some(lead =>
-        (cleanEmail && lead.email && lead.email.toLowerCase() === cleanEmail) ||
-        (cleanPhone && String(lead.phone || '').replace(/[^0-9]/g, '') === cleanPhone)
+      const existingLead = leads.find(lead =>
+        (cleanEmail && lead.email && lead.email.toLowerCase().trim() === cleanEmail) ||
+        (cleanPhone && cleanPhone.length >= 10 && String(lead.phone || '').replace(/[^0-9]/g, '').slice(-10) === cleanPhone.slice(-10))
       );
-      if (duplicateExists) {
-        dupCount++;
+
+      const finalCampaign = campaign ? campaign.trim() : '';
+
+      if (existingLead) {
+        // UPDATE existing lead with latest info from uploaded file
+        const updatePayload = {};
+        if (name && name.trim() && name !== 'Campaign Contact') updatePayload.name = name.trim();
+        if (email && email.trim()) updatePayload.email = email.trim();
+        if (course && course.trim()) updatePayload.course = course.trim();
+        if (source && source.trim()) updatePayload.source = source.trim();
+        if (finalCampaign) {
+          updatePayload.campaign = finalCampaign;
+          updatePayload.campaignName = finalCampaign;
+          updatePayload.subSource = finalCampaign;
+        }
+        if (rawCounselor && rawCounselor.trim()) updatePayload.counselor = mapCsvCounselor(rawCounselor);
+        if (rawStatus && rawStatus.trim()) updatePayload.stage = mapCsvStage(rawStatus);
+        if (rawTemp && rawTemp.trim()) updatePayload.temperature = rawTemp.trim();
+        if (rawCreatedDate && rawCreatedDate.trim()) updatePayload.createdDate = parseCsvDate(rawCreatedDate);
+
+        if (Object.keys(updatePayload).length > 0) {
+          updateLead(existingLead.id, updatePayload);
+          updatedCount++;
+        }
       } else {
+        // ADD NEW LEAD with exact info from uploaded file
+        const finalStage = mapCsvStage(rawStatus);
+        const finalCounselor = mapCsvCounselor(rawCounselor);
+        const finalCreatedDate = parseCsvDate(rawCreatedDate);
+        const finalTemp = rawTemp && ['Hot', 'Warm', 'Cold'].includes(rawTemp.trim()) ? rawTemp.trim() : 'Hot';
+
         addLead({
-          name: name || 'Unknown',
+          name: name || (cleanPhone ? cleanPhone : 'Lead'),
           email: email || '',
           phone: phone || '',
-          course: course || courses[0]?.name,
+          course: course || '',
           source: source || 'CSV Import',
-          campaign: campaign || '',
-          counselor: activeUser,
-          stage: 'New Lead'
+          subSource: finalCampaign,
+          campaign: finalCampaign,
+          campaignName: finalCampaign,
+          counselor: finalCounselor,
+          stage: finalStage,
+          temperature: finalTemp,
+          createdDate: finalCreatedDate,
+          skipAutoReply: true,
+          isBulkImport: true,
+          disableAutoWelcome: true
         });
         addedCount++;
       }
     });
 
-    if (addedCount > 0) {
-      showToastMsg(`CSV parsing completed. Imported ${addedCount} leads.`);
-    }
-    if (dupCount > 0) {
-      showToastMsg(`Identified & bypassed ${dupCount} duplicate records.`);
+    if (addedCount > 0 || updatedCount > 0) {
+      showToastMsg(`Import complete: ${addedCount} new leads added, ${updatedCount} existing leads updated with latest info.`);
+      const lastPage = Math.ceil((leads.length + addedCount) / itemsPerPage);
+      setCurrentPage(lastPage > 0 ? lastPage : 1);
+    } else {
+      showToastMsg('No new or updated lead data found in file.');
     }
     setImportOpen(false);
     setCsvText('');
@@ -367,25 +723,34 @@ export default function GridView() {
 
   const [timelineNoteText, setTimelineNoteText] = useState('');
 
-  const [callOutcome, setCallOutcome] = useState('No Answer');
+  const [callOutcome, setCallOutcome] = useState('');
   const [callNotes, setCallNotes] = useState('');
   const [scheduleFollowup, setScheduleFollowup] = useState(false);
   const [followupDate, setFollowupDate] = useState('');
 
+  React.useEffect(() => {
+    setCallOutcome('');
+    setCallNotes('');
+    setScheduleFollowup(false);
+    setFollowupDate('');
+  }, [selectedLeadId]);
+
   const handleLogCallSubmit = () => {
-    if (!selectedLeadId) return;
+    if (!selectedLeadId || !callOutcome) return;
+    const canFollowup = ['interested', 'busy', 'call later', 'answered', 'no answer'].includes((callOutcome || '').toLowerCase());
+    const hasFollowup = canFollowup && scheduleFollowup && !!followupDate;
     logCall(selectedLeadId, {
       status: callOutcome,
       notes: callNotes,
-      scheduleFollowup: scheduleFollowup,
-      followupDate: followupDate,
-      followupReason: callNotes,
-      updateStage: ''
+      scheduleFollowup: hasFollowup,
+      followupDate: hasFollowup ? followupDate : '',
+      followupReason: hasFollowup ? (callNotes || 'Scheduled callback') : '',
+      updateStage: callOutcome
     });
     setCallNotes('');
     setScheduleFollowup(false);
     setFollowupDate('');
-    setCallOutcome('No Answer');
+    setCallOutcome('');
   };
 
   const handleAddNoteSubmit = () => {
@@ -414,7 +779,7 @@ export default function GridView() {
     setEditCourse(lead.course || '');
     setEditCounselor(lead.counselor || 'Unassigned');
     setEditStage(lead.stage || 'New Lead');
-    setEditSource(lead.source || 'Walk-in');
+    setEditSource(lead.source || '');
     setEditSubSource(lead.subSource || '');
     setEditCampaign(lead.campaign || lead.campaignName || '');
     setEditFollowupDate(lead.followupDate || '');
@@ -452,7 +817,15 @@ export default function GridView() {
   // Quick stats
   const totalAll = leads.filter(l => activeRole !== 'Counselor' || l.counselor === activeUser).length;
   const convertedCount = filteredLeads.filter(l => l.stage === 'Converted').length;
-  const activeFiltersCount = [selectedCourse, selectedStage, selectedCounselor, selectedSource, selectedCampaign, dateRangeFilter].filter(f => f !== 'All' && f !== 'All Time').length;
+  const activeFiltersCount = [
+    selectedCourse.length > 0 && !selectedCourse.includes('All'),
+    selectedStage.length > 0 && !selectedStage.includes('All'),
+    selectedCounselor.length > 0 && !selectedCounselor.includes('All'),
+    selectedSource.length > 0 && !selectedSource.includes('All'),
+    selectedCampaign.length > 0 && !selectedCampaign.includes('All'),
+    selectedTemperature.length > 0 && !selectedTemperature.includes('All'),
+    dateRangeFilter !== 'All Time'
+  ].filter(Boolean).length;
 
   const uniqueMetaCampaigns = [...new Set(
     leads.filter(l => (l.source || '').toLowerCase().includes('meta'))
@@ -576,7 +949,19 @@ export default function GridView() {
             <span style={{ color: 'var(--primary)', fontWeight: 600 }}>{activeFiltersCount} filter{activeFiltersCount > 1 ? 's' : ''} active</span>
             <button
               className="gv-clear-filters"
-              onClick={() => { setSelectedCourse('All'); setSelectedStage('All'); setSelectedCounselor('All'); setSelectedSource('All'); setSelectedCampaign('All'); setDateRangeFilter('All Time'); setCustomStartDate(''); setCustomEndDate(''); setGridSearch(''); setCurrentPage(1); }}
+              onClick={() => {
+                setSelectedCourse(['All']);
+                setSelectedStage(['All']);
+                setSelectedCounselor(['All']);
+                setSelectedSource(['All']);
+                setSelectedCampaign(['All']);
+                setSelectedTemperature(['All']);
+                setDateRangeFilter('All Time');
+                setCustomStartDate('');
+                setCustomEndDate('');
+                setGridSearch('');
+                setCurrentPage(1);
+              }}
             >Clear</button>
           </div>
         )}
@@ -584,118 +969,91 @@ export default function GridView() {
 
       {/* ──────────── FILTERS ──────────── */}
       <div className="gv-filter-bar">
-        <div className="gv-filter-group">
-          <label className="gv-filter-label">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20M4 19.5A2.5 2.5 0 014 17V5a2 2 0 012-2h14v14H6.5A2.5 2.5 0 004 19.5z"/></svg>
-            Course
-          </label>
-          <select
-            value={selectedCourse}
-            onChange={(e) => { setSelectedCourse(e.target.value); setCurrentPage(1); }}
-            className="gv-filter-select"
-          >
-            <option value="All">ALL</option>
-            {courses.map((c, index) => (
-              <option key={`${c.id}-${index}`} value={c.name}>{c.code} — {c.name}</option>
-            ))}
-          </select>
-        </div>
+        <MultiSelectFilter
+          label="Course"
+          icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20M4 19.5A2.5 2.5 0 014 17V5a2 2 0 012-2h14v14H6.5A2.5 2.5 0 004 19.5z"/></svg>}
+          options={courses.map(c => ({ value: c.name, label: `${c.code ? `${c.code} — ` : ''}${c.name}` }))}
+          selectedValues={selectedCourse}
+          onChange={(vals) => { setSelectedCourse(vals); setCurrentPage(1); }}
+        />
 
-        <div className="gv-filter-group">
-          <label className="gv-filter-label">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-            Stage
-          </label>
-          <select
-            value={selectedStage}
-            onChange={(e) => { setSelectedStage(e.target.value); setCurrentPage(1); }}
-            className="gv-filter-select"
-          >
-            <option value="All">ALL</option>
-            {pipelineStages.map(s => (
-              <option key={s.id} value={s.name}>{s.name}</option>
-            ))}
-          </select>
-        </div>
-        <div className="gv-filter-group">
-          <label className="gv-filter-label">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" strokeLinecap="round"/><circle cx="12" cy="12" r="4"/></svg>
-            Temperature
-          </label>
-          <select
-            value={selectedTemperature}
-            onChange={(e) => { setSelectedTemperature(e.target.value); setCurrentPage(1); }}
-            className="gv-filter-select"
-          >
-            <option value="All">ALL</option>
-            <option value="Hot">🔥 Hot Leads</option>
-            <option value="Warm">☀️ Warm Leads</option>
-            <option value="Cold">❄️ Cold Leads</option>
-          </select>
-        </div>
+        <MultiSelectFilter
+          label="Stage"
+          icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>}
+          options={pipelineStages.map(s => ({ value: s.name, label: s.name }))}
+          selectedValues={selectedStage}
+          onChange={(vals) => { setSelectedStage(vals); setCurrentPage(1); }}
+        />
 
-        {activeRole !== 'Counselor' && (
+        <MultiSelectFilter
+          label="Temperature"
+          icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" strokeLinecap="round"/><circle cx="12" cy="12" r="4"/></svg>}
+          options={[
+            { value: 'Hot', label: '🔥 Hot Leads' },
+            { value: 'Warm', label: '☀️ Warm Leads' },
+            { value: 'Cold', label: '❄️ Cold Leads' }
+          ]}
+          selectedValues={selectedTemperature}
+          onChange={(vals) => { setSelectedTemperature(vals); setCurrentPage(1); }}
+        />
+
+        {activeRole === 'Counselor' ? (
           <div className="gv-filter-group">
             <label className="gv-filter-label">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 3a4 4 0 100 8 4 4 0 000-8z"/></svg>
-              Owner
+              ASSIGNED TO
             </label>
-            <select
-              value={selectedCounselor}
-              onChange={(e) => { setSelectedCounselor(e.target.value); setCurrentPage(1); }}
-              className="gv-filter-select"
-            >
-              <option key="all" value="All">ALL</option>
-              {counselors.map((c, index) => (
-                <option key={`${c.id}-${index}`} value={c.name}>
-                  {c.name} {c.status === 'Deactivated' ? '(Deactivated)' : ''}
-                </option>
-              ))}
+            <select className="gv-filter-select" disabled value={activeUser} style={{ opacity: 0.8 }}>
+              <option value={activeUser}>{activeUser}</option>
             </select>
           </div>
+        ) : (
+          <MultiSelectFilter
+            label="ASSIGNED TO"
+            icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 3a4 4 0 100 8 4 4 0 000-8z"/></svg>}
+            options={[
+              { value: 'Unassigned', label: 'Unassigned' },
+              ...counselors.map(c => ({
+                value: c.name,
+                label: `${c.name}${c.status === 'Deactivated' ? ' (Deactivated)' : ''}`
+              }))
+            ]}
+            selectedValues={selectedCounselor}
+            onChange={(vals) => { setSelectedCounselor(vals); setCurrentPage(1); }}
+          />
         )}
 
-        <div className="gv-filter-group">
-          <label className="gv-filter-label">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-            Source
-          </label>
-          <select
-            value={selectedSource}
-            onChange={(e) => { 
-              setSelectedSource(e.target.value); 
-              setCurrentPage(1); 
-              if (e.target.value !== 'meta') setSelectedCampaign('All');
-            }}
-            className="gv-filter-select"
-          >
-            <option value="All">ALL</option>
-            <option value="meta">Meta</option>
-            <option value="google">Google</option>
-            <option value="whatsapp">WhatsApp</option>
-            <option value="website">Website</option>
-            <option value="call">Call</option>
-            <option value="walkin">Walk-in</option>
-          </select>
-        </div>
+        <MultiSelectFilter
+          label="Source"
+          icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>}
+          options={[
+            { value: 'meta', label: 'Meta' },
+            { value: 'google', label: 'Google' },
+            { value: 'whatsapp', label: 'WhatsApp' },
+            { value: 'instagram', label: 'Instagram' },
+            { value: 'website', label: 'Website' },
+            { value: 'call', label: 'Call' },
+            { value: 'walkin', label: 'Walk-in' },
+            { value: 'other', label: 'Other' }
+          ]}
+          selectedValues={selectedSource}
+          onChange={(vals) => {
+            setSelectedSource(vals);
+            setCurrentPage(1);
+            if (!vals.includes('meta')) {
+              setSelectedCampaign(['All']);
+            }
+          }}
+        />
 
-        {selectedSource === 'meta' && (
-          <div className="gv-filter-group">
-            <label className="gv-filter-label">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" strokeLinecap="round"/><circle cx="12" cy="12" r="4"/></svg>
-              Campaign
-            </label>
-            <select
-              value={selectedCampaign}
-              onChange={(e) => { setSelectedCampaign(e.target.value); setCurrentPage(1); }}
-              className="gv-filter-select"
-            >
-              <option value="All">ALL</option>
-              {uniqueMetaCampaigns.map((c, index) => (
-                <option key={`${c}-${index}`} value={c}>{c}</option>
-              ))}
-            </select>
-          </div>
+        {selectedSource && selectedSource.includes('meta') && (
+          <MultiSelectFilter
+            label="Campaign"
+            icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" strokeLinecap="round"/><circle cx="12" cy="12" r="4"/></svg>}
+            options={uniqueMetaCampaigns.map(c => ({ value: c, label: c }))}
+            selectedValues={selectedCampaign}
+            onChange={(vals) => { setSelectedCampaign(vals); setCurrentPage(1); }}
+          />
         )}
 
         <div className="gv-filter-group" style={{ position: 'relative' }}>
@@ -778,6 +1136,25 @@ export default function GridView() {
           <div className="gv-bulk-left">
             <div className="gv-bulk-count">{selectedIds.length}</div>
             <span>lead{selectedIds.length > 1 ? 's' : ''} selected</span>
+            {selectedIds.length < filteredLeads.length ? (
+              <button 
+                className="gv-btn-ghost gv-btn-sm" 
+                style={{ marginLeft: '12px', color: 'var(--primary)', fontWeight: '600', textDecoration: 'underline', cursor: 'pointer' }}
+                onClick={() => setSelectedIds(filteredLeads.map(l => l.id))}
+              >
+                Select all {filteredLeads.length} leads
+              </button>
+            ) : (
+              filteredLeads.length > itemsPerPage && (
+                <button 
+                  className="gv-btn-ghost gv-btn-sm" 
+                  style={{ marginLeft: '12px', color: 'var(--primary)', fontWeight: '600', textDecoration: 'underline', cursor: 'pointer' }}
+                  onClick={() => setSelectedIds(currentPageIds)}
+                >
+                  Select current page only ({paginatedLeads.length})
+                </button>
+              )
+            )}
           </div>
           <div className="gv-bulk-right">
             <div style={{ position: 'relative' }}>
@@ -789,6 +1166,7 @@ export default function GridView() {
                 <div className="gv-popover">
                   <label className="form-label" style={{ fontSize: '11px' }}>Assign to Counselor</label>
                   <select className="gv-filter-select" style={{ width: '100%' }} value={bulkCounselorName} onChange={(e) => setBulkCounselorName(e.target.value)}>
+                    <option value="Unassigned">Unassigned</option>
                     {counselors.filter(c => c.status === 'Active' && c.role !== 'Admin' && c.name.toLowerCase() !== 'admin').map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                   </select>
                   <button className="gv-btn-primary gv-btn-sm" style={{ width: '100%', marginTop: '8px', justifyContent: 'center' }} onClick={executeBulkReassign}>Apply</button>
@@ -797,7 +1175,7 @@ export default function GridView() {
             </div>
 
             <div style={{ position: 'relative' }}>
-              <button className="gv-btn-outline gv-btn-sm" onClick={() => { setBulkStageOpen(!bulkStageOpen); setBulkReassignOpen(false); }}>
+              <button className="gv-btn-outline gv-btn-sm" onClick={() => { setBulkStageOpen(!bulkStageOpen); setBulkReassignOpen(false); setBulkSourceOpen(false); }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                 Move Stage
               </button>
@@ -808,6 +1186,44 @@ export default function GridView() {
                     {pipelineStages.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
                   </select>
                   <button className="gv-btn-primary gv-btn-sm" style={{ width: '100%', marginTop: '8px', justifyContent: 'center' }} onClick={executeBulkStageUpdate}>Apply</button>
+                </div>
+              )}
+            </div>
+
+            <div style={{ position: 'relative' }}>
+              <button className="gv-btn-outline gv-btn-sm" onClick={() => { setBulkSourceOpen(!bulkSourceOpen); setBulkStageOpen(false); setBulkReassignOpen(false); }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+                Change Source
+              </button>
+              {bulkSourceOpen && (
+                <div className="gv-popover">
+                  <label className="form-label" style={{ fontSize: '11px' }}>Update Source to</label>
+                  <select className="gv-filter-select" style={{ width: '100%' }} value={bulkSourceName} onChange={(e) => setBulkSourceName(e.target.value)}>
+                    <option value="Meta Ads">Meta Ads</option>
+                    <option value="Walk-in">Walk-in</option>
+                    <option value="WhatsApp Inbound">WhatsApp Inbound</option>
+                    <option value="Website Embedded Form">Website Embedded Form</option>
+                    <option value="Google Ads">Google Ads</option>
+                    <option value="Instagram">Instagram</option>
+                    <option value="Campaign Upload">Campaign Upload</option>
+                  </select>
+                  <button className="gv-btn-primary gv-btn-sm" style={{ width: '100%', marginTop: '8px', justifyContent: 'center' }} onClick={executeBulkSourceUpdate}>Apply</button>
+                </div>
+              )}
+            </div>
+
+            <div style={{ position: 'relative' }}>
+              <button className="gv-btn-outline gv-btn-sm" onClick={() => { setBulkCourseOpen(!bulkCourseOpen); setBulkSourceOpen(false); setBulkStageOpen(false); setBulkReassignOpen(false); }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20M4 19.5A2.5 2.5 0 014 17V5a2 2 0 012-2h14v14H6.5A2.5 2.5 0 004 19.5z"/></svg>
+                Change Course
+              </button>
+              {bulkCourseOpen && (
+                <div className="gv-popover">
+                  <label className="form-label" style={{ fontSize: '11px' }}>Change Course to</label>
+                  <select className="gv-filter-select" style={{ width: '100%' }} value={bulkCourseName} onChange={(e) => setBulkCourseName(e.target.value)}>
+                    {courses.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                  </select>
+                  <button className="gv-btn-primary gv-btn-sm" style={{ width: '100%', marginTop: '8px', justifyContent: 'center' }} onClick={executeBulkCourseUpdate}>Apply</button>
                 </div>
               )}
             </div>
@@ -839,11 +1255,12 @@ export default function GridView() {
             <thead>
               <tr>
                 <th style={{ width: '44px' }}>
-                  <label className="gv-checkbox-wrap">
+                  <label className="gv-checkbox-wrap" title={isAllPageSelected ? "Deselect current page" : "Select current page"}>
                     <input
                       type="checkbox"
+                      ref={el => { if (el) el.indeterminate = isSomePageSelected && !isAllPageSelected; }}
                       onChange={handleSelectAll}
-                      checked={selectedIds.length === paginatedLeads.length && paginatedLeads.length > 0}
+                      checked={isAllPageSelected}
                     />
                     <span className="gv-checkmark" />
                   </label>
@@ -901,18 +1318,17 @@ export default function GridView() {
                       {/* Student */}
                       <td>
                         {(() => {
-                          const displayName = lead.source === 'Instagram' && lead.name?.startsWith('Instagram User') && lead.instagramUsername
+                          const displayName = (lead.source === 'Instagram' && lead.name?.startsWith('Instagram User') && lead.instagramUsername)
                             ? lead.instagramUsername
-                            : (lead.name || '');
-                          const initials = getInitials(displayName);
-                          const hue = displayName ? (displayName.charCodeAt(0) * 7 % 360) : 0;
+                            : ((lead.name && lead.name !== 'Campaign Contact' && lead.name !== 'WhatsApp Student') ? lead.name : (lead.phone || 'Lead'));
+                          const charCode = displayName.charCodeAt(0) || 65;
                           return (
                             <div className="gv-student-cell">
                               <div className="gv-avatar" style={{
-                                background: `hsl(${hue}, 55%, 92%)`,
-                                color: `hsl(${hue}, 60%, 40%)`
+                                background: `hsl(${charCode * 7 % 360}, 55%, 92%)`,
+                                color: `hsl(${charCode * 7 % 360}, 60%, 40%)`
                               }}>
-                                {initials}
+                                {getInitials(displayName)}
                               </div>
                               <div className="gv-student-info">
                                 <span className="gv-student-name">
@@ -926,7 +1342,7 @@ export default function GridView() {
                                     </span>
                                   )}
                                 </span>
-                                <span className="gv-student-meta" style={{ fontFamily: 'monospace', opacity: 0.8 }}>{lead.phone || '-'}</span>
+                                <span className="gv-student-meta" style={{ fontFamily: 'monospace', color: '#334155', fontWeight: '600' }}>{lead.phone || '-'}</span>
                               </div>
                             </div>
                           );
@@ -948,11 +1364,15 @@ export default function GridView() {
                               ? 'Website Leads' 
                               : (lead.source === 'Walk-in' && lead.subSource ? `Walk-in (${lead.subSource})` : lead.source)}
                           </span>
-                          {(lead.campaign || lead.campaignName) && (
-                            <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
-                              {lead.campaign || lead.campaignName}
-                            </span>
-                          )}
+                          {(() => {
+                            const campText = lead.campaign || lead.campaignName || (lead.subSource && lead.subSource !== lead.source ? lead.subSource : '');
+                            if (!campText) return null;
+                            return (
+                              <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                                {campText}
+                              </span>
+                            );
+                          })()}
                         </div>
                       </td>
 
@@ -966,14 +1386,20 @@ export default function GridView() {
 
                       {/* Date */}
                       <td>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                            {new Date(lead.createdDate).toLocaleDateString()}
-                          </span>
-                          <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
-                            {new Date(lead.createdDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        </div>
+                        {(() => {
+                          const rawDate = lead.createdDate || lead.createdAt;
+                          const parsedDate = rawDate && !isNaN(new Date(rawDate).getTime()) ? new Date(rawDate) : null;
+                          return (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                              <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                {parsedDate ? parsedDate.toLocaleDateString() : '—'}
+                              </span>
+                              <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                                {parsedDate ? parsedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                              </span>
+                            </div>
+                          );
+                        })()}
                       </td>
                     </tr>
                   );
@@ -1195,6 +1621,38 @@ export default function GridView() {
                     </div>
                   )}
 
+                  {/* WhatsApp Chat Option */}
+                  {!isEditing && lead.phone && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedLeadId(lead.id);
+                        setShowDetailModal(false);
+                        setActiveView('gowhatsapp');
+                        setWhatsappSubView('inbox');
+                      }}
+                      className="gv-btn-primary"
+                      style={{
+                        padding: '6px 12px',
+                        fontSize: '13px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        height: '36px',
+                        backgroundColor: '#25D366',
+                        borderColor: '#25D366',
+                        color: '#ffffff',
+                        cursor: 'pointer'
+                      }}
+                      title={`Chat with ${lead.name} in WhatsApp Inbox`}
+                    >
+                      <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
+                        <path d="M12.012 2c-5.506 0-9.969 4.463-9.969 9.969 0 1.761.459 3.479 1.331 4.988l-1.413 5.163 5.281-1.385c1.455.794 3.1 1.213 4.77 1.213 5.506 0 9.969-4.463 9.969-9.969s-4.463-9.969-9.969-9.969zm5.82 14.344c-.244.688-1.425 1.313-1.969 1.394-.544.081-1.244.119-3.563-.825-2.731-1.113-4.488-3.9-4.625-4.081-.138-.181-1.106-1.469-1.106-2.8 0-1.331.694-1.988.944-2.25.25-.263.544-.325.725-.325.181 0 .363.006.519.013.169.006.394-.063.619.475.244.588.825 2.013.894 2.156.069.144.113.313.019.5-.094.188-.144.3-.288.469-.144.169-.3.375-.431.506-.144.144-.294.3-.125.588.169.288.75 1.238 1.613 2.006 1.106.988 2.038 1.294 2.325 1.438.288.144.456.125.625-.069.169-.194.725-.844.919-1.138.194-.294.394-.244.662-.144.269.094 1.713.806 2.006.95.294.144.494.219.569.344.075.125.075.725-.169 1.413z"/>
+                      </svg>
+                      WhatsApp
+                    </button>
+                  )}
+
                   {/* Edit Lead Option */}
                   {!isEditing && (
                     <button 
@@ -1359,6 +1817,7 @@ export default function GridView() {
                           onChange={(e) => setEditSource(e.target.value)}
                           style={{ padding: '8px 12px', fontSize: '13px', height: '38px' }}
                         >
+                        <option value="">Select Source</option>
                           <option value="Walk-in">Walk-in</option>
                           <option value="Meta Ads">Meta Ads</option>
                           <option value="WhatsApp">WhatsApp</option>
@@ -1499,14 +1958,15 @@ export default function GridView() {
                     <div style={{ display: 'flex', gap: '12px' }}>
                       <div style={{ flex: 1 }}>
                         <label style={{ fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', color: '#64748b', marginBottom: '4px', display: 'block' }}>Call Outcome</label>
-                        <select className="form-control" value={callOutcome} onChange={(e) => setCallOutcome(e.target.value)} style={{ padding: '8px 12px', fontSize: '13px', height: '36px', width: '100%' }}>
-                          <option value="Answered">Answered</option>
-                          <option value="No Answer">No Answer</option>
-                          <option value="Busy">Busy</option>
-                          <option value="Wrong Number">Wrong Number</option>
-                          <option value="Interested">Interested</option>
-                          <option value="Not Interested">Not Interested</option>
-                          <option value="Call Later">Call Later</option>
+                        <select className="form-control" value={callOutcome} onChange={(e) => setCallOutcome(e.target.value)} style={{ padding: '8px 12px', fontSize: '13px', height: '36px', width: '100%', color: callOutcome ? 'inherit' : '#94a3b8' }}>
+                          <option value="" disabled>Call Outcome</option>
+                          <option value="Answered" style={{ color: '#1e293b' }}>Answered</option>
+                          <option value="No Answer" style={{ color: '#1e293b' }}>No Answer</option>
+                          <option value="Busy" style={{ color: '#1e293b' }}>Busy</option>
+                          <option value="Wrong Number" style={{ color: '#1e293b' }}>Wrong Number</option>
+                          <option value="Interested" style={{ color: '#1e293b' }}>Interested</option>
+                          <option value="Not Interested" style={{ color: '#1e293b' }}>Not Interested</option>
+                          <option value="Call Later" style={{ color: '#1e293b' }}>Call Later</option>
                         </select>
                       </div>
                       <div style={{ flex: 2 }}>
@@ -1517,12 +1977,16 @@ export default function GridView() {
                     
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', cursor: 'pointer', color: '#334155' }}>
-                          <input type="checkbox" checked={scheduleFollowup} onChange={(e) => setScheduleFollowup(e.target.checked)} />
-                          Schedule Follow-up
-                        </label>
-                        {scheduleFollowup && (
-                          <input type="datetime-local" className="form-control" value={followupDate} onChange={(e) => setFollowupDate(e.target.value)} style={{ padding: '4px 8px', fontSize: '12px', height: '28px' }} />
+                        {['interested', 'busy', 'call later', 'answered', 'no answer'].includes((callOutcome || '').toLowerCase()) && (
+                          <>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', cursor: 'pointer', color: '#334155' }}>
+                              <input type="checkbox" checked={scheduleFollowup} onChange={(e) => setScheduleFollowup(e.target.checked)} />
+                              Schedule Follow-up
+                            </label>
+                            {scheduleFollowup && (
+                              <input type="datetime-local" className="form-control" value={followupDate} onChange={(e) => setFollowupDate(e.target.value)} style={{ padding: '4px 8px', fontSize: '12px', height: '28px' }} />
+                            )}
+                          </>
                         )}
                       </div>
                       <button type="button" onClick={handleLogCallSubmit} className="gv-btn-primary" style={{ padding: '0 16px', fontSize: '12px', height: '32px' }}>
