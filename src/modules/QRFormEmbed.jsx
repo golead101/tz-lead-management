@@ -70,7 +70,7 @@ export default function QRFormEmbed() {
           if (Array.isArray(parsed) && parsed.length > 0) return parsed.map(c => c.name || c);
         }
       } catch(e){}
-      return ['Full-Stack Web Development', 'Data Science & Artificial Intelligence', 'Cloud & DevOps Engineering', 'Cyber Security & Ethical Hacking', 'UI/UX Product Design'];
+      return ['Data Analytics', 'Data Science With GenAI', 'AIML With GenAI', 'Digital Marketing'];
     })(),
     timings: ['Morning (9 AM - 11 AM)', 'Afternoon (2 PM - 4 PM)', 'Evening (6 PM - 8 PM)', 'Weekend Batches'],
     sources: ['Instagram', 'Facebook', 'Google Search', 'Friend/Referral', 'Walk-in/Poster', 'Other']

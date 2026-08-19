@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { db, auth } from '../firebase';
 import { collection, doc, setDoc, deleteDoc, onSnapshot, writeBatch, getDoc, getDocs } from 'firebase/firestore';
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
@@ -174,6 +174,8 @@ export const CRMProvider = ({ children }) => {
     const local = localStorage.getItem('crm_courses');
     return local ? JSON.parse(local) : DEFAULT_COURSES;
   });
+  // Track IDs being deleted so onSnapshot doesn't race-restore them
+  const deletingCourseIds = useRef(new Set());
 
   const [pipelineStages, setPipelineStages] = useState(() => {
     const local = localStorage.getItem('crm_stages');
@@ -505,7 +507,7 @@ export const CRMProvider = ({ children }) => {
         console.error("Firestore iframe subscription error:", err);
       });
 
-      // 2. Courses (Strictly restrict to the 4 active institute courses & remove extra courses from Firestore)
+      // 2. Courses (Firestore subscription — respects user additions and deletions)
       coursesUnsub = onSnapshot(collection(db, 'courses'), (snapshot) => {
         if (!active) return;
         if (snapshot.empty) {
@@ -516,40 +518,16 @@ export const CRMProvider = ({ children }) => {
           });
           batch.commit().catch(err => console.error("Firestore seeding courses failed:", err));
         } else {
-          const validCourses = [];
-          snapshot.docs.forEach(docSnap => {
-            const data = docSnap.data();
-            const cName = (data.name || '').trim().toLowerCase();
-
-            // Match against allowed 4 courses (case-insensitive)
-            const isAllowed = DEFAULT_COURSES.some(dc => {
-              const defLower = dc.name.toLowerCase();
-              return cName === defLower || cName.includes(defLower) || defLower.includes(cName) ||
-                (cName.includes('data science') && defLower.includes('data science')) ||
-                (cName.includes('data analytics') && defLower.includes('data analytics')) ||
-                ((cName.includes('aiml') || cName.includes('ai & ml') || cName.includes('ai/ml')) && defLower.includes('aiml')) ||
-                (cName.includes('digital marketing') && defLower.includes('digital marketing'));
-            });
-
-            if (!isAllowed) {
-              // Delete extra / deprecated courses from Firestore
-              deleteDoc(doc(db, 'courses', docSnap.id)).catch(console.error);
-            } else {
-              validCourses.push(data);
-            }
-          });
-
-          // Ensure all 4 allowed default courses exist in state
-          DEFAULT_COURSES.forEach(defCourse => {
-            const defLower = defCourse.name.toLowerCase();
-            const exists = validCourses.some(vc => (vc.name || '').toLowerCase() === defLower || vc.id === defCourse.id);
-            if (!exists) {
-              validCourses.push(defCourse);
-              setDoc(doc(db, 'courses', defCourse.id), defCourse).catch(console.error);
-            }
-          });
-
-          setCourses(validCourses);
+          const coursesData = snapshot.docs
+            .filter(docSnap => !deletingCourseIds.current.has(docSnap.id))
+            .map(docSnap => ({
+              id: docSnap.id,
+              ...docSnap.data()
+            }));
+          setCourses(coursesData);
+          try {
+            localStorage.setItem('crm_courses', JSON.stringify(coursesData));
+          } catch (e) {}
         }
       }, (err) => {
         console.error("Firestore courses subscription error:", err);
@@ -1794,18 +1772,93 @@ export const CRMProvider = ({ children }) => {
     showToastMsg(`Course "${courseData.name}" added to list.`);
   };
 
-  // Course Remover
-  const removeCourse = (courseId) => {
+  // Course Remover — deletes by real Firestore docSnap.id (always reliable)
+  const removeCourse = async (courseId, courseName) => {
+    const targetId = courseId;
+    const targetName = (courseName || '').trim().toLowerCase();
+
+    // 1. Mark as deleting so onSnapshot won't race-restore this course
+    deletingCourseIds.current.add(targetId);
+
+    // 2. Immediately remove from local state + localStorage
+    setCourses(prev => {
+      const updated = prev.filter(c => {
+        if (targetId && c.id === targetId) return false;
+        if (targetName && (c.name || '').trim().toLowerCase() === targetName) return false;
+        return true;
+      });
+      try { localStorage.setItem('crm_courses', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+
     if (isFirebaseEnabled) {
-      deleteDoc(doc(db, 'courses', courseId))
-        .catch(err => {
-          console.error("Firestore removeCourse failed, falling back to local delete:", err);
-          setCourses(prev => prev.filter(c => c.id !== courseId));
+      try {
+        // Fetch all courses from Firestore and delete every doc that matches by path-id, data-id, or name
+        const snap = await getDocs(collection(db, 'courses'));
+        const batch = writeBatch(db);
+        let matchCount = 0;
+
+        snap.docs.forEach(docSnap => {
+          const data = docSnap.data();
+          const docFirestoreId = docSnap.id;
+          const docDataId = (data.id || '').toString();
+          const docName = (data.name || '').trim().toLowerCase();
+
+          if (
+            docFirestoreId === targetId ||
+            docDataId === targetId ||
+            (targetName && docName === targetName)
+          ) {
+            // Also mark the Firestore path ID for snapshot protection
+            deletingCourseIds.current.add(docFirestoreId);
+            batch.delete(doc(db, 'courses', docFirestoreId));
+            matchCount++;
+          }
         });
-    } else {
-      setCourses(prev => prev.filter(c => c.id !== courseId));
+
+        if (matchCount > 0) {
+          await batch.commit();
+        }
+      } catch (err) {
+        console.error('[removeCourse] Firestore error:', err);
+      }
     }
     showToastMsg('Course removed successfully.', 'error');
+  };
+
+  // Course Updater — saves edits to Firestore by Firestore doc path ID
+  const updateCourse = async (courseId, updatedData) => {
+    const updated = {
+      id: courseId,
+      name: updatedData.name || '',
+      code: updatedData.code || '',
+      duration: updatedData.duration || '',
+      fee: updatedData.fee || '',
+      description: updatedData.description || ''
+    };
+
+    setCourses(prev => {
+      const next = prev.map(c => c.id === courseId ? { ...c, ...updated } : c);
+      try { localStorage.setItem('crm_courses', JSON.stringify(next)); } catch (e) {}
+      return next;
+    });
+
+    if (isFirebaseEnabled) {
+      try {
+        // Also find by name match in case Firestore ID differs
+        const snap = await getDocs(collection(db, 'courses'));
+        const batch = writeBatch(db);
+        snap.docs.forEach(docSnap => {
+          if (docSnap.id === courseId || (docSnap.data().id || '') === courseId) {
+            batch.set(doc(db, 'courses', docSnap.id), updated, { merge: true });
+          }
+        });
+        await batch.commit();
+      } catch (err) {
+        console.error('[updateCourse] Firestore error:', err);
+      }
+    }
+    showToastMsg(`Course "${updated.name}" updated successfully.`);
   };
 
   // Stage Adder
@@ -1970,6 +2023,7 @@ export const CRMProvider = ({ children }) => {
       addCounselor,
       removeCounselor,
       removeCourse,
+      updateCourse,
       updateCounselorStatus,
       
       login,

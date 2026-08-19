@@ -115,6 +115,7 @@ export default function ConfigSettings() {
     counselors,
     addCourse,
     removeCourse,
+    updateCourse,
     addStage,
     addCustomField,
     addCounselor,
@@ -203,6 +204,14 @@ export default function ConfigSettings() {
   const [courseDuration, setCourseDuration] = useState('6 Months');
   const [courseFee, setCourseFee] = useState('₹75,000');
   const [courseDesc, setCourseDesc] = useState('');
+
+  // Edit Course State
+  const [editingCourseId, setEditingCourseId] = useState(null);
+  const [editCourseName, setEditCourseName] = useState('');
+  const [editCourseCode, setEditCourseCode] = useState('');
+  const [editCourseDuration, setEditCourseDuration] = useState('');
+  const [editCourseFee, setEditCourseFee] = useState('');
+  const [editCourseDesc, setEditCourseDesc] = useState('');
 
   // New Stage State
   const [stageName, setStageName] = useState('');
@@ -368,6 +377,32 @@ export default function ConfigSettings() {
     setCourseName('');
     setCourseCode('');
     setCourseDesc('');
+  };
+
+  const startEditCourse = (course) => {
+    setEditingCourseId(course.id);
+    setEditCourseName(course.name || '');
+    setEditCourseCode(course.code || '');
+    setEditCourseDuration(course.duration || '');
+    setEditCourseFee(course.fee || '');
+    setEditCourseDesc(course.description || '');
+  };
+
+  const cancelEditCourse = () => {
+    setEditingCourseId(null);
+  };
+
+  const handleSaveEditCourse = async (e) => {
+    e.preventDefault();
+    if (!editCourseName.trim()) return;
+    await updateCourse(editingCourseId, {
+      name: editCourseName,
+      code: editCourseCode,
+      duration: editCourseDuration,
+      fee: editCourseFee,
+      description: editCourseDesc
+    });
+    setEditingCourseId(null);
   };
 
   const handleAddStage = (e) => {
@@ -847,25 +882,80 @@ export default function ConfigSettings() {
               <h3 className="panel-title mb-4">Offered Program Directory</h3>
               <div style={{ maxHeight: '350px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {courses.map(course => (
-                  <div key={course.id} className="config-list-item" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
-                    <div>
-                      <span style={{ fontWeight: '700', color: 'var(--text-primary)' }}>[{course.code}] {course.name}</span>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Duration: {course.duration} | Tuition Fee: {course.fee}</div>
+                  <div key={course.id}>
+                    {/* Course row */}
+                    <div className="config-list-item" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: editingCourseId === course.id ? '#eff6ff' : '#f8fafc', border: `1px solid ${editingCourseId === course.id ? '#93c5fd' : '#e2e8f0'}`, borderRadius: editingCourseId === course.id ? '8px 8px 0 0' : '8px', transition: 'all 0.2s' }}>
+                      <div>
+                        <span style={{ fontWeight: '700', color: 'var(--text-primary)' }}>[{course.code}] {course.name}</span>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Duration: {course.duration} | Tuition Fee: {course.fee}</div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        {/* Edit button */}
+                        <button
+                          onClick={() => editingCourseId === course.id ? cancelEditCourse() : startEditCourse(course)}
+                          style={{ color: editingCourseId === course.id ? '#2563eb' : '#64748b', border: 'none', background: 'transparent', cursor: 'pointer', padding: '6px', borderRadius: '4px' }}
+                          title={editingCourseId === course.id ? 'Cancel Edit' : 'Edit Course'}
+                        >
+                          {editingCourseId === course.id ? (
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5">
+                              <line x1="18" y1="6" x2="6" y2="18" />
+                              <line x1="6" y1="6" x2="18" y2="18" />
+                            </svg>
+                          ) : (
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5">
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                            </svg>
+                          )}
+                        </button>
+                        {/* Delete button */}
+                        {courses.length > 1 && (
+                          <button
+                            onClick={() => removeCourse(course.id, course.name)}
+                            style={{ color: '#ef4444', border: 'none', background: 'transparent', cursor: 'pointer', padding: '6px', borderRadius: '4px' }}
+                            title="Remove Course"
+                          >
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5">
+                              <polyline points="3 6 5 6 21 6" />
+                              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                              <line x1="10" y1="11" x2="10" y2="17" />
+                              <line x1="14" y1="11" x2="14" y2="17" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    {courses.length > 1 && (
-                      <button 
-                        onClick={() => removeCourse(course.id)}
-                        className="ghost-btn-custom" 
-                        style={{ color: '#ef4444', border: 'none', background: 'transparent', cursor: 'pointer', padding: '6px' }}
-                        title="Remove Program"
-                      >
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5">
-                          <polyline points="3 6 5 6 21 6" />
-                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                          <line x1="10" y1="11" x2="10" y2="17" />
-                          <line x1="14" y1="11" x2="14" y2="17" />
-                        </svg>
-                      </button>
+
+                    {/* Inline Edit Form */}
+                    {editingCourseId === course.id && (
+                      <form onSubmit={handleSaveEditCourse} style={{ background: '#eff6ff', border: '1px solid #93c5fd', borderTop: 'none', borderRadius: '0 0 8px 8px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                          <div>
+                            <label style={{ fontSize: '11px', fontWeight: '600', color: '#1e40af', display: 'block', marginBottom: '4px' }}>Course Name</label>
+                            <input type="text" required className="form-control" value={editCourseName} onChange={e => setEditCourseName(e.target.value)} style={{ fontSize: '13px', padding: '7px 10px' }} />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: '11px', fontWeight: '600', color: '#1e40af', display: 'block', marginBottom: '4px' }}>Code</label>
+                            <input type="text" className="form-control" value={editCourseCode} onChange={e => setEditCourseCode(e.target.value)} style={{ fontSize: '13px', padding: '7px 10px' }} />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: '11px', fontWeight: '600', color: '#1e40af', display: 'block', marginBottom: '4px' }}>Duration</label>
+                            <input type="text" className="form-control" value={editCourseDuration} onChange={e => setEditCourseDuration(e.target.value)} style={{ fontSize: '13px', padding: '7px 10px' }} />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: '11px', fontWeight: '600', color: '#1e40af', display: 'block', marginBottom: '4px' }}>Tuition Fee</label>
+                            <input type="text" className="form-control" value={editCourseFee} onChange={e => setEditCourseFee(e.target.value)} style={{ fontSize: '13px', padding: '7px 10px' }} />
+                          </div>
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '11px', fontWeight: '600', color: '#1e40af', display: 'block', marginBottom: '4px' }}>Description</label>
+                          <input type="text" className="form-control" value={editCourseDesc} onChange={e => setEditCourseDesc(e.target.value)} style={{ fontSize: '13px', padding: '7px 10px' }} />
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button type="submit" style={{ background: '#2563eb', color: '#fff', border: 'none', borderRadius: '6px', padding: '7px 18px', fontWeight: '600', fontSize: '12px', cursor: 'pointer' }}>Save Changes</button>
+                          <button type="button" onClick={cancelEditCourse} style={{ background: 'transparent', color: '#64748b', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '7px 14px', fontSize: '12px', cursor: 'pointer' }}>Cancel</button>
+                        </div>
+                      </form>
                     )}
                   </div>
                 ))}
