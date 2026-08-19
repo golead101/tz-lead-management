@@ -4,7 +4,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { whatsappDb } from './whatsappDb';
-import { useCRM } from '../../context/CRMContext';
+import { useCRM, normalizeLeadSource } from '../../context/CRMContext';
 import { storage } from '../../firebase';
 import { ref, uploadBytesResumable, getDownloadURL, listAll } from 'firebase/storage';
 
@@ -81,6 +81,152 @@ const autoDetectTemplateVariables = (tmplName, bodyText, columns) => {
 
   return mapping;
 };
+
+function MultiSelectDropdown({ options, selectedValues, onChange, placeholder = "Select..." }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const toggleOption = (val) => {
+    if (selectedValues.includes(val)) {
+      onChange(selectedValues.filter(v => v !== val));
+    } else {
+      onChange([...selectedValues, val]);
+    }
+  };
+
+  const handleSelectAll = () => {
+    if (selectedValues.length === options.length) {
+      onChange([]);
+    } else {
+      onChange([...options]);
+    }
+  };
+
+  const getDisplayText = () => {
+    if (!selectedValues || selectedValues.length === 0 || selectedValues.length === options.length) {
+      return placeholder;
+    }
+    if (selectedValues.length === 1) return selectedValues[0];
+    return `${selectedValues.length} Selected`;
+  };
+
+  return (
+    <div ref={dropdownRef} style={{ position: 'relative', flex: 1, minWidth: 150 }}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          width: '100%',
+          padding: '8px 12px',
+          borderRadius: 6,
+          border: '1px solid #cbd5e1',
+          background: '#fff',
+          fontSize: '0.88rem',
+          color: (selectedValues && selectedValues.length > 0 && selectedValues.length < options.length) ? '#0f172a' : '#64748b',
+          fontWeight: (selectedValues && selectedValues.length > 0 && selectedValues.length < options.length) ? '600' : '400',
+          textAlign: 'left',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          cursor: 'pointer',
+          outline: 'none',
+          boxSizing: 'border-box'
+        }}
+      >
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {getDisplayText()}
+        </span>
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#64748b" strokeWidth="2" style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s', flexShrink: 0, marginLeft: 4 }}>
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+
+      {isOpen && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            marginTop: 4,
+            background: '#fff',
+            border: '1px solid #cbd5e1',
+            borderRadius: 8,
+            boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)',
+            zIndex: 1000,
+            padding: '6px',
+            maxHeight: 220,
+            overflowY: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 2
+          }}
+        >
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '6px 8px',
+              borderRadius: 4,
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              color: '#1e293b',
+              cursor: 'pointer',
+              borderBottom: '1px solid #f1f5f9'
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={selectedValues.length === options.length && options.length > 0}
+              onChange={handleSelectAll}
+            />
+            Select All ({options.length})
+          </label>
+
+          {options.map(opt => {
+            const isChecked = selectedValues.includes(opt);
+            return (
+              <label
+                key={opt}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '6px 8px',
+                  borderRadius: 4,
+                  fontSize: '0.85rem',
+                  color: '#334155',
+                  cursor: 'pointer',
+                  background: isChecked ? '#eff6ff' : 'transparent'
+                }}
+                onMouseEnter={(e) => { if (!isChecked) e.currentTarget.style.background = '#f8fafc'; }}
+                onMouseLeave={(e) => { if (!isChecked) e.currentTarget.style.background = 'transparent'; }}
+              >
+                <input
+                  type="checkbox"
+                  checked={isChecked}
+                  onChange={() => toggleOption(opt)}
+                />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt}</span>
+              </label>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function NewCampaign({ setSubView }) {
   const fileInputRef = useRef(null);
@@ -159,8 +305,8 @@ export default function NewCampaign({ setSubView }) {
 
   // Filters for CRM Leads
   const [campaignCourseFilter, setCampaignCourseFilter] = useState('');
-  const [campaignStageFilter, setCampaignStageFilter] = useState('');
-  const [campaignSourceFilter, setCampaignSourceFilter] = useState('');
+  const [campaignStageFilters, setCampaignStageFilters] = useState([]);
+  const [campaignSourceFilters, setCampaignSourceFilters] = useState([]);
   const [campaignNameFilter, setCampaignNameFilter] = useState('');
 
   const getBaseLeads = () => {
@@ -186,14 +332,15 @@ export default function NewCampaign({ setSubView }) {
       const matchCampaign = campaignNameFilter && hasMetaSourceSelected 
         ? (lead.campaign === campaignNameFilter || lead.campaignName === campaignNameFilter) 
         : true;
+
       return matchCourse && matchStage && matchSource && matchCampaign;
     });
   };
 
   const baseLeads = getBaseLeads();
-  const uniqueCourses = [...new Set(baseLeads.map(l => l.course).filter(Boolean))];
+  const uniqueCourses = (courses && courses.length > 0) ? courses.map(c => c.name) : [...new Set(baseLeads.map(l => l.course).filter(Boolean))];
   const uniqueStages = [...new Set(baseLeads.map(l => l.stage).filter(Boolean))];
-  const uniqueSources = [...new Set(baseLeads.map(l => l.source).filter(Boolean))];
+  const uniqueSources = [...new Set(baseLeads.map(l => normalizeLeadSource(l.source)).filter(Boolean))];
   const uniqueCampaigns = [...new Set(baseLeads.filter(l => (l.source || '').toLowerCase().includes('meta')).map(l => l.campaign || l.campaignName).filter(Boolean))];
 
   useEffect(() => {
@@ -201,7 +348,7 @@ export default function NewCampaign({ setSubView }) {
       const filtered = getFilteredLeads();
       setPreviewContacts(filtered.slice(0, 3));
     }
-  }, [selectedListId, campaignCourseFilter, campaignStageFilter, campaignSourceFilter, campaignNameFilter, leads]);
+  }, [selectedListId, campaignCourseFilter, campaignStageFilters, campaignSourceFilters, campaignNameFilter, leads]);
 
   useEffect(() => {
     loadExistingLists();
@@ -236,7 +383,7 @@ export default function NewCampaign({ setSubView }) {
   }, [selectedTemplate, columns, templates]);
 
   const loadExistingLists = () => {
-    const lists = whatsappDb.getContactLists().filter(l => l.id !== 'crm-leads-all');
+    const lists = whatsappDb.getContactLists().filter(l => l.id !== 'crm-leads-all' && l.name !== 'Active CRM Leads (Live)');
     const crmList = {
       id: 'crm-leads-all',
       name: 'Active CRM Leads (Live)',
@@ -332,28 +479,8 @@ export default function NewCampaign({ setSubView }) {
           }
         }
         
-        let resolvedName = '';
-        const nameKeys = ['name', 'Name', 'first_name', 'First Name', 'full_name', 'Full Name', 'contact_name', 'Contact Name', 'student_name', 'Student Name'];
-        for (const key of nameKeys) {
-          if (c[key]) {
-            resolvedName = String(c[key]).trim();
-            break;
-          }
-        }
-        if (!resolvedName) {
-          for (const key of Object.keys(c)) {
-            if (key.toLowerCase().includes('name') && c[key]) {
-              resolvedName = String(c[key]).trim();
-              break;
-            }
-          }
-        }
-        if (!resolvedName) {
-          resolvedName = 'Campaign Contact';
-        }
-
         return {
-          name: resolvedName,
+          name: c.name || c.Name || c.first_name || 'Campaign Contact',
           phone: phone,
           email: c.email || c.Email || '',
           course: c.course || c.Course || '',
@@ -780,100 +907,33 @@ export default function NewCampaign({ setSubView }) {
         <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', padding: 24 }}>
           <h2 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: 16, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
             <Users size={20} />
-            Select or Upload Contacts
+            Select Contacts
           </h2>
-
-          <div
-            onClick={() => fileInputRef.current?.click()}
-            style={{
-              border: '2px dashed #cbd5e1', borderRadius: 12, padding: 40,
-              textAlign: 'center', cursor: 'pointer', marginBottom: 20,
-              background: uploadedContacts.length > 0 ? '#f0fdf4' : '#fafafa',
-              transition: 'all 0.2s',
-            }}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv,.xlsx,.xls"
-              onChange={handleFileUpload}
-              style={{ display: 'none' }}
-            />
-            {uploadedContacts.length > 0 ? (
-              <>
-                <FileSpreadsheet size={36} color={BRAND_BLUE} style={{ margin: '0 auto 8px' }} />
-                <p style={{ fontWeight: 600, color: '#16a34a' }}>{uploadedContacts.length} contacts loaded</p>
-                <p style={{ fontSize: '0.85rem', color: '#64748b', marginTop: 4 }}>
-                  Columns: {columns.join(', ')}
-                </p>
-              </>
-            ) : (
-              <>
-                <Upload size={36} color="#94a3b8" style={{ margin: '0 auto 8px' }} />
-                <p style={{ fontWeight: 500, color: '#475569' }}>Drop CSV or Excel file here, or click to upload</p>
-                <p style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: 4 }}>
-                  File must have a column with phone numbers (named: phone, Phone, number, mobile, etc.)
-                </p>
-              </>
-            )}
-          </div>
-
-          {uploadedContacts.length > 0 && !selectedListId && (
-            <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 20 }}>
-              <input
-                value={uploadName}
-                onChange={(e) => setUploadName(e.target.value)}
-                placeholder="Contact list name..."
-                style={{
-                  flex: 1, padding: '10px 14px', borderRadius: 8,
-                  border: '1px solid #d1d5db', outline: 'none',
-                }}
-              />
-              <button
-                onClick={handleUploadToServer}
-                disabled={uploading}
-                style={{
-                  padding: '10px 20px', borderRadius: 8, fontWeight: 600,
-                  background: BRAND_BLUE, color: '#fff', border: 'none', cursor: 'pointer',
-                  opacity: uploading ? 0.6 : 1,
-                }}
-              >
-                {uploading ? 'Saving...' : 'Save Contacts'}
-              </button>
-            </div>
-          )}
 
           {/* Existing Lists */}
           {existingLists.length > 0 && (
-            <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '20px 0 12px' }}>
-                <div style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
-                <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>or select existing list</span>
-                <div style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {existingLists
-                  .filter(list => !selectedListId || selectedListId === list.id)
-                  .map(list => (
-                  <div
-                    key={list.id}
-                    onClick={() => handleSelectExistingList(list.id)}
-                    style={{
-                      padding: '12px 16px', borderRadius: 10, cursor: 'pointer',
-                      border: selectedListId === list.id ? `2px solid ${BRAND_BLUE}` : '1px solid #e2e8f0',
-                      background: selectedListId === list.id ? `${BRAND_BLUE}08` : '#fff',
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontWeight: 500, color: '#0f172a' }}>{list.name}</div>
-                      <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{list.contactCount} contacts</div>
-                    </div>
-                    {selectedListId === list.id && <CheckCircle size={20} color={BRAND_BLUE} />}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {existingLists
+                .filter(list => !selectedListId || selectedListId === list.id)
+                .map(list => (
+                <div
+                  key={list.id}
+                  onClick={() => handleSelectExistingList(list.id)}
+                  style={{
+                    padding: '12px 16px', borderRadius: 10, cursor: 'pointer',
+                    border: selectedListId === list.id ? `2px solid ${BRAND_BLUE}` : '1px solid #e2e8f0',
+                    background: selectedListId === list.id ? `${BRAND_BLUE}08` : '#fff',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 500, color: '#0f172a' }}>{list.name}</div>
+                    <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{list.contactCount} contacts</div>
                   </div>
-                ))}
-              </div>
-            </>
+                  {selectedListId === list.id && <CheckCircle size={20} color={BRAND_BLUE} />}
+                </div>
+              ))}
+            </div>
           )}
 
           {selectedListId && (
@@ -883,37 +943,38 @@ export default function NewCampaign({ setSubView }) {
                 <select
                   value={campaignCourseFilter}
                   onChange={e => setCampaignCourseFilter(e.target.value)}
-                  style={{ flex: 1, padding: '8px 12px', borderRadius: 6, border: '1px solid #cbd5e1', outline: 'none' }}
+                  style={{ flex: 1, minWidth: 150, padding: '8px 12px', borderRadius: 6, border: '1px solid #cbd5e1', outline: 'none' }}
                 >
                   <option value="">All Courses</option>
                   {uniqueCourses.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
-                <select
-                  value={campaignStageFilter}
-                  onChange={e => setCampaignStageFilter(e.target.value)}
-                  style={{ flex: 1, padding: '8px 12px', borderRadius: 6, border: '1px solid #cbd5e1', outline: 'none' }}
-                >
-                  <option value="">All Stages</option>
-                  {uniqueStages.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-                <select
-                  value={campaignSourceFilter}
-                  onChange={e => {
-                    setCampaignSourceFilter(e.target.value);
-                    if (!e.target.value.toLowerCase().includes('meta')) {
+
+                {/* Multi-select for Stage */}
+                <MultiSelectDropdown
+                  options={uniqueStages}
+                  selectedValues={campaignStageFilters}
+                  onChange={setCampaignStageFilters}
+                  placeholder="All Stages"
+                />
+
+                {/* Multi-select for Source */}
+                <MultiSelectDropdown
+                  options={uniqueSources}
+                  selectedValues={campaignSourceFilters}
+                  onChange={(vals) => {
+                    setCampaignSourceFilters(vals);
+                    if (!vals.some(s => s.toLowerCase().includes('meta'))) {
                       setCampaignNameFilter('');
                     }
                   }}
-                  style={{ flex: 1, padding: '8px 12px', borderRadius: 6, border: '1px solid #cbd5e1', outline: 'none' }}
-                >
-                  <option value="">All Sources</option>
-                  {uniqueSources.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-                {campaignSourceFilter.toLowerCase().includes('meta') && (
+                  placeholder="All Sources"
+                />
+
+                {campaignSourceFilters.some(s => s.toLowerCase().includes('meta')) && (
                   <select
                     value={campaignNameFilter}
                     onChange={e => setCampaignNameFilter(e.target.value)}
-                    style={{ flex: 1, padding: '8px 12px', borderRadius: 6, border: '1px solid #cbd5e1', outline: 'none' }}
+                    style={{ flex: 1, minWidth: 150, padding: '8px 12px', borderRadius: 6, border: '1px solid #cbd5e1', outline: 'none' }}
                   >
                     <option value="">All Campaigns</option>
                     {uniqueCampaigns.map(c => <option key={c} value={c}>{c}</option>)}

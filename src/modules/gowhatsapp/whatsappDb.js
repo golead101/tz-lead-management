@@ -179,15 +179,15 @@ export function initWhatsappDb() {
       console.error('Failed to sanitize chatbot settings local storage:', e);
     }
   }
+  if (!localStorage.getItem('gowha_api_status')) {
+    localStorage.setItem('gowha_api_status', JSON.stringify(SEED_API_STATUS));
+  }
   if (!localStorage.getItem('instagram_chatbot')) {
     localStorage.setItem('instagram_chatbot', JSON.stringify({
       enabled: false,
       customReplies: [],
       mediaFiles: []
     }));
-  }
-  if (!localStorage.getItem('gowha_api_status')) {
-    localStorage.setItem('gowha_api_status', JSON.stringify(SEED_API_STATUS));
   }
   if (!localStorage.getItem('gowha_conversations')) {
     localStorage.setItem('gowha_conversations', JSON.stringify(SEED_CONVERSATIONS));
@@ -260,6 +260,8 @@ export function initWhatsappDb() {
         localStorage.setItem('gowha_recipients', JSON.stringify(recipientsObj));
       }
     });
+    // Trigger auto-repair for any leads that were overwritten by previous WhatsApp campaigns
+    autoRepairOverwrittenLeads();
   } catch (error) {
     console.error("Failed to initialize Firestore WhatsApp listeners:", error);
   }

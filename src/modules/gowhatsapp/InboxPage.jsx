@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   MessageCircle, Send, Search, Check, CheckCheck, Clock,
-  AlertCircle, Paperclip, FileText
+  AlertCircle, Paperclip, FileText, UploadCloud, RefreshCw, Loader2
 } from 'lucide-react';
+import { ref, listAll, getMetadata, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
+import { storage } from '../../firebase';
 import { whatsappDb } from './whatsappDb';
 import { useCRM } from '../../context/CRMContext';
 
@@ -164,9 +166,100 @@ function LeadStatusBadge({ stage }) {
   );
 }
 
+function renderMessageBubbleContent(msg) {
+  let mediaData = msg.mediaData;
+  let text = msg.text || '';
+
+  if (!mediaData && text.includes('[Attached:')) {
+    const matchName = text.match(/\[Attached:\s*([^\]\n]+)/);
+    const matchLink = text.match(/Link:\s*(https?:\/\/[^\s\]\n]+)/);
+    if (matchName || matchLink) {
+      const fileName = matchName ? matchName[1].trim() : 'Document';
+      const fileUrl = matchLink ? matchLink[1].trim() : null;
+      let type = 'document';
+      if (fileName.match(/\.(jpg|jpeg|png|gif|webp)$/i)) type = 'image';
+      else if (fileName.match(/\.(mp4|webm|mov|avi)$/i)) type = 'video';
+      
+      mediaData = {
+        name: fileName,
+        filename: fileName,
+        url: fileUrl,
+        type: type
+      };
+      
+      text = text.replace(/\[Attached:[\s\S]*?\]/, '').trim();
+    }
+  }
+
+  return (
+    <>
+      {mediaData && (
+        <div style={{
+          background: 'rgba(255, 255, 255, 0.9)',
+          border: '1px solid #cbd5e1',
+          borderRadius: '10px',
+          padding: '10px 12px',
+          marginBottom: text ? '8px' : '2px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          minWidth: '240px',
+          maxWidth: '320px',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+        }}>
+          <div style={{
+            fontSize: '22px',
+            width: '38px',
+            height: '38px',
+            borderRadius: '8px',
+            background: '#e2e8f0',
+            display: 'grid',
+            placeItems: 'center',
+            flexShrink: 0
+          }}>
+            {mediaData.type === 'video' ? '🎥' : mediaData.type === 'image' ? '🖼️' : '📄'}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+            <span style={{ fontWeight: '600', fontSize: '13px', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {mediaData.name || mediaData.filename || 'Document Brochure'}
+            </span>
+            <span style={{ fontSize: '11px', color: '#64748b' }}>
+              {mediaData.size || (mediaData.type ? mediaData.type.toUpperCase() : 'DOCUMENT')}
+            </span>
+          </div>
+          {mediaData.url && (
+            <a
+              href={mediaData.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Download or View File"
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justify: 'center',
+                padding: '6px 12px',
+                background: '#2563eb',
+                color: '#ffffff',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: '600',
+                textDecoration: 'none',
+                flexShrink: 0
+              }}
+            >
+              Open ↗
+            </a>
+          )}
+        </div>
+      )}
+      {text ? <div style={{ color: '#0f172a', whiteSpace: 'pre-wrap' }}>{text}</div> : null}
+    </>
+  );
+}
+
 export default function InboxPage() {
-  const { leads, sendWhatsAppMsg, updateLead, activeRole, activeUser, showToastMsg } = useCRM();
-  const [selectedLeadId, setSelectedLeadId] = useState(null);
+  const { leads, sendWhatsAppMsg, updateLead, activeRole, activeUser, showToastMsg, selectedLeadId, setSelectedLeadId } = useCRM();
   const [replyText, setReplyText] = useState('');
   const [sending, setSending] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -179,16 +272,147 @@ export default function InboxPage() {
   const [attachedTemplate, setAttachedTemplate] = useState(null);
   const [metaTemplates, setMetaTemplates] = useState([]);
 
+  const [storageFiles, setStorageFiles] = useState([]);
+  const [loadingStorage, setLoadingStorage] = useState(false);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const fileInputRef = useRef(null);
+
   useEffect(() => {
     setMetaTemplates(whatsappDb.getTemplates());
   }, []);
-  
-  const mockStorageFiles = [
-    { id: 1, name: 'AI_Course_Brochure.pdf', type: 'document', size: '2.4 MB' },
-    { id: 2, name: 'Campus_Tour.mp4', type: 'video', size: '14.1 MB' },
-    { id: 3, name: 'Promo_Offer_Poster.jpg', type: 'image', size: '1.1 MB' },
-    { id: 4, name: 'Fee_Structure_2026.pdf', type: 'document', size: '0.8 MB' }
-  ];
+
+  const formatFileSize = (bytes) => {
+    if (!bytes) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
+
+  const fetchStorageFiles = async () => {
+    setLoadingStorage(true);
+    try {
+      let storageRef = ref(storage, 'documents');
+      let result = await listAll(storageRef);
+      if (result.items.length === 0) {
+        const rootRef = ref(storage, '');
+        const rootResult = await listAll(rootRef);
+        if (rootResult.items.length > 0) {
+          result = rootResult;
+        }
+      }
+
+      const files = await Promise.all(
+        result.items.map(async (itemRef) => {
+          let url = '';
+          let meta = {};
+          try {
+            url = await getDownloadURL(itemRef);
+            meta = await getMetadata(itemRef);
+          } catch (err) {
+            console.warn('Error fetching metadata for storage file:', itemRef.name, err);
+          }
+          const contentType = meta.contentType || '';
+          let fileType = 'document';
+          if (contentType.startsWith('image/')) fileType = 'image';
+          else if (contentType.startsWith('video/')) fileType = 'video';
+
+          return {
+            id: itemRef.fullPath,
+            name: itemRef.name,
+            type: fileType,
+            size: formatFileSize(meta.size),
+            url: url,
+            fullPath: itemRef.fullPath,
+            isSample: false
+          };
+        })
+      );
+
+      const fallbackMock = [
+        { id: 'mock-1', name: 'AI_Course_Brochure.pdf', type: 'document', size: '2.4 MB', isSample: true },
+        { id: 'mock-2', name: 'Campus_Tour.mp4', type: 'video', size: '14.1 MB', isSample: true },
+        { id: 'mock-3', name: 'Promo_Offer_Poster.jpg', type: 'image', size: '1.1 MB', isSample: true },
+        { id: 'mock-4', name: 'Fee_Structure_2026.pdf', type: 'document', size: '0.8 MB', isSample: true }
+      ];
+
+      if (files.length > 0) {
+        setStorageFiles(files);
+      } else {
+        setStorageFiles(fallbackMock);
+      }
+    } catch (error) {
+      console.warn('Firebase Storage query warning:', error);
+      setStorageFiles([
+        { id: 'mock-1', name: 'AI_Course_Brochure.pdf', type: 'document', size: '2.4 MB', isSample: true },
+        { id: 'mock-2', name: 'Campus_Tour.mp4', type: 'video', size: '14.1 MB', isSample: true },
+        { id: 'mock-3', name: 'Promo_Offer_Poster.jpg', type: 'image', size: '1.1 MB', isSample: true },
+        { id: 'mock-4', name: 'Fee_Structure_2026.pdf', type: 'document', size: '0.8 MB', isSample: true }
+      ]);
+    } finally {
+      setLoadingStorage(false);
+    }
+  };
+
+  useEffect(() => {
+    if (showStorageModal) {
+      fetchStorageFiles();
+    }
+  }, [showStorageModal]);
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingFile(true);
+    setUploadProgress(0);
+
+    try {
+      const storageRef = ref(storage, `documents/${Date.now()}_${file.name}`);
+      const uploadTask = uploadBytesResumable(storageRef, file);
+
+      uploadTask.on(
+        'state_changed',
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          setUploadProgress(Math.round(progress));
+        },
+        (error) => {
+          console.error('Upload error:', error);
+          if (showToastMsg) showToastMsg('Failed to upload file to Firebase Storage.');
+          setUploadingFile(false);
+        },
+        async () => {
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+          const meta = await getMetadata(uploadTask.snapshot.ref);
+          let fileType = 'document';
+          if (file.type.startsWith('image/')) fileType = 'image';
+          else if (file.type.startsWith('video/')) fileType = 'video';
+
+          const newFile = {
+            id: uploadTask.snapshot.ref.fullPath,
+            name: file.name,
+            type: fileType,
+            size: formatFileSize(meta.size || file.size),
+            url: downloadURL,
+            fullPath: uploadTask.snapshot.ref.fullPath,
+            isSample: false
+          };
+
+          setStorageFiles(prev => [newFile, ...prev.filter(f => !f.isSample)]);
+          setAttachedFile(newFile);
+          if (showToastMsg) showToastMsg(`Uploaded & attached "${file.name}"!`);
+          setUploadingFile(false);
+          setShowStorageModal(false);
+        }
+      );
+    } catch (err) {
+      console.error('File upload exception:', err);
+      if (showToastMsg) showToastMsg('Upload failed.');
+      setUploadingFile(false);
+    }
+  };
 
   const handleAttachClick = () => {
     setShowStorageModal(true);
@@ -196,9 +420,26 @@ export default function InboxPage() {
 
   // Dynamically compute conversations from CRM leads
   const conversations = React.useMemo(() => {
-    const contactLeads = leads; // Show all existing chats regardless of assigned counselor
+    const filteredLeads = leads.filter(lead => {
+      if (selectedLeadId && lead.id === selectedLeadId) return true;
+      if (activeRole === 'Counselor' && lead.counselor !== activeUser) return false;
+      const msgs = lead.whatsappMessages || [];
 
-    const mapped = contactLeads.map(lead => {
+      // If user is explicitly viewing the 'campaign' filter tab, show leads with campaign history
+      if (inboxFilter === 'campaign') {
+        return msgs.length > 0;
+      }
+
+      // For 'all', 'unread', 'read': Hide leads with no messages OR leads that only have bulk campaign broadcasts with no inbound replies!
+      if (msgs.length === 0) return false;
+
+      const hasInbound = msgs.some(m => m.sender === 'lead' || m.type === 'inbound' || m.isInbound);
+      const hasDirectChat = msgs.some(m => (m.sender === 'counselor' || m.sender === 'user') && !m.isCampaign && !m.isTemplate && !m.id?.includes('camp') && !m.title?.toLowerCase().includes('campaign'));
+
+      return hasInbound || hasDirectChat;
+    });
+
+    const mapped = filteredLeads.map(lead => {
       const msgs = lead.whatsappMessages || [];
       const lastMsg = msgs[msgs.length - 1];
       
@@ -237,7 +478,7 @@ export default function InboxPage() {
       const timeB = b.lastMessageAt?._seconds || 0;
       return timeB - timeA;
     });
-  }, [leads, activeRole, activeUser]);
+  }, [leads, activeRole, activeUser, inboxFilter, selectedLeadId]);
 
   const targetLead = leads.find(l => l.id === selectedLeadId);
   const selectedConvo = conversations.find(c => c.id === selectedLeadId) || (targetLead ? {
@@ -283,9 +524,19 @@ export default function InboxPage() {
     setSending(true);
     let text = replyText.trim();
     let templateData = null;
+    let mediaData = null;
     
     if (attachedFile) {
-      text = text ? `${text}\n[Attached: ${attachedFile.name}]` : `[Attached: ${attachedFile.name}]`;
+      mediaData = {
+        type: attachedFile.type === 'image' ? 'image' : attachedFile.type === 'video' ? 'video' : 'document',
+        url: attachedFile.url || '',
+        filename: attachedFile.name || 'document.pdf',
+        name: attachedFile.name,
+        size: attachedFile.size
+      };
+      if (!text) {
+        text = `[Attached: ${attachedFile.name}${attachedFile.url ? `\nLink: ${attachedFile.url}` : ''}]`;
+      }
     }
     if (attachedTemplate) {
       const bodyText = attachedTemplate.components?.find(c => c.type === 'BODY')?.text || '';
@@ -325,7 +576,7 @@ export default function InboxPage() {
     setAttachedFile(null);
     setAttachedTemplate(null);
 
-    sendWhatsAppMsg(selectedLeadId, text, templateData);
+    sendWhatsAppMsg(selectedLeadId, text, templateData, mediaData);
     setSending(false);
   };
 
@@ -425,7 +676,9 @@ export default function InboxPage() {
                   <div style={{ fontWeight: 600, fontSize: '14px', color: '#111b21', marginTop: '1px' }}>
                     {convo.contactName || formatPhone(convo.phone)}
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
+
+                  {/* Bottom Row: Message preview & unread badge */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 1 }}>
                     <span style={{
                       fontSize: '13px', color: '#667781',
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -436,7 +689,7 @@ export default function InboxPage() {
                       <span style={{
                         background: '#25d366', color: '#fff', borderRadius: '50%',
                         width: 20, height: 20, fontSize: '11px', fontWeight: 700,
-                        display: 'grid', placeItems: 'center',
+                        display: 'grid', placeItems: 'center', flexShrink: 0
                       }}>
                         {convo.unreadCount}
                       </span>
@@ -496,7 +749,7 @@ export default function InboxPage() {
                   const isOutbound = msg.direction === 'outbound' || msg.sender === 'counselor';
                   return (
                     <div key={msg.id} className={`message-bubble ${isOutbound ? 'bubble-outbound' : 'bubble-inbound'}`}>
-                      <div style={{ color: '#0f172a', whiteSpace: 'pre-wrap' }}>{msg.text}</div>
+                      {renderMessageBubbleContent(msg)}
                       <div className="message-time">
                         {getDisplayTime(msg)}
                         {isOutbound && <StatusIcon status={msg.status || 'read'} size={15} />}
@@ -588,31 +841,102 @@ export default function InboxPage() {
       {/* Firebase Storage Modal */}
       {showStorageModal && (
         <div className="storage-modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'grid', placeItems: 'center' }} onClick={() => setShowStorageModal(false)}>
-          <div className="storage-modal-content" style={{ background: '#fff', padding: '24px', borderRadius: '16px', width: '90%', maxWidth: '440px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold', color: '#0f172a' }}>Select from Storage</h3>
+          <div className="storage-modal-content" style={{ background: '#fff', padding: '24px', borderRadius: '16px', width: '90%', maxWidth: '460px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold', color: '#0f172a' }}>Select from Storage</h3>
+                <button 
+                  onClick={fetchStorageFiles} 
+                  disabled={loadingStorage}
+                  title="Refresh Firebase Storage"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', padding: 4 }}
+                >
+                  <RefreshCw size={15} className={loadingStorage ? 'animate-spin' : ''} />
+                </button>
+              </div>
               <button onClick={() => setShowStorageModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', color: '#64748b' }}>×</button>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {mockStorageFiles.map(file => (
-                <div 
-                  key={file.id} 
-                  onClick={() => {
-                    setAttachedFile(file);
-                    if (showToastMsg) showToastMsg(`Attached "${file.name}" to conversation!`);
-                    setShowStorageModal(false);
-                  }} 
-                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', border: '1px solid #e2e8f0', borderRadius: '10px', cursor: 'pointer', transition: 'background-color 0.2s' }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                    <span style={{ fontSize: '22px' }}>{file.type === 'video' ? '🎥' : file.type === 'image' ? '🖼️' : '📄'}</span>
-                    <span style={{ fontWeight: '500', color: '#334155', fontSize: '14px' }}>{file.name}</span>
-                  </div>
-                  <span style={{ color: '#94a3b8', fontSize: '12px' }}>{file.size}</span>
+
+            {/* Hidden File Input for Direct Upload */}
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              style={{ display: 'none' }} 
+              onChange={handleFileUpload} 
+            />
+
+            {/* Upload Button */}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingFile}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justify: 'center',
+                gap: '8px',
+                padding: '10px 16px',
+                marginBottom: '16px',
+                background: '#eff6ff',
+                color: BRAND_BLUE,
+                border: `1px dashed ${BRAND_BLUE}`,
+                borderRadius: '10px',
+                fontWeight: '600',
+                fontSize: '14px',
+                cursor: uploadingFile ? 'not-allowed' : 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              {uploadingFile ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  <span>Uploading to Firebase Storage ({uploadProgress}%)...</span>
+                </>
+              ) : (
+                <>
+                  <UploadCloud size={18} />
+                  <span>Upload Document to Firebase Storage</span>
+                </>
+              )}
+            </button>
+
+            {/* File List */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '320px', overflowY: 'auto', paddingRight: '4px' }}>
+              {loadingStorage ? (
+                <div style={{ padding: '30px', textAlign: 'center', color: '#64748b', fontSize: '14px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                  <Loader2 size={24} className="animate-spin" color={BRAND_BLUE} />
+                  <span>Fetching files from Firebase Storage...</span>
                 </div>
-              ))}
+              ) : storageFiles.length === 0 ? (
+                <div style={{ padding: '20px', textAlign: 'center', color: '#64748b', fontSize: '14px' }}>
+                  No files found in Firebase Storage. Click upload above to add one.
+                </div>
+              ) : (
+                storageFiles.map(file => (
+                  <div 
+                    key={file.id} 
+                    onClick={() => {
+                      setAttachedFile(file);
+                      if (showToastMsg) showToastMsg(`Attached "${file.name}" to conversation!`);
+                      setShowStorageModal(false);
+                    }} 
+                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', border: '1px solid #e2e8f0', borderRadius: '10px', cursor: 'pointer', transition: 'background-color 0.2s' }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px', overflow: 'hidden' }}>
+                      <span style={{ fontSize: '22px', flexShrink: 0 }}>{file.type === 'video' ? '🎥' : file.type === 'image' ? '🖼️' : '📄'}</span>
+                      <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                        <span style={{ fontWeight: '500', color: '#334155', fontSize: '14px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{file.name}</span>
+                        {file.isSample && (
+                          <span style={{ fontSize: '10px', color: '#94a3b8', fontStyle: 'italic' }}>Sample item</span>
+                        )}
+                      </div>
+                    </div>
+                    <span style={{ color: '#94a3b8', fontSize: '12px', flexShrink: 0, marginLeft: '8px' }}>{file.size}</span>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

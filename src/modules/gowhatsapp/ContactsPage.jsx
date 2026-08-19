@@ -44,7 +44,8 @@ export default function ContactsPage() {
 
   const loadLists = () => {
     try {
-      const data = whatsappDb.getContactLists();
+      const rawData = whatsappDb.getContactLists();
+      const customLists = rawData.filter(l => l.id !== 'crm-leads-all' && l.name !== 'Active CRM Leads (Live)');
 
       const crmList = {
         id: 'crm-leads-all',
@@ -55,7 +56,7 @@ export default function ContactsPage() {
         isLive: true
       };
 
-      setLists([crmList, ...data]);
+      setLists([crmList, ...customLists]);
     } catch (error) {
       console.error('Failed to load lists:', error);
     } finally {
