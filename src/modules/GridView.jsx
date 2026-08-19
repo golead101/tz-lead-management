@@ -213,7 +213,7 @@ export default function GridView() {
 
   // Sorting State
   const [sortBy, setSortBy] = useState('createdDate');
-  const [sortOrder, setSortOrder] = useState('asc');
+  const [sortOrder, setSortOrder] = useState('desc');
 
   // Selection State for Bulk Actions
   const [selectedIds, setSelectedIds] = useState([]);
