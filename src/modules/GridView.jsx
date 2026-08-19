@@ -83,8 +83,16 @@ export default function GridView() {
     if (activeRole === 'Counselor' && lead.counselor !== activeUser) {
       return false;
     }
-    if (selectedCourse !== 'All' && lead.course !== selectedCourse) return false;
-    if (selectedStage !== 'All' && lead.stage !== selectedStage) return false;
+    if (selectedCourse !== 'All') {
+      const leadC = (lead.course || '').trim().toLowerCase();
+      const filterC = selectedCourse.trim().toLowerCase();
+      if (leadC !== filterC && !leadC.includes(filterC) && !filterC.includes(leadC)) return false;
+    }
+    if (selectedStage !== 'All') {
+      const leadS = (lead.stage || '').trim().toLowerCase();
+      const filterS = selectedStage.trim().toLowerCase();
+      if (leadS !== filterS) return false;
+    }
     if (selectedTemperature !== 'All' && (lead.temperature || 'Warm') !== selectedTemperature) return false;
     if (selectedCounselor !== 'All') {
       if (selectedCounselor === 'Unassigned') {
@@ -99,8 +107,9 @@ export default function GridView() {
       if (selectedSource === 'meta') {
         if (!srcLower.includes('meta')) return false;
         if (selectedCampaign !== 'All') {
-          const leadCampaign = lead.campaign || lead.campaignName || '';
-          if (leadCampaign !== selectedCampaign) return false;
+          const leadCampaign = (lead.campaign || lead.campaignName || lead.subSource || '').trim().toLowerCase();
+          const filterCamp = selectedCampaign.trim().toLowerCase();
+          if (leadCampaign !== filterCamp) return false;
         }
       } else if (selectedSource === 'google') {
         if (!srcLower.includes('google')) return false;
@@ -339,18 +348,31 @@ export default function GridView() {
     };
 
     const parseCsvDate = (raw) => {
-      if (!raw) return new Date().toISOString();
+      if (!raw || !raw.trim()) return new Date().toISOString();
+      const str = raw.trim();
       try {
-        const parsed = new Date(raw);
+        const parsed = new Date(str);
         if (!isNaN(parsed.getTime())) {
           return parsed.toISOString();
         }
       } catch (e) {}
-      return new Date().toISOString();
+
+      const parts = str.split(/[\/\-\s,:]+/);
+      if (parts.length >= 3) {
+        const d1 = parseInt(parts[0], 10);
+        const d2 = parseInt(parts[1], 10);
+        const y = parseInt(parts[2], 10);
+        if (!isNaN(d1) && !isNaN(d2) && !isNaN(y)) {
+          const fullYear = y < 100 ? 2000 + y : y;
+          const d = new Date(fullYear, d2 - 1, d1);
+          if (!isNaN(d.getTime())) return d.toISOString();
+        }
+      }
+      return str;
     };
 
     let addedCount = 0;
-    let dupCount = 0;
+    let updatedCount = 0;
 
     lines.forEach((line, index) => {
       if (index === 0 && hasHeader) return;
@@ -372,40 +394,85 @@ export default function GridView() {
         rawCreatedDate = createdDateIdx !== -1 && createdDateIdx < parts.length ? parts[createdDateIdx] : '';
         campaign = campaignIdx !== -1 && campaignIdx < parts.length ? parts[campaignIdx] : '';
       } else {
-        name = parts[0];
-        email = parts[1];
-        phone = parts[2];
-        course = parts[3];
-        rawStatus = parts.length > 4 ? parts[4] : '';
-        source = parts.length > 5 ? parts[5] : '';
-        campaign = parts.length > 6 ? parts[6] : '';
+        if (parts.length === 4) {
+          name = parts[0];
+          phone = parts[1];
+          source = parts[2];
+          campaign = parts[3];
+        } else if (parts.length === 5) {
+          name = parts[0];
+          phone = parts[1];
+          source = parts[2];
+          campaign = parts[3];
+          rawCreatedDate = parts[4];
+        } else if (parts.length === 6) {
+          name = parts[0];
+          phone = parts[1];
+          source = parts[2];
+          campaign = parts[3];
+          rawCreatedDate = parts[4];
+          rawCounselor = parts[5];
+        } else {
+          name = parts[0];
+          email = parts[1];
+          phone = parts[2];
+          course = parts[3];
+          rawStatus = parts.length > 4 ? parts[4] : '';
+          source = parts.length > 5 ? parts[5] : '';
+          campaign = parts.length > 6 ? parts[6] : '';
+          rawCreatedDate = parts.length > 7 ? parts[7] : '';
+        }
       }
 
       if (!name && !email && !phone) return;
 
       const cleanPhone = phone ? String(phone).replace(/[^0-9]/g, '') : '';
-      const cleanEmail = email ? email.toLowerCase() : '';
+      const cleanEmail = email ? email.toLowerCase().trim() : '';
 
-      const duplicateExists = leads.some(lead =>
-        (cleanEmail && lead.email && lead.email.toLowerCase() === cleanEmail) ||
-        (cleanPhone && String(lead.phone || '').replace(/[^0-9]/g, '') === cleanPhone)
+      const existingLead = leads.find(lead =>
+        (cleanEmail && lead.email && lead.email.toLowerCase().trim() === cleanEmail) ||
+        (cleanPhone && cleanPhone.length >= 10 && String(lead.phone || '').replace(/[^0-9]/g, '').slice(-10) === cleanPhone.slice(-10))
       );
 
-      if (duplicateExists) {
-        dupCount++;
+      const finalCampaign = campaign ? campaign.trim() : '';
+
+      if (existingLead) {
+        // UPDATE existing lead with latest info from uploaded file
+        const updatePayload = {};
+        if (name && name.trim() && name !== 'Campaign Contact') updatePayload.name = name.trim();
+        if (email && email.trim()) updatePayload.email = email.trim();
+        if (course && course.trim()) updatePayload.course = course.trim();
+        if (source && source.trim()) updatePayload.source = source.trim();
+        if (finalCampaign) {
+          updatePayload.campaign = finalCampaign;
+          updatePayload.campaignName = finalCampaign;
+          updatePayload.subSource = finalCampaign;
+        }
+        if (rawCounselor && rawCounselor.trim()) updatePayload.counselor = mapCsvCounselor(rawCounselor);
+        if (rawStatus && rawStatus.trim()) updatePayload.stage = mapCsvStage(rawStatus);
+        if (rawTemp && rawTemp.trim()) updatePayload.temperature = rawTemp.trim();
+        if (rawCreatedDate && rawCreatedDate.trim()) updatePayload.createdDate = parseCsvDate(rawCreatedDate);
+
+        if (Object.keys(updatePayload).length > 0) {
+          updateLead(existingLead.id, updatePayload);
+          updatedCount++;
+        }
       } else {
+        // ADD NEW LEAD with exact info from uploaded file
         const finalStage = mapCsvStage(rawStatus);
         const finalCounselor = mapCsvCounselor(rawCounselor);
         const finalCreatedDate = parseCsvDate(rawCreatedDate);
         const finalTemp = rawTemp && ['Hot', 'Warm', 'Cold'].includes(rawTemp.trim()) ? rawTemp.trim() : 'Hot';
 
         addLead({
-          name: name || 'Unknown',
+          name: name || (cleanPhone ? cleanPhone : 'Lead'),
           email: email || '',
           phone: phone || '',
           course: course || '',
           source: source || 'CSV Import',
-          campaign: campaign || '',
+          subSource: finalCampaign,
+          campaign: finalCampaign,
+          campaignName: finalCampaign,
           counselor: finalCounselor,
           stage: finalStage,
           temperature: finalTemp,
@@ -418,13 +485,12 @@ export default function GridView() {
       }
     });
 
-    if (addedCount > 0) {
-      showToastMsg(`CSV parsing completed. Imported ${addedCount} leads.`);
+    if (addedCount > 0 || updatedCount > 0) {
+      showToastMsg(`Import complete: ${addedCount} new leads added, ${updatedCount} existing leads updated with latest info.`);
       const lastPage = Math.ceil((leads.length + addedCount) / itemsPerPage);
       setCurrentPage(lastPage > 0 ? lastPage : 1);
-    }
-    if (dupCount > 0) {
-      showToastMsg(`Identified & bypassed ${dupCount} duplicate records.`);
+    } else {
+      showToastMsg('No new or updated lead data found in file.');
     }
     setImportOpen(false);
     setCsvText('');
@@ -1050,28 +1116,34 @@ export default function GridView() {
 
                       {/* Student */}
                       <td>
-                        <div className="gv-student-cell">
-                          <div className="gv-avatar" style={{
-                            background: `hsl(${lead.name.charCodeAt(0) * 7 % 360}, 55%, 92%)`,
-                            color: `hsl(${lead.name.charCodeAt(0) * 7 % 360}, 60%, 40%)`
-                          }}>
-                            {getInitials(lead.name)}
-                          </div>
-                          <div className="gv-student-info">
-                            <span className="gv-student-name">
-                              {lead.name}
-                              {lead.temperature && lead.temperature !== 'Unassigned' && (
-                                <span style={{
-                                  display: 'inline-flex', alignItems: 'center', marginLeft: '6px', fontSize: '10px', fontWeight: 'bold',
-                                  color: lead.temperature === 'Hot' ? '#ef4444' : lead.temperature === 'Cold' ? '#0ea5e9' : '#eab308'
-                                }} title={`${lead.temperature} Lead`}>
-                                  {lead.temperature === 'Hot' ? '🔥' : lead.temperature === 'Cold' ? '❄️' : '☀️'}
+                        {(() => {
+                          const displayName = (lead.name && lead.name !== 'Campaign Contact' && lead.name !== 'WhatsApp Student') ? lead.name : (lead.phone || 'Lead');
+                          const charCode = displayName.charCodeAt(0) || 65;
+                          return (
+                            <div className="gv-student-cell">
+                              <div className="gv-avatar" style={{
+                                background: `hsl(${charCode * 7 % 360}, 55%, 92%)`,
+                                color: `hsl(${charCode * 7 % 360}, 60%, 40%)`
+                              }}>
+                                {getInitials(displayName)}
+                              </div>
+                              <div className="gv-student-info">
+                                <span className="gv-student-name">
+                                  {displayName}
+                                  {lead.temperature && lead.temperature !== 'Unassigned' && (
+                                    <span style={{
+                                      display: 'inline-flex', alignItems: 'center', marginLeft: '6px', fontSize: '10px', fontWeight: 'bold',
+                                      color: lead.temperature === 'Hot' ? '#ef4444' : lead.temperature === 'Cold' ? '#0ea5e9' : '#eab308'
+                                    }} title={`${lead.temperature} Lead`}>
+                                      {lead.temperature === 'Hot' ? '🔥' : lead.temperature === 'Cold' ? '❄️' : '☀️'}
+                                    </span>
+                                  )}
                                 </span>
-                              )}
-                            </span>
-                            <span className="gv-student-meta" style={{ fontFamily: 'monospace', color: '#334155', fontWeight: '600' }}>{lead.phone || '-'}</span>
-                          </div>
-                        </div>
+                                <span className="gv-student-meta" style={{ fontFamily: 'monospace', color: '#334155', fontWeight: '600' }}>{lead.phone || '-'}</span>
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       {/* Status */}
@@ -1089,11 +1161,15 @@ export default function GridView() {
                               ? 'Website Leads' 
                               : (lead.source === 'Walk-in' && lead.subSource ? `Walk-in (${lead.subSource})` : lead.source)}
                           </span>
-                          {(lead.campaign || lead.campaignName) && (
-                            <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
-                              {lead.campaign || lead.campaignName}
-                            </span>
-                          )}
+                          {(() => {
+                            const campText = lead.campaign || lead.campaignName || (lead.subSource && lead.subSource !== lead.source ? lead.subSource : '');
+                            if (!campText) return null;
+                            return (
+                              <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                                {campText}
+                              </span>
+                            );
+                          })()}
                         </div>
                       </td>
 

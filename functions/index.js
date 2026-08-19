@@ -1090,7 +1090,7 @@ exports.sendWhatsAppMessage = functions.https.onRequest((req, res) => {
  * whatsappWebhook
  * Public webhook endpoint for receiving incoming WhatsApp text replies and handshakes.
  */
-exports.whatsappWebhook = functions.https.onRequest((req, res) => {
+exports.whatsappWebhook = functions.https.onRequest(async (req, res) => {
   if (req.method === 'GET') {
     try {
       const mode = req.query['hub.mode'];
@@ -1147,15 +1147,40 @@ exports.whatsappWebhook = functions.https.onRequest((req, res) => {
 
       const senderPhoneRaw = message.from;
       const senderName = contact?.profile?.name || 'WhatsApp Student';
-      let messageText = message.text?.body || '';
-      if (message.type === 'interactive') {
+      let messageText = '';
+      if (message.text?.body) {
+        messageText = message.text.body;
+      } else if (typeof message.text === 'string') {
+        messageText = message.text;
+      } else if (message.type === 'interactive') {
         if (message.interactive?.button_reply) {
           messageText = message.interactive.button_reply.title || message.interactive.button_reply.id || '';
         } else if (message.interactive?.list_reply) {
           messageText = message.interactive.list_reply.title || message.interactive.list_reply.id || '';
         }
       } else if (message.type === 'button') {
-        messageText = message.button?.text || message.button?.payload || '';
+        if (typeof message.button === 'string') {
+          messageText = message.button;
+        } else if (message.button) {
+          messageText = message.button.text || message.button.payload || '';
+        } else if (message.button_reply) {
+          messageText = message.button_reply.title || message.button_reply.id || '';
+        }
+      }
+
+      // Exhaustive fallback checks for button text across all WhatsApp webhook schemas
+      if (!messageText) {
+        messageText = message.button?.text ||
+                      message.button?.payload ||
+                      (typeof message.button === 'string' ? message.button : '') ||
+                      message.interactive?.button_reply?.title ||
+                      message.interactive?.button_reply?.id ||
+                      message.interactive?.list_reply?.title ||
+                      message.button_reply?.title ||
+                      message.button_reply?.id ||
+                      message.text?.body ||
+                      message.body ||
+                      '';
       }
 
       const cleanedSenderPhone = senderPhoneRaw.replace(/[^0-9]/g, '');
@@ -1240,79 +1265,72 @@ exports.whatsappWebhook = functions.https.onRequest((req, res) => {
 
         await db.collection('leads').doc(newLeadId).set(newLead);
       }
-            try {
-              const chatbotDoc = await db.collection('settings').doc('whatsapp_chatbot').get();
-              if (chatbotDoc.exists) {
-                const chatbotSettings = chatbotDoc.data();
-                const replies = chatbotSettings.customReplies || [];
-                
-                // Find a match (case-insensitive)
-                const lowerMsg = messageText.toLowerCase().trim();
-                const matchedReply = replies.find(r => {
-                  if (!r.trigger) return false;
-                  const triggers = r.trigger.split(',').map(t => t.trim().toLowerCase());
-                  return triggers.includes(lowerMsg);
-                });
 
-                if (matchedReply) {
-                  console.log(`[WhatsApp Webhook] Trigger matched for "${lowerMsg}":`, matchedReply.responseType);
-                  
-                  const creds = await getDecryptedWhatsAppCredentials();
-                  if (creds.accessToken && creds.phoneNumberId) {
-                    let payload = {
-                      messaging_product: 'whatsapp',
-                      recipient_type: 'individual',
-                      to: senderPhoneRaw
-                    };
+      try {
+        const chatbotDoc = await db.collection('settings').doc('whatsapp_chatbot').get();
+        if (chatbotDoc.exists) {
+          const chatbotSettings = chatbotDoc.data();
+          const replies = chatbotSettings.customReplies || [];
+          
+          // Find a match (case-insensitive)
+          const lowerMsg = messageText.toLowerCase().trim();
+          const matchedReply = replies.find(r => {
+            if (!r.trigger) return false;
+            const triggers = r.trigger.split(',').map(t => t.trim().toLowerCase());
+            return triggers.includes(lowerMsg);
+          });
 
-                    if (matchedReply.responseType === 'Text') {
-                      payload.type = 'text';
-                      payload.text = { preview_url: false, body: matchedReply.preview };
-                    } else if (matchedReply.responseType === 'Template') {
-                      payload.type = 'template';
-                      payload.template = { name: matchedReply.preview, language: { code: 'en' } };
-                    } else if (matchedReply.responseType === 'Document') {
-                      const docFile = (chatbotSettings.mediaFiles || []).find(f => f.name === matchedReply.preview);
-                      if (docFile && docFile.url) {
-                        payload.type = 'document';
-                        payload.document = { link: docFile.url, filename: docFile.name };
-                      }
-                    } else if (matchedReply.responseType === 'Buttons') {
-                      payload.type = 'interactive';
-                      const buttons = (Array.isArray(matchedReply.buttons) ? matchedReply.buttons : []).map((btn, i) => ({
-                        type: 'reply',
-                        reply: { id: `btn_${i}`, title: btn.substring(0, 20) }
-                      }));
-                      payload.interactive = {
-                        type: 'button',
-                        body: { text: matchedReply.preview },
-                        action: { buttons }
-                      };
-                    }
+          if (matchedReply) {
+            console.log(`[WhatsApp Webhook] Trigger matched for "${lowerMsg}":`, matchedReply.responseType);
+            
+            const creds = await getDecryptedWhatsAppCredentials();
+            if (creds.accessToken && creds.phoneNumberId) {
+              let payload = {
+                messaging_product: 'whatsapp',
+                recipient_type: 'individual',
+                to: senderPhoneRaw
+              };
 
-                    if (payload.type) {
-                      const url = `https://graph.facebook.com/${creds.apiVersion}/${creds.phoneNumberId}/messages`;
-                      await axios.post(url, payload, {
-                        headers: { 'Authorization': `Bearer ${creds.accessToken}`, 'Content-Type': 'application/json' }
-                      });
-                      console.log(`[WhatsApp Webhook] Chatbot auto-reply sent successfully!`);
-                    }
-                  }
+              if (matchedReply.responseType === 'Text') {
+                payload.type = 'text';
+                payload.text = { preview_url: false, body: matchedReply.preview };
+              } else if (matchedReply.responseType === 'Template') {
+                payload.type = 'template';
+                payload.template = { name: matchedReply.preview, language: { code: 'en' } };
+              } else if (matchedReply.responseType === 'Document') {
+                const docFile = (chatbotSettings.mediaFiles || []).find(f => f.name === matchedReply.preview);
+                if (docFile && docFile.url) {
+                  payload.type = 'document';
+                  payload.document = { link: docFile.url, filename: docFile.name };
                 }
+              } else if (matchedReply.responseType === 'Buttons') {
+                payload.type = 'interactive';
+                const buttons = (Array.isArray(matchedReply.buttons) ? matchedReply.buttons : []).map((btn, i) => ({
+                  type: 'reply',
+                  reply: { id: `btn_${i}`, title: btn.substring(0, 20) }
+                }));
+                payload.interactive = {
+                  type: 'button',
+                  body: { text: matchedReply.preview },
+                  action: { buttons }
+                };
               }
-            } catch (botErr) {
-              console.error('[WhatsApp Webhook] Chatbot auto-reply error:', botErr.message);
+
+              if (payload.type) {
+                const url = `https://graph.facebook.com/${creds.apiVersion}/${creds.phoneNumberId}/messages`;
+                await axios.post(url, payload, {
+                  headers: { 'Authorization': `Bearer ${creds.accessToken}`, 'Content-Type': 'application/json' }
+                });
+                console.log(`[WhatsApp Webhook] Chatbot auto-reply sent successfully!`);
+              }
             }
           }
-          // ===============================
+        }
+      } catch (botErr) {
+        console.error('[WhatsApp Webhook] Chatbot auto-reply error:', botErr.message);
+      }
 
-          return res.status(200).send('EVENT_RECEIVED');
-        })
-        .catch((err) => {
-          console.error('[WhatsApp Webhook] Query error:', err);
-          return res.status(500).send('Internal Server Error');
-        });
-
+      return res.status(200).send('EVENT_RECEIVED');
     } catch (err) {
       console.error('[WhatsApp Webhook] Processing error:', err);
       return res.status(500).send('Internal Server Error');
@@ -1617,25 +1635,39 @@ exports.sendBulkWhatsAppCampaign = functions.runWith({ timeoutSeconds: 540, memo
               }
             }
 
-            // 2. Check by exact doc ID = cleanPhone
+            // 2. Check by exact doc ID = cleanPhone or phoneSuffix
             if (!leadData && cleanPhone) {
-              const docSnap = await leadsRef.doc(cleanPhone).get();
+              let docSnap = await leadsRef.doc(cleanPhone).get();
               if (docSnap.exists) {
                 leadId = docSnap.id;
                 leadData = docSnap.data();
+              } else if (phoneSuffix) {
+                docSnap = await leadsRef.doc(phoneSuffix).get();
+                if (docSnap.exists) {
+                  leadId = docSnap.id;
+                  leadData = docSnap.data();
+                }
               }
             }
 
-            // 3. Check by phone field matching
-            if (!leadData) {
-              const phoneQueries = [
-                leadsRef.where('phone', '==', cleanPhone).limit(1).get(),
-                leadsRef.where('phone', '==', phone).limit(1).get()
+            // 3. Check by phone field matching (handles formatted strings with spaces/dashes)
+            if (!leadData && phoneSuffix.length === 10) {
+              const formattedPhoneVariants = [
+                cleanPhone,
+                phone,
+                phoneSuffix,
+                `+91${phoneSuffix}`,
+                `+91 ${phoneSuffix}`,
+                `${phoneSuffix.slice(0, 5)} ${phoneSuffix.slice(5)}`,
+                `+91 ${phoneSuffix.slice(0, 5)} ${phoneSuffix.slice(5)}`,
+                `91 ${phoneSuffix.slice(0, 5)} ${phoneSuffix.slice(5)}`,
+                `+91-${phoneSuffix.slice(0, 5)}-${phoneSuffix.slice(5)}`
               ];
-              if (phoneSuffix.length === 10) {
-                phoneQueries.push(leadsRef.where('phone', '==', phoneSuffix).limit(1).get());
-                phoneQueries.push(leadsRef.where('phone', '==', `+91${phoneSuffix}`).limit(1).get());
-              }
+
+              // Deduplicate variants
+              const uniqueVariants = [...new Set(formattedPhoneVariants.filter(Boolean))];
+              const phoneQueries = uniqueVariants.map(variant => leadsRef.where('phone', '==', variant).limit(1).get());
+
               const querySnapshots = await Promise.all(phoneQueries);
               for (const snap of querySnapshots) {
                 if (!snap.empty) {
@@ -1647,16 +1679,16 @@ exports.sendBulkWhatsAppCampaign = functions.runWith({ timeoutSeconds: 540, memo
             }
             
             if (!leadData) {
-              // Create new lead (only if not found in CRM)
+              // Create new lead only if strictly not found in CRM
               leadId = cleanPhone || `lead-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
               const nowISO = new Date().toISOString();
-              leadData = {
+              
+              const newLeadObject = {
                 name: contact.name || contact.Name || 'Campaign Contact',
-                phone: phone,
-                course: contact.course || contact.Course || '',
-                source: contact.source || 'WhatsApp Campaign',
+                phone: phone || cleanPhone,
+                source: contact.source && contact.source !== 'WhatsApp Campaign' ? contact.source : 'Campaign Import',
                 subSource: campaignName || 'Bulk Campaign',
-                counselor: contact.counselor || counselorName || 'Unassigned',
+                counselor: contact.counselor && contact.counselor !== 'Counselor' ? contact.counselor : (counselorName !== 'Counselor' ? counselorName : 'Unassigned'),
                 stage: contact.stage || 'New Lead',
                 status: 'Active',
                 timeline: [],
@@ -1664,7 +1696,13 @@ exports.sendBulkWhatsAppCampaign = functions.runWith({ timeoutSeconds: 540, memo
                 createdDate: contact.createdDate || contact.createdAt || nowISO,
                 createdAt: nowISO
               };
-              await leadsRef.doc(leadId).set(leadData);
+
+              if (contact.course || contact.Course) {
+                newLeadObject.course = contact.course || contact.Course;
+              }
+
+              leadData = newLeadObject;
+              await leadsRef.doc(leadId).set(newLeadObject, { merge: true });
             }
 
             // Construct payload
@@ -1763,11 +1801,9 @@ exports.sendBulkWhatsAppCampaign = functions.runWith({ timeoutSeconds: 540, memo
           deliveryResults.push(success);
         });
 
-        // Small delay between chunks to prevent Meta rate limiting
         await new Promise(res => setTimeout(res, 200));
       }
 
-      // Save campaign records
       const newCamp = {
         id: campaignId,
         name: campaignName || `Campaign - ${new Date().toLocaleDateString()}`,
@@ -1807,238 +1843,11 @@ exports.sendBulkWhatsAppCampaign = functions.runWith({ timeoutSeconds: 540, memo
 /**
  * onLeadCreated
  * Triggered automatically when a new lead is added to Firestore.
- * Sends the 'thanks' template to the new lead via WhatsApp Cloud API.
+ * Automated welcome message sending disabled.
  */
 exports.onLeadCreated = functions.firestore
   .document('leads/{leadId}')
   .onCreate(async (snap, context) => {
-    const newLead = snap.data();
-    const leadId = context.params.leadId;
-
-    // Skip automated welcome 'thanks' template for WhatsApp templates, campaigns, bulk uploads, or non-new leads
-    const srcLower = (newLead.source || '').toLowerCase().trim();
-    const isTemplateOrCampaign = newLead.skipAutoReply || 
-                                newLead.isBulkImport || 
-                                newLead.disableAutoWelcome ||
-                                newLead.isCampaignSend ||
-                                newLead.isTemplateSend ||
-                                newLead.templateName ||
-                                srcLower.includes('csv') || 
-                                srcLower.includes('campaign') || 
-                                srcLower.includes('template') || 
-                                srcLower.includes('excel') || 
-                                srcLower.includes('import');
-
-    if (isTemplateOrCampaign) {
-      console.log(`[onLeadCreated] Bypassing welcome 'thanks' template for template/campaign/imported lead ${leadId}.`);
-      return null;
-    }
-
-    if (!newLead.phone) {
-      console.log(`[onLeadCreated] No phone number for lead ${leadId}. Skipping auto-reply.`);
-      return null;
-    }
-
-    try {
-      // 1. Load WhatsApp Config
-      const creds = await getDecryptedWhatsAppCredentials();
-      if (!creds.enabled || !creds.phoneNumberId || !creds.accessToken) {
-        console.log('[onLeadCreated] WhatsApp Integration not setup. Skipping auto-reply.');
-        return null;
-      }
-
-      // 2. Format phone number
-      let cleanPhone = newLead.phone.replace(/[^0-9]/g, '').trim();
-      if (cleanPhone.length === 10) cleanPhone = '91' + cleanPhone;
-      if (cleanPhone.startsWith('00')) cleanPhone = cleanPhone.substring(2);
-
-      // 3. Build Template Payload using the user's template
-      const payload = {
-        messaging_product: 'whatsapp',
-        recipient_type: 'individual',
-        to: cleanPhone,
-        type: 'template',
-        template: {
-          name: 'thanks',
-          language: { code: 'en' }
-        }
-      };
-
-      const url = `https://graph.facebook.com/${creds.apiVersion}/${creds.phoneNumberId}/messages`;
-
-      // 4. Send API Request
-      const response = await axios.post(url, payload, {
-        headers: {
-          'Authorization': `Bearer ${creds.accessToken.trim()}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      // 5. Update timeline in the CRM for this lead
-      const messageId = response.data.messages?.[0]?.id || `msg-sent-${Date.now()}`;
-      const outboundMsg = {
-        id: messageId,
-        type: 'whatsapp',
-        title: 'Auto-Reply Sent',
-        content: `Sent 'thanks' welcome template via automation.`,
-        user: 'System Automation',
-        timestamp: new Date().toISOString()
-      };
-
-      await db.collection('leads').doc(leadId).update({
-        timeline: admin.firestore.FieldValue.arrayUnion(outboundMsg),
-        lastAction: 'Welcome Template Sent',
-        lastActionDate: admin.firestore.FieldValue.serverTimestamp()
-      });
-
-    } catch (error) {
-      console.error(`[onLeadCreated] Error:`, error.response?.data || error.message);
-    }
+    console.log(`[onLeadCreated] Automated welcome message sending is disabled per system configuration for lead ${context.params.leadId}.`);
     return null;
   });
-
-/**
- * uploadMetaTemplateMedia
- * Uploads a file to Meta's Resumable Upload API for Template creation.
- */
-exports.uploadMetaTemplateMedia = functions.https.onRequest((req, res) => {
-  return cors(req, res, async () => {
-    if (req.method !== 'POST') {
-      return res.status(405).json({ error: 'Method not allowed' });
-    }
-
-    try {
-      const creds = await getDecryptedWhatsAppCredentials();
-      if (!creds.accessToken || !creds.appId) {
-        return res.status(400).json({ success: false, error: 'Meta integration missing App ID or Access Token.' });
-      }
-
-      const busboy = Busboy({ headers: req.headers });
-      let fileBuffer = null;
-      let mimeType = '';
-      let fileName = '';
-
-      busboy.on('file', (fieldname, file, info) => {
-        fileName = info.filename;
-        mimeType = info.mimeType;
-        const chunks = [];
-        file.on('data', (data) => chunks.push(data));
-        file.on('end', () => {
-          fileBuffer = Buffer.concat(chunks);
-        });
-      });
-
-      busboy.on('finish', async () => {
-        if (!fileBuffer) {
-          return res.status(400).json({ success: false, error: 'No file uploaded.' });
-        }
-
-        try {
-          // 1. Create Upload Session
-          const sessionUrl = `https://graph.facebook.com/v20.0/${creds.appId}/uploads?file_length=${fileBuffer.length}&file_type=${mimeType}`;
-          const sessionRes = await axios.post(sessionUrl, {}, {
-            headers: {
-              'Authorization': `OAuth ${creds.accessToken}`
-            }
-          });
-
-          const uploadId = sessionRes.data.id;
-          if (!uploadId) {
-            throw new Error('Meta did not return an upload session ID');
-          }
-
-          // 2. Upload file data
-          const uploadUrl = `https://graph.facebook.com/v20.0/${uploadId}`;
-          const uploadRes = await axios.post(uploadUrl, fileBuffer, {
-            headers: {
-              'Authorization': `OAuth ${creds.accessToken}`,
-              'file_offset': '0',
-              'Content-Type': 'application/octet-stream'
-            }
-          });
-
-          const handle = uploadRes.data.h;
-          if (!handle) {
-            throw new Error('Meta did not return a media handle');
-          }
-
-          return res.status(200).json({ success: true, handle });
-        } catch (error) {
-          console.error('[uploadMetaTemplateMedia] Error:', error.response?.data || error.message);
-          return res.status(500).json({ success: false, error: 'Failed to upload media to Meta' });
-        }
-      });
-
-      busboy.end(req.rawBody);
-    } catch (e) {
-      console.error('[uploadMetaTemplateMedia] Initialization Error:', e);
-      return res.status(500).json({ success: false, error: e.message });
-    }
-  });
-});
-
-/**
- * processScheduledCampaigns
- * Runs every 5 minutes to dispatch scheduled WhatsApp campaigns.
- */
-exports.processScheduledCampaigns = functions.pubsub.schedule('every 5 minutes').onRun(async (context) => {
-  try {
-    const now = new Date().toISOString();
-    const campaignsRef = db.collection('whatsapp_campaigns');
-    const scheduledQuery = await campaignsRef
-      .where('status', '==', 'scheduled')
-      .where('scheduledFor', '<=', now)
-      .get();
-
-    if (scheduledQuery.empty) {
-      console.log('[processScheduledCampaigns] No scheduled campaigns due.');
-      return null;
-    }
-
-    const projectId = process.env.GCLOUD_PROJECT || (process.env.FIREBASE_CONFIG ? JSON.parse(process.env.FIREBASE_CONFIG).projectId : 'leads-management-tz');
-    const region = 'us-central1';
-    
-    const baseUrl = process.env.FUNCTIONS_EMULATOR === 'true' 
-      ? `http://127.0.0.1:5001/${projectId}/${region}/sendBulkWhatsAppCampaign`
-      : `https://${region}-${projectId}.cloudfunctions.net/sendBulkWhatsAppCampaign`;
-
-    for (const docSnapshot of scheduledQuery.docs) {
-      const camp = docSnapshot.data();
-      const campaignId = docSnapshot.id;
-      console.log(`[processScheduledCampaigns] Processing campaign: ${campaignId}`);
-      
-      await campaignsRef.doc(campaignId).update({ status: 'processing' });
-
-      const recipientsDoc = await db.collection('whatsapp_recipients').doc(campaignId).get();
-      let recipientsList = [];
-      if (recipientsDoc.exists) {
-        recipientsList = recipientsDoc.data().recipients || [];
-      }
-
-      if (recipientsList.length === 0) {
-        await campaignsRef.doc(campaignId).update({ status: 'completed', sent: 0, failed: 0 });
-        continue;
-      }
-
-      console.log(`[processScheduledCampaigns] Dispatching ${recipientsList.length} messages for ${campaignId}`);
-      try {
-        await axios.post(baseUrl, {
-          targetContacts: recipientsList,
-          campaignName: camp.name,
-          messageType: camp.type,
-          selectedTemplate: camp.templateName,
-          templateLanguage: camp.languageCode,
-          messageText: camp.message,
-          counselorName: 'System Auto-Sender',
-          existingCampaignId: campaignId
-        });
-      } catch (err) {
-        console.error(`[processScheduledCampaigns] Failed to dispatch campaign ${campaignId}:`, err.message);
-        await campaignsRef.doc(campaignId).update({ status: 'failed' });
-      }
-    }
-  } catch (error) {
-    console.error('[processScheduledCampaigns] Fatal Error:', error);
-  }
-  return null;
-});

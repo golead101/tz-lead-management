@@ -456,10 +456,14 @@ export default function InboxPage() {
         return acc;
       }, 0);
 
+      const displayName = (lead.name && lead.name !== 'Campaign Contact' && lead.name !== 'WhatsApp Student')
+        ? lead.name
+        : formatPhone(lead.phone || lead.id);
+
       return {
         id: lead.id,
         phone: lead.phone,
-        contactName: lead.name,
+        contactName: displayName,
         lastMessage: lastMsg ? (lastMsg.text || lastMsg.content || 'Message') : 'No messages yet',
         lastMessageAt,
         lastDirection: lastMsg ? (lastMsg.sender === 'counselor' ? 'outbound' : 'inbound') : null,
@@ -480,7 +484,7 @@ export default function InboxPage() {
   const selectedConvo = conversations.find(c => c.id === selectedLeadId) || (targetLead ? {
     id: targetLead.id,
     phone: targetLead.phone,
-    contactName: targetLead.name,
+    contactName: (targetLead.name && targetLead.name !== 'Campaign Contact' && targetLead.name !== 'WhatsApp Student') ? targetLead.name : formatPhone(targetLead.phone || targetLead.id),
     lastMessage: 'No messages yet',
     unreadCount: 0,
     lead: targetLead

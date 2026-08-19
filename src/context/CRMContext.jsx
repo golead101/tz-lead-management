@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
 import { collection, doc, setDoc, deleteDoc, onSnapshot, writeBatch, getDoc, getDocs } from 'firebase/firestore';
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
+import { autoRepairOverwrittenLeads } from '../modules/gowhatsapp/whatsappDb';
 const CRMContext = createContext();
 
 export const normalizeLeadSource = (rawSource) => {
@@ -35,13 +36,12 @@ export const normalizeLeadSource = (rawSource) => {
   return trimmed;
 };
 
-// Default configurations
+// Default configurations (ONLY the 4 active institute courses)
 const DEFAULT_COURSES = [
-  { id: 'c-1', name: 'Full-Stack Web Development', code: 'FSWD', duration: '6 Months', fee: '₹75,000', description: 'HTML, CSS, JS, React, Node.js, Express & MongoDB' },
-  { id: 'c-2', name: 'Data Science & Artificial Intelligence', code: 'DSAI', duration: '8 Months', fee: '₹95,000', description: 'Python, R, SQL, Machine Learning, Deep Learning, NLP' },
-  { id: 'c-3', name: 'Cloud & DevOps Engineering', code: 'CDE', duration: '5 Months', fee: '₹80,000', description: 'AWS, Azure, Docker, Kubernetes, CI/CD, Terraform' },
-  { id: 'c-4', name: 'Cyber Security & Ethical Hacking', code: 'CSEH', duration: '6 Months', fee: '₹85,000', description: 'Network Security, Pentesting, OWASP, Linux, Cryptography' },
-  { id: 'c-5', name: 'UI/UX Product Design', code: 'UIUX', duration: '4 Months', fee: '₹60,000', description: 'User Research, Wireframing, Prototyping, Figma, Adobe XD' }
+  { id: 'c-da', name: 'Data Analytics', code: 'DA', duration: '3 Months', fee: '₹50,000', description: 'Data Analytics' },
+  { id: 'c-ds', name: 'Data Science With GenAI', code: 'DS', duration: '6 Months', fee: '₹75,000', description: 'Data Science & GenAI' },
+  { id: 'c-aiml', name: 'AIML With GenAI', code: 'AIML', duration: '6 Months', fee: '₹75,000', description: 'AI & Machine Learning with GenAI' },
+  { id: 'c-dm', name: 'Digital Marketing', code: 'DM', duration: '3 Months', fee: '₹50,000', description: 'Digital Marketing & Growth Hacking' }
 ];
 
 const DEFAULT_STAGES = [
@@ -462,6 +462,7 @@ export const CRMProvider = ({ children }) => {
           });
           updateLeads();
           setIsFirebaseEnabled(true);
+          autoRepairOverwrittenLeads();
         }
       }, (err) => {
         console.error("Firestore leads subscription error:", err);
@@ -504,7 +505,7 @@ export const CRMProvider = ({ children }) => {
         console.error("Firestore iframe subscription error:", err);
       });
 
-      // 2. Courses
+      // 2. Courses (Strictly restrict to the 4 active institute courses & remove extra courses from Firestore)
       coursesUnsub = onSnapshot(collection(db, 'courses'), (snapshot) => {
         if (!active) return;
         if (snapshot.empty) {
@@ -515,8 +516,40 @@ export const CRMProvider = ({ children }) => {
           });
           batch.commit().catch(err => console.error("Firestore seeding courses failed:", err));
         } else {
-          const coursesData = snapshot.docs.map(doc => doc.data());
-          setCourses(coursesData);
+          const validCourses = [];
+          snapshot.docs.forEach(docSnap => {
+            const data = docSnap.data();
+            const cName = (data.name || '').trim().toLowerCase();
+
+            // Match against allowed 4 courses (case-insensitive)
+            const isAllowed = DEFAULT_COURSES.some(dc => {
+              const defLower = dc.name.toLowerCase();
+              return cName === defLower || cName.includes(defLower) || defLower.includes(cName) ||
+                (cName.includes('data science') && defLower.includes('data science')) ||
+                (cName.includes('data analytics') && defLower.includes('data analytics')) ||
+                ((cName.includes('aiml') || cName.includes('ai & ml') || cName.includes('ai/ml')) && defLower.includes('aiml')) ||
+                (cName.includes('digital marketing') && defLower.includes('digital marketing'));
+            });
+
+            if (!isAllowed) {
+              // Delete extra / deprecated courses from Firestore
+              deleteDoc(doc(db, 'courses', docSnap.id)).catch(console.error);
+            } else {
+              validCourses.push(data);
+            }
+          });
+
+          // Ensure all 4 allowed default courses exist in state
+          DEFAULT_COURSES.forEach(defCourse => {
+            const defLower = defCourse.name.toLowerCase();
+            const exists = validCourses.some(vc => (vc.name || '').toLowerCase() === defLower || vc.id === defCourse.id);
+            if (!exists) {
+              validCourses.push(defCourse);
+              setDoc(doc(db, 'courses', defCourse.id), defCourse).catch(console.error);
+            }
+          });
+
+          setCourses(validCourses);
         }
       }, (err) => {
         console.error("Firestore courses subscription error:", err);
@@ -843,36 +876,36 @@ export const CRMProvider = ({ children }) => {
     const newLeads = leadsArray.map((leadData, index) => {
       const cleanPhone = leadData.phone ? String(leadData.phone).replace(/\D/g, '') : '';
       return {
-      id: cleanPhone ? cleanPhone : `lead-${Date.now()}-${index}`,
-      name: leadData.name || '',
-      email: leadData.email || '',
-      phone: leadData.phone || '',
-      location: leadData.location || 'Campaign Upload',
-      education: leadData.education || 'Not Provided',
-      course: leadData.course || '',
-      source: leadData.source || 'Campaign Upload',
-      subSource: leadData.subSource || '',
-      counselor: leadData.counselor || activeUser,
-      stage: leadData.stage || 'New Lead',
-      temperature: leadData.temperature || 'Hot',
-      createdDate: leadData.createdDate || new Date().toISOString(),
-      lastContacted: leadData.createdDate || new Date().toISOString(),
-      skipAutoReply: true,
-      isBulkImport: true,
-      disableAutoWelcome: true,
-      customFields: leadData.customFields || {},
-      timeline: [
-        {
-          id: `log-${Date.now()}-${index}`,
-          type: 'system',
-          title: 'Lead Captured',
-          content: 'Inquiry successfully entered system via Campaign Upload.',
-          timestamp: new Date().toISOString(),
-          user: 'System'
-        }
-      ],
-      whatsappMessages: []
-    };
+        id: cleanPhone ? cleanPhone : `lead-${Date.now()}-${index}`,
+        name: leadData.name || (cleanPhone ? cleanPhone : 'Lead'),
+        email: leadData.email || '',
+        phone: leadData.phone || '',
+        location: leadData.location || 'Not Provided',
+        education: leadData.education || 'Not Provided',
+        course: leadData.course || '',
+        source: leadData.source || 'CSV Import',
+        subSource: leadData.subSource || leadData.campaign || '',
+        counselor: leadData.counselor || 'Unassigned',
+        stage: leadData.stage || 'New Lead',
+        temperature: leadData.temperature || 'Hot',
+        createdDate: leadData.createdDate || new Date().toISOString(),
+        lastContacted: leadData.createdDate || new Date().toISOString(),
+        skipAutoReply: true,
+        isBulkImport: true,
+        disableAutoWelcome: true,
+        customFields: leadData.customFields || {},
+        timeline: [
+          {
+            id: `log-${Date.now()}-${index}`,
+            type: 'system',
+            title: 'Lead Captured',
+            content: `Inquiry successfully entered system via ${leadData.source || 'CSV Import'}.`,
+            timestamp: new Date().toISOString(),
+            user: 'System'
+          }
+        ],
+        whatsappMessages: []
+      };
     });
 
     if (isFirebaseEnabled) {
@@ -884,7 +917,7 @@ export const CRMProvider = ({ children }) => {
             const chunk = newLeads.slice(i, i + CHUNK_SIZE);
             const batch = writeBatch(db);
             chunk.forEach(lead => {
-              batch.set(doc(db, 'leads', lead.id), lead);
+              batch.set(doc(db, 'leads', lead.id), lead, { merge: true });
             });
             await batch.commit();
           }
