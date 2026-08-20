@@ -143,8 +143,10 @@ export default function Dashboard() {
       return !(isMeta || isGoogle || isWhatsapp || isWebsite || isCall || isWalkin);
     }).length;
     
+    const newLeadsCount = activeLeads.filter(l => l.stage === 'New Lead').length;
     const contactedCount = activeLeads.filter(l => ['Contacted', 'Interested', 'Demo Scheduled', 'Demo Attended', 'Free Class'].includes(l.stage)).length;
     const followUpsCount = activeLeads.filter(l => l.followupDate || l.stage === 'Follow-up').length;
+    const demoAttendedCount = activeLeads.filter(l => l.stage === 'Demo Attended').length;
     const convertedCount = activeLeads.filter(l => l.stage === 'Converted').length;
 
     return {
@@ -156,8 +158,10 @@ export default function Dashboard() {
       walkinLeads: walkinCount,
       othersLeads: othersCount,
       totalLeads: activeLeads.length,
+      newLeads: newLeadsCount,
       contacted: contactedCount,
       followUps: followUpsCount,
+      demoAttended: demoAttendedCount,
       converted: convertedCount,
       metaPct: parseFloat(((metaCount / total) * 100).toFixed(1)),
       googlePct: parseFloat(((googleCount / total) * 100).toFixed(1)),
@@ -566,11 +570,8 @@ export default function Dashboard() {
                     <stop offset="100%" stopColor="#f43f5e" />
                   </linearGradient>
                 </defs>
-                {/* Bottom ground shadow */}
                 <ellipse cx="50" cy="91" rx="32" ry="7" fill="#000000" opacity="0.12" />
-                {/* Map Pin body */}
                 <path d="M 50 86 C 44 80 16 56 16 38 C 16 19.2 31.2 4 50 4 C 68.8 4 84 19.2 84 38 C 84 56 56 80 50 86 Z" fill="url(#walkGrad)" stroke="#ffffff" strokeWidth="2" strokeLinejoin="round" />
-                {/* Walking man silhouette */}
                 <circle cx="52.5" cy="21" r="5" fill="#ffffff" />
                 <path d="M52.5 26 L52 44" stroke="#ffffff" strokeWidth="6.5" strokeLinecap="round" />
                 <path d="M52.5 29 L58.5 31.5 L64.5 35" stroke="#ffffff" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -583,6 +584,108 @@ export default function Dashboard() {
               <span className="db-source-label">Walk-in</span>
               <span className="db-source-value">{activeStats.walkinLeads.toLocaleString()}</span>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 2.5 Row (Five Core Funnel KPIs) */}
+      <div className="db-funnel-grid" style={{ marginBottom: '24px' }}>
+        {/* New Leads Card */}
+        <div className="db-funnel-card new-leads-card">
+          <div className="db-funnel-left">
+            <span className="db-funnel-label">New Leads</span>
+            <span className="db-funnel-value">{activeStats.newLeads.toLocaleString()}</span>
+            <div className="db-funnel-delta up">
+              ▲ 16.8% <span>vs last 7 days</span>
+            </div>
+          </div>
+          <div className="db-funnel-icon-wrap new">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '28px', height: '28px' }}>
+              <circle cx="7" cy="8" r="3.2" fill="currentColor" opacity="0.4" />
+              <path d="M2 17.5C2 15 4 13.5 7 13.5C8.2 13.5 9.5 13.9 10.3 14.6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" opacity="0.4" />
+              <circle cx="13" cy="9" r="4.5" fill="currentColor" />
+              <path d="M6 21C6 17.5 9 15.5 13 15.5C15.2 15.5 17.5 16.3 18.8 17.8" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+              <path d="M19 2L19.9 4.4L22.5 4.6L20.5 6.2L21.2 8.8L19 7.4L16.8 8.8L17.5 6.2L15.5 4.6L18.1 4.4L19 2Z" fill="#f59e0b" />
+            </svg>
+          </div>
+        </div>
+
+        {/* Contacted Card */}
+        <div className="db-funnel-card contacted-card">
+          <div className="db-funnel-left">
+            <span className="db-funnel-label">Contacted</span>
+            <span className="db-funnel-value">{activeStats.contacted.toLocaleString()}</span>
+            <div className="db-funnel-delta up">
+              ▲ 14.3% <span>vs last 7 days</span>
+            </div>
+          </div>
+          <div className="db-funnel-icon-wrap contacted">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '28px', height: '28px' }}>
+              <path d="M19.5 13.5C19.5 17 15.5 17.5 13 17.5L8.5 21V17.5C4.5 17.5 2.5 15 2.5 11.5C2.5 7.5 6.5 4.5 11 4.5C15.5 4.5 19.5 7.5 19.5 11.5V13.5Z" fill="currentColor" />
+              <path d="M13 9.5H19C21 9.5 22.5 10.8 22.5 12.5C22.5 14.2 21 15.5 19 15.5H17.5V18L15 15.5" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              <circle cx="8" cy="11.5" r="1.2" fill="#ffffff" />
+              <circle cx="11" cy="11.5" r="1.2" fill="#ffffff" />
+              <circle cx="14" cy="11.5" r="1.2" fill="#ffffff" />
+            </svg>
+          </div>
+        </div>
+
+        {/* Follow Ups Card */}
+        <div className="db-funnel-card followups-card">
+          <div className="db-funnel-left">
+            <span className="db-funnel-label">Follow Ups</span>
+            <span className="db-funnel-value">{activeStats.followUps.toLocaleString()}</span>
+            <div className="db-funnel-delta up">
+              ▲ 17.6% <span>vs last 7 days</span>
+            </div>
+          </div>
+          <div className="db-funnel-icon-wrap followups">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '28px', height: '28px' }}>
+              <circle cx="12" cy="12" r="9.5" stroke="currentColor" strokeWidth="2.2" />
+              <path d="M12 6.5V12.5L16 14.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M12 2C15.5 2 18.5 3.5 20.5 6L21.5 3" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" />
+              <circle cx="12" cy="12" r="2" fill="currentColor" />
+            </svg>
+          </div>
+        </div>
+
+        {/* Demo Attended Card */}
+        <div className="db-funnel-card demo-card">
+          <div className="db-funnel-left">
+            <span className="db-funnel-label">Demo Attended</span>
+            <span className="db-funnel-value">{activeStats.demoAttended.toLocaleString()}</span>
+            <div className="db-funnel-delta up">
+              ▲ 15.2% <span>vs last 7 days</span>
+            </div>
+          </div>
+          <div className="db-funnel-icon-wrap demo">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '28px', height: '28px' }}>
+              <rect x="2" y="4" width="20" height="12" rx="2" stroke="currentColor" strokeWidth="2" />
+              <path d="M12 16V20M9 20H15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              <path d="M8 10L11 13L16 7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+        </div>
+
+        {/* Converted Card */}
+        <div className="db-funnel-card converted-card">
+          <div className="db-funnel-left">
+            <span className="db-funnel-label">Converted</span>
+            <span className="db-funnel-value">{activeStats.converted.toLocaleString()}</span>
+            <div className="db-funnel-delta up">
+              ▲ 20.1% <span>vs last 7 days</span>
+            </div>
+          </div>
+          <div className="db-funnel-icon-wrap converted">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '28px', height: '28px' }}>
+              <path d="M6 4H18V11C18 13.8 15.8 16 13 16H11C8.2 16 6 13.8 6 11V4Z" fill="currentColor" />
+              <path d="M6 6H4C2.9 6 2 6.9 2 8V9C2 10.1 2.9 11 4 11H6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              <path d="M18 6H20C21.1 6 22 6.9 22 8V9C22 10.1 21.1 11 20 11H18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              <path d="M9 19.5H15M12 16V19.5M7 21H17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              <path d="M9.5 9.5L11 11L14.5 7.5" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M4 2.5L4.5 3.5L5.5 3.8L4.7 4.5L5 5.5L4 5L3 5.5L3.3 4.5L2.5 3.8L3.5 3.5L4 2.5Z" fill="currentColor" />
+              <path d="M20 2L20.3 2.8L21.1 3L20.5 3.6L20.7 4.4L20 4L19.3 4.4L19.5 3.6L18.9 3L19.7 2.8L20 2Z" fill="currentColor" />
+            </svg>
           </div>
         </div>
       </div>
@@ -837,121 +940,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* 4. Bottom Row (Four Core KPI Cards) */}
-      <div className="db-bottom-grid">
-        {/* New Leads Card */}
-        <div className="db-bottom-card">
-          <div className="db-bottom-left">
-            <span className="db-bottom-label">New Leads</span>
-            <span className="db-bottom-value">{activeStats.totalLeads.toLocaleString()}</span>
-            <div className="db-bottom-delta up">
-              ▲ 16.8% <span>vs last 7 days</span>
-            </div>
-          </div>
-          <div className="db-bottom-icon-wrap new">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '28px', height: '28px' }}>
-              <defs>
-                <linearGradient id="newLeadsGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#3b82f6" />
-                  <stop offset="100%" stopColor="#60a5fa" />
-                </linearGradient>
-                <linearGradient id="starGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#fbbf24" />
-                  <stop offset="100%" stopColor="#f59e0b" />
-                </linearGradient>
-              </defs>
-              <circle cx="7" cy="8" r="3.2" fill="url(#newLeadsGrad)" opacity="0.4" />
-              <path d="M2 17.5C2 15 4 13.5 7 13.5C8.2 13.5 9.5 13.9 10.3 14.6" stroke="url(#newLeadsGrad)" strokeWidth="1.5" strokeLinecap="round" opacity="0.4" />
-              <circle cx="13" cy="9" r="4.5" fill="url(#newLeadsGrad)" />
-              <path d="M6 21C6 17.5 9 15.5 13 15.5C15.2 15.5 17.5 16.3 18.8 17.8" stroke="url(#newLeadsGrad)" strokeWidth="2.5" strokeLinecap="round" />
-              <path d="M19 2L19.9 4.4L22.5 4.6L20.5 6.2L21.2 8.8L19 7.4L16.8 8.8L17.5 6.2L15.5 4.6L18.1 4.4L19 2Z" fill="url(#starGrad)" />
-            </svg>
-          </div>
-        </div>
 
-        {/* Contacted Card */}
-        <div className="db-bottom-card">
-          <div className="db-bottom-left">
-            <span className="db-bottom-label">Contacted</span>
-            <span className="db-bottom-value">{activeStats.contacted.toLocaleString()}</span>
-            <div className="db-bottom-delta up">
-              ▲ 14.3% <span>vs last 7 days</span>
-            </div>
-          </div>
-          <div className="db-bottom-icon-wrap contacted">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '28px', height: '28px' }}>
-              <defs>
-                <linearGradient id="contactedGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#10b981" />
-                  <stop offset="100%" stopColor="#059669" />
-                </linearGradient>
-              </defs>
-              <path d="M19.5 13.5C19.5 17 15.5 17.5 13 17.5L8.5 21V17.5C4.5 17.5 2.5 15 2.5 11.5C2.5 7.5 6.5 4.5 11 4.5C15.5 4.5 19.5 7.5 19.5 11.5V13.5Z" fill="url(#contactedGrad)" />
-              <path d="M13 9.5H19C21 9.5 22.5 10.8 22.5 12.5C22.5 14.2 21 15.5 19 15.5H17.5V18L15 15.5" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              <circle cx="8" cy="11.5" r="1.2" fill="#ffffff" />
-              <circle cx="11" cy="11.5" r="1.2" fill="#ffffff" />
-              <circle cx="14" cy="11.5" r="1.2" fill="#ffffff" />
-            </svg>
-          </div>
-        </div>
-
-        {/* Follow Ups Card */}
-        <div className="db-bottom-card">
-          <div className="db-bottom-left">
-            <span className="db-bottom-label">Follow Ups</span>
-            <span className="db-bottom-value">{activeStats.followUps.toLocaleString()}</span>
-            <div className="db-bottom-delta up">
-              ▲ 17.6% <span>vs last 7 days</span>
-            </div>
-          </div>
-          <div className="db-bottom-icon-wrap followups">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '28px', height: '28px' }}>
-              <defs>
-                <linearGradient id="followGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#f97316" />
-                  <stop offset="100%" stopColor="#ea580c" />
-                </linearGradient>
-                <linearGradient id="arrowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#f87171" />
-                  <stop offset="100%" stopColor="#ef4444" />
-                </linearGradient>
-              </defs>
-              <circle cx="12" cy="12" r="9.5" stroke="url(#followGrad)" strokeWidth="2.2" />
-              <path d="M12 6.5V12.5L16 14.5" stroke="url(#followGrad)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M12 2C15.5 2 18.5 3.5 20.5 6L21.5 3" stroke="url(#arrowGrad)" strokeWidth="2" strokeLinecap="round" />
-              <circle cx="12" cy="12" r="2" fill="url(#followGrad)" />
-            </svg>
-          </div>
-        </div>
-
-        {/* Converted Card */}
-        <div className="db-bottom-card">
-          <div className="db-bottom-left">
-            <span className="db-bottom-label">Converted</span>
-            <span className="db-bottom-value">{activeStats.converted.toLocaleString()}</span>
-            <div className="db-bottom-delta up">
-              ▲ 20.1% <span>vs last 7 days</span>
-            </div>
-          </div>
-          <div className="db-bottom-icon-wrap converted">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '28px', height: '28px' }}>
-              <defs>
-                <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#fbbf24" />
-                  <stop offset="100%" stopColor="#d97706" />
-                </linearGradient>
-              </defs>
-              <path d="M6 4H18V11C18 13.8 15.8 16 13 16H11C8.2 16 6 13.8 6 11V4Z" fill="url(#goldGrad)" />
-              <path d="M6 6H4C2.9 6 2 6.9 2 8V9C2 10.1 2.9 11 4 11H6" stroke="url(#goldGrad)" strokeWidth="1.5" strokeLinecap="round" />
-              <path d="M18 6H20C21.1 6 22 6.9 22 8V9C22 10.1 21.1 11 20 11H18" stroke="url(#goldGrad)" strokeWidth="1.5" strokeLinecap="round" />
-              <path d="M9 19.5H15M12 16V19.5M7 21H17" stroke="url(#goldGrad)" strokeWidth="2" strokeLinecap="round" />
-              <path d="M9.5 9.5L11 11L14.5 7.5" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M4 2.5L4.5 3.5L5.5 3.8L4.7 4.5L5 5.5L4 5L3 5.5L3.3 4.5L2.5 3.8L3.5 3.5L4 2.5Z" fill="url(#goldGrad)" />
-              <path d="M20 2L20.3 2.8L21.1 3L20.5 3.6L20.7 4.4L20 4L19.3 4.4L19.5 3.6L18.9 3L19.7 2.8L20 2Z" fill="url(#goldGrad)" />
-            </svg>
-          </div>
-        </div>
-      </div>
 
     </div>
   );
