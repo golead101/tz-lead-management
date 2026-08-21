@@ -1,0 +1,28 @@
+{
+  "name": "Student Registration Form",
+  "short_name": "Registration Form",
+  "description": "Student walk-in registration form",
+  "theme_color": "#0f172a",
+  "background_color": "#0f172a",
+  "display": "standalone",
+  "start_url": "/qr-form",
+  "scope": "/qr-form",
+  "icons": [
+    {
+      "src": "/image-removebg-preview.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/image-removebg-preview.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/image-removebg-preview.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

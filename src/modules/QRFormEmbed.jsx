@@ -89,6 +89,11 @@ export default function QRFormEmbed() {
     document.body.style.backgroundSize = '400% 400%';
     document.body.style.animation = 'gradientBG 15s ease infinite';
     document.body.style.color = '#0f172a';
+
+    const manifestLink = document.querySelector('link[rel="manifest"]');
+    if (manifestLink) {
+      manifestLink.setAttribute('href', '/qr-manifest.webmanifest');
+    }
     
     const fetchConfig = async () => {
       try {

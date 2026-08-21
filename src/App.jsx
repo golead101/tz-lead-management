@@ -52,6 +52,14 @@ function MainAppContent() {
   const [navigatedView, setNavigatedView] = useState(activeView);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  // Dynamic PWA manifest restore safety
+  useEffect(() => {
+    const manifestLink = document.querySelector('link[rel="manifest"]');
+    if (manifestLink) {
+      manifestLink.setAttribute('href', '/manifest.webmanifest');
+    }
+  }, []);
+
   // Trigger quick shimmer loading state when swapping tabs or when role changes and view needs redirection
   useEffect(() => {
     // Guard check: redirect if role tries to access a restricted view
