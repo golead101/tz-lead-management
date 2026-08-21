@@ -974,7 +974,7 @@ export const CRMProvider = ({ children }) => {
     showToastMsg('Inquiry removed from CRM database.', 'error');
     if (selectedLeadId === leadId) {
       setSelectedLeadId(null);
-      setActiveView('dashboard');
+      // Do NOT redirect - let the calling page decide what to do next
     }
   };
 

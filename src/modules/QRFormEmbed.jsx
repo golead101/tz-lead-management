@@ -148,6 +148,7 @@ export default function QRFormEmbed() {
       user: 'System'
     }];
     data.whatsappMessages = [];
+    data.education = data.qualification || 'Not Provided';
     data.customFields = {
       qualification: data.qualification || '',
       batchTiming: data.batchTiming || ''

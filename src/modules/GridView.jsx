@@ -197,19 +197,31 @@ export default function GridView() {
     setPrefilledCampaignLeads
   } = useCRM();
 
-  // Filter States (now supporting multi-select as arrays)
-  const [selectedCourse, setSelectedCourse] = useState(['All']);
-  const [selectedStage, setSelectedStage] = useState(['All']);
-  const [selectedCounselor, setSelectedCounselor] = useState(['All']);
-  const [selectedSource, setSelectedSource] = useState(['All']);
-  const [selectedCampaign, setSelectedCampaign] = useState(['All']);
-  const [selectedTemperature, setSelectedTemperature] = useState(['All']);
+  // Filter States — persisted to sessionStorage so navigation away (e.g. to WhatsApp inbox) and back preserves them
+  const [selectedCourse, setSelectedCourse] = useState(() => { try { const s = sessionStorage.getItem('gv_filter_course'); return s ? JSON.parse(s) : ['All']; } catch { return ['All']; } });
+  const [selectedStage, setSelectedStage] = useState(() => { try { const s = sessionStorage.getItem('gv_filter_stage'); return s ? JSON.parse(s) : ['All']; } catch { return ['All']; } });
+  const [selectedCounselor, setSelectedCounselor] = useState(() => { try { const s = sessionStorage.getItem('gv_filter_counselor'); return s ? JSON.parse(s) : ['All']; } catch { return ['All']; } });
+  const [selectedSource, setSelectedSource] = useState(() => { try { const s = sessionStorage.getItem('gv_filter_source'); return s ? JSON.parse(s) : ['All']; } catch { return ['All']; } });
+  const [selectedCampaign, setSelectedCampaign] = useState(() => { try { const s = sessionStorage.getItem('gv_filter_campaign'); return s ? JSON.parse(s) : ['All']; } catch { return ['All']; } });
+  const [selectedTemperature, setSelectedTemperature] = useState(() => { try { const s = sessionStorage.getItem('gv_filter_temperature'); return s ? JSON.parse(s) : ['All']; } catch { return ['All']; } });
 
-  const [dateRangeFilter, setDateRangeFilter] = useState('All Time');
-  const [customStartDate, setCustomStartDate] = useState('');
-  const [customEndDate, setCustomEndDate] = useState('');
+  const [dateRangeFilter, setDateRangeFilter] = useState(() => { try { return sessionStorage.getItem('gv_filter_daterange') || 'All Time'; } catch { return 'All Time'; } });
+  const [customStartDate, setCustomStartDate] = useState(() => { try { return sessionStorage.getItem('gv_filter_startdate') || ''; } catch { return ''; } });
+  const [customEndDate, setCustomEndDate] = useState(() => { try { return sessionStorage.getItem('gv_filter_enddate') || ''; } catch { return ''; } });
   const [dateFilterOpen, setDateFilterOpen] = useState(false);
-  const [gridSearch, setGridSearch] = useState('');
+  const [gridSearch, setGridSearch] = useState(() => { try { return sessionStorage.getItem('gv_filter_search') || ''; } catch { return ''; } });
+
+  // Persist filters to sessionStorage whenever they change
+  React.useEffect(() => { try { sessionStorage.setItem('gv_filter_course', JSON.stringify(selectedCourse)); } catch {} }, [selectedCourse]);
+  React.useEffect(() => { try { sessionStorage.setItem('gv_filter_stage', JSON.stringify(selectedStage)); } catch {} }, [selectedStage]);
+  React.useEffect(() => { try { sessionStorage.setItem('gv_filter_counselor', JSON.stringify(selectedCounselor)); } catch {} }, [selectedCounselor]);
+  React.useEffect(() => { try { sessionStorage.setItem('gv_filter_source', JSON.stringify(selectedSource)); } catch {} }, [selectedSource]);
+  React.useEffect(() => { try { sessionStorage.setItem('gv_filter_campaign', JSON.stringify(selectedCampaign)); } catch {} }, [selectedCampaign]);
+  React.useEffect(() => { try { sessionStorage.setItem('gv_filter_temperature', JSON.stringify(selectedTemperature)); } catch {} }, [selectedTemperature]);
+  React.useEffect(() => { try { sessionStorage.setItem('gv_filter_daterange', dateRangeFilter); } catch {} }, [dateRangeFilter]);
+  React.useEffect(() => { try { sessionStorage.setItem('gv_filter_startdate', customStartDate); } catch {} }, [customStartDate]);
+  React.useEffect(() => { try { sessionStorage.setItem('gv_filter_enddate', customEndDate); } catch {} }, [customEndDate]);
+  React.useEffect(() => { try { sessionStorage.setItem('gv_filter_search', gridSearch); } catch {} }, [gridSearch]);
 
   // Sorting State
   const [sortBy, setSortBy] = useState('createdDate');
@@ -980,7 +992,12 @@ export default function GridView() {
         <MultiSelectFilter
           label="Stage"
           icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>}
-          options={pipelineStages.map(s => ({ value: s.name, label: s.name }))}
+          options={(() => {
+            const list = pipelineStages.map(s => s.name);
+            if (!list.includes('No Answer')) list.push('No Answer');
+            if (!list.includes('Answered')) list.push('Answered');
+            return list.map(name => ({ value: name, label: name }));
+          })()}
           selectedValues={selectedStage}
           onChange={(vals) => { setSelectedStage(vals); setCurrentPage(1); }}
         />
@@ -1365,7 +1382,7 @@ export default function GridView() {
                               : (lead.source === 'Walk-in' && lead.subSource ? `Walk-in (${lead.subSource})` : lead.source)}
                           </span>
                           {(() => {
-                            const campText = lead.campaign || lead.campaignName || (lead.subSource && lead.subSource !== lead.source ? lead.subSource : '');
+                            const campText = lead.campaign || lead.campaignName || '';
                             if (!campText) return null;
                             return (
                               <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
@@ -1621,7 +1638,7 @@ export default function GridView() {
                     </div>
                   )}
 
-                  {/* WhatsApp Chat Option */}
+                   {/* WhatsApp Chat Option */}
                   {!isEditing && lead.phone && (
                     <button
                       type="button"
@@ -1936,7 +1953,12 @@ export default function GridView() {
                           )}
                           <div>
                             <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase', marginBottom: '2px', letterSpacing: '0.03em' }}>Education</div>
-                            <div style={{ fontSize: '13px', color: '#1e293b', fontWeight: '600' }}>{lead.education || 'Not Provided'}</div>
+                            <div style={{ fontSize: '13px', color: '#1e293b', fontWeight: '600' }}>
+                              {(() => {
+                                const edu = lead.education && lead.education !== 'Not Provided' ? lead.education : (lead.customFields?.qualification || lead.qualification || 'Not Provided');
+                                return edu;
+                              })()}
+                            </div>
                           </div>
                           <div>
                             <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase', marginBottom: '2px', letterSpacing: '0.03em' }}>Course</div>

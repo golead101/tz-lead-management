@@ -153,19 +153,6 @@ export default function Sidebar({ mobileMenuOpen, setMobileMenuOpen }) {
       )
     },
     {
-      id: 'history',
-      target: 'history',
-      label: 'History',
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-          <polyline points="3 3 3 8 8 8" />
-          <line x1="12" y1="7" x2="12" y2="12" />
-          <line x1="12" y1="12" x2="16" y2="14" />
-        </svg>
-      )
-    },
-    {
       id: 'settings',
       target: 'settings',
       label: 'Settings',
@@ -173,6 +160,19 @@ export default function Sidebar({ mobileMenuOpen, setMobileMenuOpen }) {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
           <circle cx="12" cy="12" r="3" />
           <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+        </svg>
+      )
+    },
+    {
+      id: 'history',
+      target: 'history',
+      label: 'Activity History',
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+          <polyline points="3 3 3 8 8 8" />
+          <line x1="12" y1="7" x2="12" y2="12" />
+          <line x1="12" y1="12" x2="16" y2="14" />
         </svg>
       )
     }
@@ -269,7 +269,7 @@ export default function Sidebar({ mobileMenuOpen, setMobileMenuOpen }) {
           }
 
           // Hide these as they are now sub-items of Leads
-          if (item.id === 'followups' || item.id === 'history') {
+          if (item.id === 'followups') {
             return null;
           }
 
@@ -309,13 +309,8 @@ export default function Sidebar({ mobileMenuOpen, setMobileMenuOpen }) {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '14px', borderLeft: '1px dashed rgba(255, 255, 255, 0.15)', marginLeft: '24px', marginTop: '2px', marginBottom: '6px' }}>
                     {[
                       { subTarget: 'grid', label: 'Total Leads' },
-                      { subTarget: 'followups', label: 'Follow-ups' },
-                      { subTarget: 'history', label: 'Activity History' }
+                      { subTarget: 'followups', label: 'Follow-ups' }
                     ].map(sub => {
-                      if (sub.subTarget === 'history') {
-                        if (activeRole === 'Telecaller') return null;
-                      }
-
                       const isSubActive = activeView === sub.subTarget;
                       return (
                         <button
