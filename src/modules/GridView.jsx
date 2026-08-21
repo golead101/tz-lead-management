@@ -1942,6 +1942,28 @@ export default function GridView() {
                             <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase', marginBottom: '2px', letterSpacing: '0.03em' }}>Course</div>
                             <div style={{ fontSize: '13px', color: '#1e293b', fontWeight: '600' }}>{lead.course || 'Not Provided'}</div>
                           </div>
+                          {(lead.source === 'Walk-in' || lead.location) && (
+                            <div>
+                              <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase', marginBottom: '2px', letterSpacing: '0.03em' }}>Address / City</div>
+                              <div style={{ fontSize: '13px', color: '#1e293b', fontWeight: '600' }}>{lead.location || 'Not Provided'}</div>
+                            </div>
+                          )}
+                          {(() => {
+                            const bt = lead.customFields?.batchTiming || lead.batchTiming || (() => {
+                              const keys = Object.keys(lead.customFields || {});
+                              const key = keys.find(k => k.toLowerCase().includes('batchtiming') || k.toLowerCase().includes('batch timing'));
+                              return key ? lead.customFields[key] : null;
+                            })();
+                            if (lead.source === 'Walk-in' || bt) {
+                              return (
+                                <div>
+                                  <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase', marginBottom: '2px', letterSpacing: '0.03em' }}>Preferred Batch Timing</div>
+                                  <div style={{ fontSize: '13px', color: '#1e293b', fontWeight: '600' }}>{bt || 'Not Provided'}</div>
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
                         </div>
                       </div>
                     </>

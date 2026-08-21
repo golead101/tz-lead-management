@@ -516,6 +516,17 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
               </div>
 
               <div className="form-group">
+                <label className="form-label">Address / City</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="e.g. Hyderabad, Sector 4"
+                  value={formLocation}
+                  onChange={(e) => setFormLocation(e.target.value)}
+                />
+              </div>
+
+              <div className="form-group">
                 <label className="form-label">Applied Course</label>
                 <select
                   className="form-control"

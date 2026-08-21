@@ -144,9 +144,11 @@ export default function Dashboard() {
     }).length;
     
     const newLeadsCount = activeLeads.filter(l => l.stage === 'New Lead').length;
-    const contactedCount = activeLeads.filter(l => ['Contacted', 'Interested', 'Demo Scheduled', 'Demo Attended', 'Free Class'].includes(l.stage)).length;
+    const contactedCount = activeLeads.filter(l => ['Contacted', 'Interested'].includes(l.stage)).length;
     const followUpsCount = activeLeads.filter(l => l.followupDate || l.stage === 'Follow-up').length;
+    const demoScheduledCount = activeLeads.filter(l => l.stage === 'Demo Scheduled').length;
     const demoAttendedCount = activeLeads.filter(l => l.stage === 'Demo Attended').length;
+    const freeClassCount = activeLeads.filter(l => l.stage === 'Free Class').length;
     const convertedCount = activeLeads.filter(l => l.stage === 'Converted').length;
 
     return {
@@ -161,7 +163,9 @@ export default function Dashboard() {
       newLeads: newLeadsCount,
       contacted: contactedCount,
       followUps: followUpsCount,
+      demoScheduled: demoScheduledCount,
       demoAttended: demoAttendedCount,
+      freeClass: freeClassCount,
       converted: convertedCount,
       metaPct: parseFloat(((metaCount / total) * 100).toFixed(1)),
       googlePct: parseFloat(((googleCount / total) * 100).toFixed(1)),
@@ -588,17 +592,10 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* 2.5 Row (Five Core Funnel KPIs) */}
+      {/* 2.5 Row (Seven Core Funnel KPIs) */}
       <div className="db-funnel-grid" style={{ marginBottom: '24px' }}>
         {/* New Leads Card */}
         <div className="db-funnel-card new-leads-card">
-          <div className="db-funnel-left">
-            <span className="db-funnel-label">New Leads</span>
-            <span className="db-funnel-value">{activeStats.newLeads.toLocaleString()}</span>
-            <div className="db-funnel-delta up">
-              ▲ 16.8% <span>vs last 7 days</span>
-            </div>
-          </div>
           <div className="db-funnel-icon-wrap new">
             <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '28px', height: '28px' }}>
               <circle cx="7" cy="8" r="3.2" fill="currentColor" opacity="0.4" />
@@ -608,17 +605,17 @@ export default function Dashboard() {
               <path d="M19 2L19.9 4.4L22.5 4.6L20.5 6.2L21.2 8.8L19 7.4L16.8 8.8L17.5 6.2L15.5 4.6L18.1 4.4L19 2Z" fill="#f59e0b" />
             </svg>
           </div>
+          <div className="db-funnel-left">
+            <span className="db-funnel-label">New Leads</span>
+            <span className="db-funnel-value">{activeStats.newLeads.toLocaleString()}</span>
+            <div className="db-funnel-delta up">
+              ▲ 16.8% <span>vs last 7 days</span>
+            </div>
+          </div>
         </div>
 
         {/* Contacted Card */}
         <div className="db-funnel-card contacted-card">
-          <div className="db-funnel-left">
-            <span className="db-funnel-label">Contacted</span>
-            <span className="db-funnel-value">{activeStats.contacted.toLocaleString()}</span>
-            <div className="db-funnel-delta up">
-              ▲ 14.3% <span>vs last 7 days</span>
-            </div>
-          </div>
           <div className="db-funnel-icon-wrap contacted">
             <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '28px', height: '28px' }}>
               <path d="M19.5 13.5C19.5 17 15.5 17.5 13 17.5L8.5 21V17.5C4.5 17.5 2.5 15 2.5 11.5C2.5 7.5 6.5 4.5 11 4.5C15.5 4.5 19.5 7.5 19.5 11.5V13.5Z" fill="currentColor" />
@@ -628,17 +625,17 @@ export default function Dashboard() {
               <circle cx="14" cy="11.5" r="1.2" fill="#ffffff" />
             </svg>
           </div>
+          <div className="db-funnel-left">
+            <span className="db-funnel-label">Contacted</span>
+            <span className="db-funnel-value">{activeStats.contacted.toLocaleString()}</span>
+            <div className="db-funnel-delta up">
+              ▲ 14.3% <span>vs last 7 days</span>
+            </div>
+          </div>
         </div>
 
         {/* Follow Ups Card */}
         <div className="db-funnel-card followups-card">
-          <div className="db-funnel-left">
-            <span className="db-funnel-label">Follow Ups</span>
-            <span className="db-funnel-value">{activeStats.followUps.toLocaleString()}</span>
-            <div className="db-funnel-delta up">
-              ▲ 17.6% <span>vs last 7 days</span>
-            </div>
-          </div>
           <div className="db-funnel-icon-wrap followups">
             <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '28px', height: '28px' }}>
               <circle cx="12" cy="12" r="9.5" stroke="currentColor" strokeWidth="2.2" />
@@ -647,17 +644,37 @@ export default function Dashboard() {
               <circle cx="12" cy="12" r="2" fill="currentColor" />
             </svg>
           </div>
+          <div className="db-funnel-left">
+            <span className="db-funnel-label">Follow Ups</span>
+            <span className="db-funnel-value">{activeStats.followUps.toLocaleString()}</span>
+            <div className="db-funnel-delta up">
+              ▲ 17.6% <span>vs last 7 days</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Demo Scheduled Card */}
+        <div className="db-funnel-card demosched-card">
+          <div className="db-funnel-icon-wrap demosched">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '28px', height: '28px' }}>
+              <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="2" />
+              <line x1="16" y1="2" x2="16" y2="6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              <line x1="8" y1="2" x2="8" y2="6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" strokeWidth="2" />
+              <circle cx="12" cy="15" r="2" fill="currentColor" />
+            </svg>
+          </div>
+          <div className="db-funnel-left">
+            <span className="db-funnel-label">Demo Scheduled</span>
+            <span className="db-funnel-value">{activeStats.demoScheduled.toLocaleString()}</span>
+            <div className="db-funnel-delta up">
+              ▲ 11.2% <span>vs last 7 days</span>
+            </div>
+          </div>
         </div>
 
         {/* Demo Attended Card */}
         <div className="db-funnel-card demo-card">
-          <div className="db-funnel-left">
-            <span className="db-funnel-label">Demo Attended</span>
-            <span className="db-funnel-value">{activeStats.demoAttended.toLocaleString()}</span>
-            <div className="db-funnel-delta up">
-              ▲ 15.2% <span>vs last 7 days</span>
-            </div>
-          </div>
           <div className="db-funnel-icon-wrap demo">
             <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '28px', height: '28px' }}>
               <rect x="2" y="4" width="20" height="12" rx="2" stroke="currentColor" strokeWidth="2" />
@@ -665,17 +682,35 @@ export default function Dashboard() {
               <path d="M8 10L11 13L16 7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
+          <div className="db-funnel-left">
+            <span className="db-funnel-label">Demo Attended</span>
+            <span className="db-funnel-value">{activeStats.demoAttended.toLocaleString()}</span>
+            <div className="db-funnel-delta up">
+              ▲ 15.2% <span>vs last 7 days</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Free Class Card */}
+        <div className="db-funnel-card freeclass-card">
+          <div className="db-funnel-icon-wrap freeclass">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '28px', height: '28px' }}>
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+              <polygon points="12 6 13.5 9 16.5 9.5 14.2 11.5 15 14.5 12 13 9 14.5 9.8 11.5 7.5 9.5 10.5 9" fill="currentColor" />
+            </svg>
+          </div>
+          <div className="db-funnel-left">
+            <span className="db-funnel-label">Free Class</span>
+            <span className="db-funnel-value">{activeStats.freeClass.toLocaleString()}</span>
+            <div className="db-funnel-delta up">
+              ▲ 18.5% <span>vs last 7 days</span>
+            </div>
+          </div>
         </div>
 
         {/* Converted Card */}
         <div className="db-funnel-card converted-card">
-          <div className="db-funnel-left">
-            <span className="db-funnel-label">Converted</span>
-            <span className="db-funnel-value">{activeStats.converted.toLocaleString()}</span>
-            <div className="db-funnel-delta up">
-              ▲ 20.1% <span>vs last 7 days</span>
-            </div>
-          </div>
           <div className="db-funnel-icon-wrap converted">
             <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '28px', height: '28px' }}>
               <path d="M6 4H18V11C18 13.8 15.8 16 13 16H11C8.2 16 6 13.8 6 11V4Z" fill="currentColor" />
@@ -686,6 +721,13 @@ export default function Dashboard() {
               <path d="M4 2.5L4.5 3.5L5.5 3.8L4.7 4.5L5 5.5L4 5L3 5.5L3.3 4.5L2.5 3.8L3.5 3.5L4 2.5Z" fill="currentColor" />
               <path d="M20 2L20.3 2.8L21.1 3L20.5 3.6L20.7 4.4L20 4L19.3 4.4L19.5 3.6L18.9 3L19.7 2.8L20 2Z" fill="currentColor" />
             </svg>
+          </div>
+          <div className="db-funnel-left">
+            <span className="db-funnel-label">Converted</span>
+            <span className="db-funnel-value">{activeStats.converted.toLocaleString()}</span>
+            <div className="db-funnel-delta up">
+              ▲ 20.1% <span>vs last 7 days</span>
+            </div>
           </div>
         </div>
       </div>

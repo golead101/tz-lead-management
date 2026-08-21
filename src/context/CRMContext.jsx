@@ -61,7 +61,7 @@ const DEFAULT_CUSTOM_FIELDS = [];
 const DEFAULT_BRANDING = {
   instituteName: 'TechZone Academy',
   logoUrl: '',
-  
+
   // Custom sidebar appearance properties
   sidebarBg: '#0A1E44',
   sidebarText: '#ffffff',
@@ -71,7 +71,7 @@ const DEFAULT_BRANDING = {
   sidebarFont: 'Inter',
   sidebarRadius: 8,
   sidebarWidth: 'default',
-  
+
   // Legacy color systems
   primaryHue: 0,
   primarySat: '95%',
@@ -191,7 +191,7 @@ export const CRMProvider = ({ children }) => {
   const [pipelineStages, setPipelineStages] = useState(() => {
     const local = localStorage.getItem('crm_stages');
     let stages = local ? JSON.parse(local) : DEFAULT_STAGES;
-    
+
     // Migration for Follow-up name change
     let migrated = false;
     stages = stages.map(st => {
@@ -201,11 +201,11 @@ export const CRMProvider = ({ children }) => {
       }
       return st;
     });
-    
+
     if (migrated) {
       localStorage.setItem('crm_stages', JSON.stringify(stages));
     }
-    
+
     return stages;
   });
 
@@ -414,13 +414,13 @@ export const CRMProvider = ({ children }) => {
         const combined = [...mainLeads, ...iframeLeads];
         const uniqueLeadsMap = new Map();
         combined.forEach(lead => {
-            const normSource = normalizeLeadSource(lead.source);
-            uniqueLeadsMap.set(lead.id, { ...lead, source: normSource || lead.source || '' });
+          const normSource = normalizeLeadSource(lead.source);
+          uniqueLeadsMap.set(lead.id, { ...lead, source: normSource || lead.source || '' });
         });
-        
+
         // Filter out WhatsApp Campaign leads from showing in the CRM list
         const uniqueLeads = Array.from(uniqueLeadsMap.values()).filter(lead => lead.source !== 'WhatsApp Campaign');
-        
+
         uniqueLeads.sort((a, b) => new Date(b.createdDate) - new Date(a.createdDate));
         setLeads(uniqueLeads);
       };
@@ -509,7 +509,7 @@ export const CRMProvider = ({ children }) => {
           } else {
             console.log('[courses] Collection is empty — user deleted all courses. Not re-seeding.');
             setCourses([]);
-            try { localStorage.setItem('crm_courses', JSON.stringify([])); } catch (e) {}
+            try { localStorage.setItem('crm_courses', JSON.stringify([])); } catch (e) { }
           }
         } else {
           // Mark as seeded once we have real data
@@ -525,7 +525,7 @@ export const CRMProvider = ({ children }) => {
           setCourses(coursesData);
           try {
             localStorage.setItem('crm_courses', JSON.stringify(coursesData));
-          } catch (e) {}
+          } catch (e) { }
         }
       }, (err) => {
         console.error('[courses] Firestore subscription error:', err);
@@ -686,7 +686,7 @@ export const CRMProvider = ({ children }) => {
     root.style.setProperty('--secondary-h', brand.secondaryHue || 0);
     root.style.setProperty('--secondary-s', `${brand.secondarySat || '0%'}`);
     root.style.setProperty('--secondary-l', `${brand.secondaryLight || '100%'}`);
-    
+
     // Modern SaaS Sidebar style variables
     root.style.setProperty('--sidebar-bg', brand.sidebarBg || '#0A1E44');
     root.style.setProperty('--sidebar-text', brand.sidebarText || '#ffffff');
@@ -736,14 +736,14 @@ export const CRMProvider = ({ children }) => {
   // Adding a brand new inquiry
   const addLead = (leadData) => {
     const cleanPhone = leadData.phone ? String(leadData.phone).replace(/\D/g, '') : '';
-    
+
     // Check if lead already exists by phone
     if (cleanPhone) {
       const existingLead = leads.find(l => {
         const lPhone = l.phone ? String(l.phone).replace(/\D/g, '') : '';
         return lPhone === cleanPhone;
       });
-      
+
       if (existingLead) {
         // Append to existing lead instead of creating a new one
         const reinquiryLog = {
@@ -754,14 +754,14 @@ export const CRMProvider = ({ children }) => {
           timestamp: new Date().toISOString(),
           user: 'System'
         };
-        
+
         const updatedLead = {
           ...existingLead,
           stage: 'New Lead', // Bring them back to New Lead stage to ensure they get attention
           lastContacted: new Date().toISOString(),
           timeline: [...(existingLead.timeline || []), reinquiryLog]
         };
-        
+
         if (isFirebaseEnabled) {
           setDoc(doc(db, 'leads', existingLead.id), updatedLead).catch(console.error);
         }
@@ -776,7 +776,7 @@ export const CRMProvider = ({ children }) => {
 
     let finalSource = leadData.source || '';
     let finalSubSource = leadData.subSource || '';
-    
+
     if (finalSource) {
       const srcLower = finalSource.toLowerCase().trim();
 
@@ -791,7 +791,7 @@ export const CRMProvider = ({ children }) => {
       name: leadData.name || 'Anonymous Inquiry',
       email: leadData.email || '',
       phone: leadData.phone || '',
-      location: leadData.location || 'Website Source',
+      location: leadData.location ? leadData.location.trim() : (finalSource === 'Walk-in' ? 'Not Provided' : 'Website Source'),
       education: leadData.education || 'Not Provided',
       course: leadData.course || (courses[0] ? courses[0].name : ''),
       source: finalSource,
@@ -848,7 +848,7 @@ export const CRMProvider = ({ children }) => {
 
   const addBulkLeads = (leadsArray) => {
     if (!leadsArray || leadsArray.length === 0) return [];
-    
+
     const newLeads = leadsArray.map((leadData, index) => {
       const cleanPhone = leadData.phone ? String(leadData.phone).replace(/\D/g, '') : '';
       return {
@@ -984,7 +984,7 @@ export const CRMProvider = ({ children }) => {
     const nextLeads = leads.map(lead => {
       if (lead.id === leadId) {
         if (lead.stage === nextStage) return lead;
-        
+
         const logs = [...(lead.timeline || [])];
         logs.push({
           id: `log-${Date.now()}`,
@@ -998,7 +998,7 @@ export const CRMProvider = ({ children }) => {
         // Trigger automatic webhook simulations depending on stage
         let autoMsg = null;
         let whatsappHistory = [...(lead.whatsappMessages || [])];
-        
+
         if (nextStage === 'Demo Scheduled') {
           autoMsg = `Hi ${lead.name}, your online demo session has been scheduled successfully! Click here to join: meet.google.com/abc-defg-hij`;
         } else if (nextStage === 'Converted') {
@@ -1039,17 +1039,17 @@ export const CRMProvider = ({ children }) => {
                 counselorName: 'Automation Server'
               })
             })
-            .then(async (res) => {
-              const data = await res.json();
-              if (res.ok && data.success) {
-                console.log('Automated WhatsApp message delivered in real-time!');
-              } else {
-                console.error('Automated WhatsApp API failed:', data.error || data.details);
-              }
-            })
-            .catch((err) => {
-              console.error('Error dispatching automated WhatsApp to Cloud Function:', err);
-            });
+              .then(async (res) => {
+                const data = await res.json();
+                if (res.ok && data.success) {
+                  console.log('Automated WhatsApp message delivered in real-time!');
+                } else {
+                  console.error('Automated WhatsApp API failed:', data.error || data.details);
+                }
+              })
+              .catch((err) => {
+                console.error('Error dispatching automated WhatsApp to Cloud Function:', err);
+              });
           }
         }
 
@@ -1165,17 +1165,17 @@ export const CRMProvider = ({ children }) => {
                   counselorName: 'Automation Server'
                 })
               })
-              .then(async (res) => {
-                const data = await res.json();
-                if (res.ok && data.success) {
-                  console.log('Automated WhatsApp message delivered in real-time!');
-                } else {
-                  console.error('Automated WhatsApp API failed:', data.error || data.details);
-                }
-              })
-              .catch((err) => {
-                console.error('Error dispatching automated WhatsApp to Cloud Function:', err);
-              });
+                .then(async (res) => {
+                  const data = await res.json();
+                  if (res.ok && data.success) {
+                    console.log('Automated WhatsApp message delivered in real-time!');
+                  } else {
+                    console.error('Automated WhatsApp API failed:', data.error || data.details);
+                  }
+                })
+                .catch((err) => {
+                  console.error('Error dispatching automated WhatsApp to Cloud Function:', err);
+                });
             }
           }
         }
@@ -1557,28 +1557,28 @@ export const CRMProvider = ({ children }) => {
       } else {
         const errMsg = data.error || 'Meta API returned an error';
         showToastMsg(`Failed to send Instagram message: ${errMsg}`, 'error');
-        
+
         // Mark local message as failed
         setLeads(prevLeads => prevLeads.map(lead => {
           if (lead.id === leadId) {
-            const updatedChat = (lead.instagramMessages || []).map(msg => 
+            const updatedChat = (lead.instagramMessages || []).map(msg =>
               msg.id === tempId ? { ...msg, status: 'failed' } : msg
             );
             return { ...lead, instagramMessages: updatedChat };
           }
           return lead;
         }));
-        
+
         return { success: false, error: errMsg };
       }
     } catch (err) {
       console.error('Error sending Instagram message:', err);
       showToastMsg('Network error sending Instagram message.', 'error');
-      
+
       // Mark local message as failed
       setLeads(prevLeads => prevLeads.map(lead => {
         if (lead.id === leadId) {
-          const updatedChat = (lead.instagramMessages || []).map(msg => 
+          const updatedChat = (lead.instagramMessages || []).map(msg =>
             msg.id === tempId ? { ...msg, status: 'failed' } : msg
           );
           return { ...lead, instagramMessages: updatedChat };
@@ -1593,7 +1593,7 @@ export const CRMProvider = ({ children }) => {
   const triggerSimulatedBotReply = (leadId, studentName, outgoingText) => {
     let coursesText = 'We offer the following programs:\n1. Full-Stack Web Development (6 Months)\n2. Data Science & AI (8 Months)\n3. Cloud & DevOps Engineering (5 Months)\n4. Cyber Security (6 Months)\n5. UI/UX Product Design (4 Months)\n\nReply with the course number to get fee details!';
     let feeDetails = 'Our program fee structures are:\n- Web Development: ₹75,000\n- Data Science & AI: ₹95,000\n- Cloud & DevOps: ₹80,000\n- Cyber Security: ₹85,000\n- UI/UX Design: ₹60,000\n\nScholarships and monthly installment plans (EMIs starting at ₹5,000/month) are available. Let us know if you want to speak to a counselor.';
-    
+
     try {
       const storedSettings = localStorage.getItem('gowha_chatbot');
       if (storedSettings) {
@@ -1606,7 +1606,7 @@ export const CRMProvider = ({ children }) => {
     }
 
     let reply = `Thanks for sending that over! I am checking it out now. Let me know when is the best time to speak.`;
-    
+
     const lowerText = outgoingText.toLowerCase();
     if (lowerText.includes('syllabus') || lowerText.includes('brochure') || lowerText.includes('pdf')) {
       reply = `Got the syllabus details, thank you! The module outline look really exhaustive. Can you tell me if there are internship placements after graduation?`;
@@ -1940,7 +1940,7 @@ export const CRMProvider = ({ children }) => {
         if (targetName && (c.name || '').trim().toLowerCase() === targetName) return false;
         return true;
       });
-      try { localStorage.setItem('crm_courses', JSON.stringify(updated)); } catch (e) {}
+      try { localStorage.setItem('crm_courses', JSON.stringify(updated)); } catch (e) { }
       return updated;
     });
 
@@ -1997,7 +1997,7 @@ export const CRMProvider = ({ children }) => {
 
     setCourses(prev => {
       const next = prev.map(c => c.id === courseId ? { ...c, ...updated } : c);
-      try { localStorage.setItem('crm_courses', JSON.stringify(next)); } catch (e) {}
+      try { localStorage.setItem('crm_courses', JSON.stringify(next)); } catch (e) { }
       return next;
     });
 
@@ -2024,7 +2024,7 @@ export const CRMProvider = ({ children }) => {
     const nextVal = `st-${Date.now()}`;
     const colors = ['--color-new', '--color-contacted', '--color-interested', '--color-demo-sched', '--color-demo-attend', '--color-followup', '--color-converted'];
     const randomColor = colors[Math.floor(Math.random() * colors.length)];
-    
+
     const newStage = {
       id: nextVal,
       name: stageData.name,
@@ -2181,7 +2181,7 @@ export const CRMProvider = ({ children }) => {
       removeCourse,
       updateCourse,
       updateCounselorStatus,
-      
+
       login,
       logout,
       setActiveRole,
@@ -2223,9 +2223,9 @@ export const CRMProvider = ({ children }) => {
         <div className="toast-container">
           <div className={`toast ${toast.type === 'error' ? 'toast-error' : ''}`}>
             {toast.type === 'error' ? (
-              <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+              <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
             ) : (
-              <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             )}
             <span>{toast.message}</span>
           </div>
