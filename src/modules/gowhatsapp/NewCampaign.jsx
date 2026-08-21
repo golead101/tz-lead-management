@@ -291,7 +291,7 @@ export default function NewCampaign({ setSubView }) {
   const [scheduleDate, setScheduleDate] = useState('');
   const [result, setResult] = useState(null);
 
-  const { leads, courses, activeUser, addLead, addBulkLeads, sendWhatsAppMsg, prefilledCampaignLeads, setPrefilledCampaignLeads } = useCRM();
+  const { leads, courses, activeUser, sendWhatsAppMsg, prefilledCampaignLeads, setPrefilledCampaignLeads } = useCRM();
 
   useEffect(() => {
     if (prefilledCampaignLeads && prefilledCampaignLeads.length > 0) {
@@ -488,9 +488,9 @@ export default function NewCampaign({ setSubView }) {
         };
       });
       
-      if (addBulkLeads && leadsToImport.length > 0) {
-        addBulkLeads(leadsToImport);
-      }
+      // NOTE: We do NOT call addBulkLeads here — uploaded contacts are for
+      // campaign sending only and should NOT be added to the CRM leads database.
+      // Existing leads stay untouched.
 
       setSelectedListId(newListId);
       setExistingLists(newLists);
