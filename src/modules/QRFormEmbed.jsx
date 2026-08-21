@@ -230,11 +230,12 @@ export default function QRFormEmbed() {
           border-radius: 20px;
           padding: 32px 40px;
           width: 100%;
-          max-width: 100%;
+          max-width: 580px;
           box-shadow: 0 24px 48px rgba(0,0,0,0.4), 0 1px 3px rgba(255,255,255,0.05);
           align-self: flex-start;
-          margin: 6vh 0 10vh 0;
+          margin: 6vh auto 10vh auto;
           position: relative;
+          box-sizing: border-box;
         }
         
         .qr-form-container::before {
@@ -399,6 +400,10 @@ export default function QRFormEmbed() {
         }
         
         @media (max-width: 640px) {
+          .qr-form-container {
+            padding: 24px 20px;
+            margin: 4vh auto 6vh auto;
+          }
           .form-grid {
             grid-template-columns: 1fr;
           }
