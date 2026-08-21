@@ -230,7 +230,7 @@ export default function QRFormEmbed() {
           border-radius: 20px;
           padding: 32px 40px;
           width: 100%;
-          max-width: 580px;
+          max-width: 850px;
           box-shadow: 0 24px 48px rgba(0,0,0,0.4), 0 1px 3px rgba(255,255,255,0.05);
           align-self: flex-start;
           margin: 6vh auto 10vh auto;
