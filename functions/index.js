@@ -3271,29 +3271,17 @@ exports.sendBulkWhatsAppCampaign = functions.runWith({ timeoutSeconds: 540, memo
             }
             
             if (!leadData) {
-              // Create new lead only if strictly not found in CRM
-              leadId = cleanPhone || `lead-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
-              const nowISO = new Date().toISOString();
-              
-              const newLeadObject = {
-                name: contact.name || contact.Name || 'Campaign Contact',
+              // Contact not found in CRM — do NOT create a new lead.
+              // Build a minimal in-memory object just to construct the message payload.
+              leadId = cleanPhone || `temp-${Date.now()}`;
+              leadData = {
+                name: contact.name || contact.Name || contact.phone || cleanPhone,
                 phone: phone || cleanPhone,
-                source: contact.source && contact.source !== 'WhatsApp Campaign' ? contact.source : 'Campaign Import',
-                subSource: campaignName || 'Bulk Campaign',
-                counselor: contact.counselor && contact.counselor !== 'Counselor' ? contact.counselor : (counselorName !== 'Counselor' ? counselorName : 'Unassigned'),
                 stage: contact.stage || 'New Lead',
-                status: 'Active',
-                timeline: [],
-                whatsappMessages: [],
-                createdAt: new Date().toISOString()
+                course: contact.course || contact.Course || '',
+                counselor: counselorName || 'Unassigned',
               };
-
-              if (contact.course || contact.Course) {
-                newLeadObject.course = contact.course || contact.Course;
-              }
-
-              leadData = newLeadObject;
-              await leadsRef.doc(leadId).set(newLeadObject, { merge: true });
+              // Do NOT write to Firestore — we just send the message
             }
 
             // Construct payload
@@ -3337,21 +3325,9 @@ exports.sendBulkWhatsAppCampaign = functions.runWith({ timeoutSeconds: 540, memo
               timestamp: new Date().toISOString()
             };
 
-            const updatedChat = [...(leadData.whatsappMessages || []), outboundMsg];
-            const nextTimeline = [...(leadData.timeline || []), {
-              id: `log-wa-${Date.now()}`,
-              type: 'whatsapp',
-              title: messageType === 'template' ? 'WhatsApp Template Logs' : 'WhatsApp Chat Logs',
-              content: msgToDeliver || templateData?.name || 'Bulk message',
-              timestamp: new Date().toISOString(),
-              user: counselorName || 'Counselor'
-            }];
-
-            await leadsRef.doc(leadId).update({
-              whatsappMessages: updatedChat,
-              timeline: nextTimeline,
-              lastContacted: new Date().toISOString()
-            });
+            // NOTE: We do NOT update the lead document in Firestore.
+            // This ensures campaigns do not modify existing leads, change their last contacted status, or add messages to their timeline/whatsapp inbox.
+            // Existing leads and imported CSV contacts remain completely untouched.
 
             recipientDetails.push({
               id: `r-${campaignId}-${globalIndex}`,
