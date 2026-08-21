@@ -18,6 +18,7 @@ import Integrations from './modules/Integrations';
 import FollowUps from './modules/FollowUps';
 import LiveFormEmbed from './modules/LiveFormEmbed';
 import History from './modules/History';
+import KanbanView from './modules/KanbanView';
 
 // Beautiful visual page skeleton shimmer loader
 function ShimmerLoader() {
@@ -120,6 +121,8 @@ function MainAppContent() {
         return <ConfigSettings />;
       case 'history':
         return <History />;
+      case 'kanban':
+        return <KanbanView />;
       default:
         return <Dashboard />;
     }

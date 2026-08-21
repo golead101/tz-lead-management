@@ -40,14 +40,14 @@ export default function Sidebar({ mobileMenuOpen, setMobileMenuOpen }) {
 
   // Local state to track Leads menu expansion
   const [isLeadsExpanded, setIsLeadsExpanded] = useState(() => {
-    return ['grid', 'followups', 'history'].includes(activeView) || sessionStorage.getItem('leads_expanded') === 'true';
+    return ['grid', 'followups', 'history', 'kanban'].includes(activeView) || sessionStorage.getItem('leads_expanded') === 'true';
   });
 
   const toggleLeadsExpand = () => {
     const nextState = !isLeadsExpanded;
     setIsLeadsExpanded(nextState);
     sessionStorage.setItem('leads_expanded', nextState ? 'true' : 'false');
-    if (nextState && !['grid', 'followups', 'history'].includes(activeView)) {
+    if (nextState && !['grid', 'followups', 'history', 'kanban'].includes(activeView)) {
       setActiveView('grid');
     }
   };
@@ -309,6 +309,7 @@ export default function Sidebar({ mobileMenuOpen, setMobileMenuOpen }) {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '14px', borderLeft: '1px dashed rgba(255, 255, 255, 0.15)', marginLeft: '24px', marginTop: '2px', marginBottom: '6px' }}>
                     {[
                       { subTarget: 'grid', label: 'Total Leads' },
+                      { subTarget: 'kanban', label: 'Lead Stages' },
                       { subTarget: 'followups', label: 'Follow-ups' }
                     ].map(sub => {
                       const isSubActive = activeView === sub.subTarget;
