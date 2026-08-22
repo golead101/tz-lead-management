@@ -422,8 +422,13 @@ export default function InboxPage() {
   const conversations = React.useMemo(() => {
     const filteredLeads = leads.filter(lead => {
       if (selectedLeadId && lead.id === selectedLeadId) return true;
-      if (activeRole === 'Counselor' && lead.counselor !== activeUser) return false;
       const msgs = lead.whatsappMessages || [];
+      const hasInbound = msgs.some(m => m.sender === 'lead' || m.type === 'inbound' || m.isInbound);
+
+      if (activeRole === 'Counselor') {
+        const isAssigned = lead.counselor === activeUser;
+        if (!isAssigned && !hasInbound) return false;
+      }
 
       // If user is explicitly viewing the 'campaign' filter tab, show leads with campaign history
       if (inboxFilter === 'campaign') {
@@ -433,7 +438,6 @@ export default function InboxPage() {
       // For 'all', 'unread', 'read': Hide leads with no messages OR leads that only have bulk campaign broadcasts with no inbound replies!
       if (msgs.length === 0) return false;
 
-      const hasInbound = msgs.some(m => m.sender === 'lead' || m.type === 'inbound' || m.isInbound);
       const hasDirectChat = msgs.some(m => (m.sender === 'counselor' || m.sender === 'user') && !m.isCampaign && !m.isTemplate && !m.id?.includes('camp') && !m.title?.toLowerCase().includes('campaign'));
 
       return hasInbound || hasDirectChat;
