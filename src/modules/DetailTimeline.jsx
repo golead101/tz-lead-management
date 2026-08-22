@@ -82,6 +82,7 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
   const [customSubSource, setCustomSubSource] = useState('');
   const [formCounselor, setFormCounselor] = useState(getInitialCounselor());
   const [formStage, setFormStage] = useState(lead ? lead.stage : 'New Lead');
+  const [formFreeClassBatch, setFormFreeClassBatch] = useState(lead ? (lead.freeClassBatch || '') : '');
 
   // Custom Fields form data
   const [formCustomFields, setFormCustomFields] = useState(() => {
@@ -164,6 +165,7 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
       setCustomSubSource('');
       setFormCounselor(lead.counselor);
       setFormStage(lead.stage);
+      setFormFreeClassBatch(lead.freeClassBatch || '');
       setFormCustomFields(lead.customFields || {});
       setIsEditMode(false);
     } else {
@@ -179,6 +181,7 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
       setCustomSubSource('');
       setFormCounselor(activeRole === 'Counselor' ? activeUser : (counselors.filter(c => c.status === 'Active' && c.role !== 'Admin' && c.name.toLowerCase() !== 'admin')[0]?.name || activeUser));
       setFormStage('New Lead');
+      setFormFreeClassBatch('');
       setFormCustomFields({});
       setIsEditMode(true);
     }
@@ -201,6 +204,7 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
       subSource: isWalkin ? (finalSubSource || 'Walk-in') : (lead?.subSource || ''),
       counselor: formCounselor,
       stage: formStage,
+      freeClassBatch: formStage === 'Free Class' ? formFreeClassBatch : null,
       temperature: formTemperature,
       customFields: formCustomFields
     };
@@ -310,7 +314,7 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
                 <h3 className="profile-name">{lead.name}</h3>
                 <div className="profile-meta-chips">
                   <span className={`status-badge status-${lead.stage.toLowerCase().replace(/ /g, '-')}`}>
-                    {lead.stage}
+                    {lead.stage === 'Free Class' && lead.freeClassBatch ? `${lead.stage} (${lead.freeClassBatch})` : lead.stage}
                   </span>
                   {lead.temperature && lead.temperature !== 'Unassigned' && (
                     <span style={{ 
@@ -414,6 +418,15 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
                   </span>
                   <span className="detail-value">{lead.course}</span>
                 </div>
+
+                {lead.stage === 'Free Class' && lead.freeClassBatch && (
+                  <div className="profile-detail-item">
+                    <span className="detail-label">
+                      🎓 Batch / Class
+                    </span>
+                    <span className="detail-value">{lead.freeClassBatch}</span>
+                  </div>
+                )}
 
                 <div className="profile-detail-item">
                   <span className="detail-label">
@@ -758,6 +771,19 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
                   {pipelineStages.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
                 </select>
               </div>
+
+              {formStage === 'Free Class' && (
+                <div className="form-group fade-in">
+                  <label className="form-label">Free Class Batch Timing</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="e.g. Morning 10AM"
+                    value={formFreeClassBatch}
+                    onChange={(e) => setFormFreeClassBatch(e.target.value)}
+                  />
+                </div>
+              )}
 
               {/* Custom field entries inside forms */}
               {customFields

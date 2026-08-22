@@ -75,16 +75,28 @@ function LeadCard({ lead, onOpen, onDragStart }) {
       </div>
 
       {/* Course pill */}
-      {lead.course && (
-        <div style={{
-          marginTop: '9px', fontSize: '10.5px', fontWeight: '600',
-          background: '#f1f5f9', color: '#475569',
-          borderRadius: '6px', padding: '3px 9px', display: 'inline-block',
-          maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>
-          {lead.course}
-        </div>
-      )}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '9px' }}>
+        {lead.course && (
+          <div style={{
+            fontSize: '10.5px', fontWeight: '600',
+            background: '#f1f5f9', color: '#475569',
+            borderRadius: '6px', padding: '3px 9px', display: 'inline-block',
+            maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {lead.course}
+          </div>
+        )}
+        {lead.stage === 'Free Class' && lead.freeClassBatch && (
+          <div style={{
+            fontSize: '10.5px', fontWeight: '700',
+            background: '#fdf2f8', color: '#ec4899',
+            borderRadius: '6px', padding: '3px 9px', display: 'inline-block',
+            maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            🎓 {lead.freeClassBatch}
+          </div>
+        )}
+      </div>
 
       {/* Meta row */}
       <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -160,7 +172,7 @@ function KanbanColumn({ stage, leads, onOpen, onDragStart, onDrop }) {
           background: dragOver ? `${meta.color}08` : meta.light,
           transition: 'background 0.15s',
           minHeight: 0,
-          maxHeight: 'calc(100vh - 215px)',
+          maxHeight: 'calc(100vh - 275px)',
         }}
       >
         {leads.length === 0 ? (
@@ -202,6 +214,17 @@ export default function KanbanView() {
 
   // Drag state
   const dragLeadId = useRef(null);
+  const boardRef = useRef(null);
+
+  const handleScroll = (direction) => {
+    if (boardRef.current) {
+      const scrollAmount = 300;
+      boardRef.current.scrollBy({
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth'
+      });
+    }
+  };
 
   const handleDragStart = (e, leadId) => {
     dragLeadId.current = leadId;
@@ -322,16 +345,19 @@ export default function KanbanView() {
       </div>
 
       {/* ── Board ───────────────────────────────────────────────────────────── */}
-      <div style={{
-        height: 'calc(100vh - 155px)',
-        overflowX: 'auto',
-        overflowY: 'hidden',
-        padding: '16px 20px',
-        display: 'flex',
-        gap: '14px',
-        alignItems: 'stretch',
-        flexShrink: 0,
-      }}>
+      <div 
+        ref={boardRef}
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflowX: 'auto',
+          overflowY: 'hidden',
+          padding: '16px 20px',
+          display: 'flex',
+          gap: '14px',
+          alignItems: 'stretch',
+        }}
+      >
         {orderedStages.map(stage => (
           <KanbanColumn
             key={stage}
@@ -342,6 +368,46 @@ export default function KanbanView() {
             onDrop={handleDrop}
           />
         ))}
+      </div>
+
+      {/* Swipe/Scroll Navigation Buttons Below the Board */}
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        gap: '12px', 
+        padding: '10px 20px', 
+        borderTop: '1px solid var(--border-color)', 
+        background: 'var(--bg-primary)', 
+        flexShrink: 0 
+      }}>
+        <button 
+          onClick={() => handleScroll('left')} 
+          style={{
+            display: 'flex', alignItems: 'center', gap: '6px',
+            padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--border-color)',
+            background: 'var(--bg-primary)', color: 'var(--text-primary)',
+            fontSize: '13px', fontWeight: '600', cursor: 'pointer',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.05)', transition: 'all 0.15s'
+          }}
+          onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--primary)'}
+          onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border-color)'}
+        >
+          ← Swipe Left
+        </button>
+        <button 
+          onClick={() => handleScroll('right')} 
+          style={{
+            display: 'flex', alignItems: 'center', gap: '6px',
+            padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--border-color)',
+            background: 'var(--bg-primary)', color: 'var(--text-primary)',
+            fontSize: '13px', fontWeight: '600', cursor: 'pointer',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.05)', transition: 'all 0.15s'
+          }}
+          onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--primary)'}
+          onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border-color)'}
+        >
+          Swipe Right →
+        </button>
       </div>
 
       {/* ── Lead Detail Modal (stays on this page) ──────────────────────────── */}

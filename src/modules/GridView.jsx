@@ -779,6 +779,7 @@ export default function GridView() {
   const [editCourse, setEditCourse] = useState('');
   const [editCounselor, setEditCounselor] = useState('');
   const [editStage, setEditStage] = useState('');
+  const [editFreeClassBatch, setEditFreeClassBatch] = useState('');
   const [editSource, setEditSource] = useState('');
   const [editSubSource, setEditSubSource] = useState('');
   const [editCampaign, setEditCampaign] = useState('');
@@ -791,6 +792,7 @@ export default function GridView() {
     setEditCourse(lead.course || '');
     setEditCounselor(lead.counselor || 'Unassigned');
     setEditStage(lead.stage || 'New Lead');
+    setEditFreeClassBatch(lead.freeClassBatch || '');
     setEditSource(lead.source || '');
     setEditSubSource(lead.subSource || '');
     setEditCampaign(lead.campaign || lead.campaignName || '');
@@ -810,6 +812,7 @@ export default function GridView() {
       course: editCourse,
       counselor: editCounselor,
       stage: editStage,
+      freeClassBatch: editStage === 'Free Class' ? editFreeClassBatch : null,
       source: editSource,
       subSource: editSubSource,
       campaign: editCampaign,
@@ -1369,7 +1372,7 @@ export default function GridView() {
                       {/* Status */}
                       <td>
                         <span className={`gv-status-badge status-${lead.stage.toLowerCase().replace(/ /g, '-')}`}>
-                          {lead.stage}
+                          {lead.stage === 'Free Class' && lead.freeClassBatch ? `${lead.stage} (${lead.freeClassBatch})` : lead.stage}
                         </span>
                       </td>
 
@@ -1763,6 +1766,20 @@ export default function GridView() {
                           ))}
                         </select>
                       </div>
+
+                      {editStage === 'Free Class' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#475569' }}>Free Class Batch Timing</label>
+                          <input
+                            type="text"
+                            className="form-control"
+                            value={editFreeClassBatch}
+                            onChange={(e) => setEditFreeClassBatch(e.target.value)}
+                            placeholder="e.g. Morning 10AM"
+                            style={{ padding: '8px 12px', fontSize: '13px', height: '38px' }}
+                          />
+                        </div>
+                      )}
 
                       {editStage === 'Follow-up' && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
