@@ -756,6 +756,7 @@ export default function NewCampaign({ setSubView }) {
 
       const preparedContacts = targetContacts.map(contact => ({
         ...contact,
+        phone: getContactPhone(contact),
         _messageToDeliver: getMessageForContact(contact),
         _templateData: getTemplateDataForContact(contact)
       }));
@@ -806,6 +807,7 @@ export default function NewCampaign({ setSubView }) {
     // Prepare contacts with the dynamic message body and template payload attached
     const preparedContacts = targetContacts.map(contact => ({
       ...contact,
+      phone: getContactPhone(contact),
       _messageToDeliver: getMessageForContact(contact),
       _templateData: getTemplateDataForContact(contact)
     }));

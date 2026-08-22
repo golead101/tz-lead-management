@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   ArrowLeft, CheckCircle, XCircle, Clock, Send, Eye,
   CheckCheck, ArrowRight, AlertTriangle, MessageSquare, Download
@@ -26,6 +26,8 @@ export default function CampaignReport({ campaignId, setSubView }) {
 
   const { leads } = useCRM();
 
+  const campaignTimeRef = useRef(null);
+
   useEffect(() => {
     if (!campaignId) {
       setLoading(false);
@@ -39,6 +41,11 @@ export default function CampaignReport({ campaignId, setSubView }) {
       if (snap.exists()) {
         const campData = snap.data();
         setCampaign(campData);
+        if (campData.createdAt) {
+          campaignTimeRef.current = campData.createdAt._seconds 
+            ? campData.createdAt._seconds * 1000 
+            : new Date(campData.createdAt).getTime();
+        }
       }
       setLoading(false);
     }, (err) => {
@@ -51,39 +58,7 @@ export default function CampaignReport({ campaignId, setSubView }) {
       if (snap.exists()) {
         const recsData = snap.data() || {};
         const list = recsData.recipients || [];
-
-        // Calculate if any lead has replied
-        const campaignTime = campaign?.createdAt?._seconds 
-          ? campaign.createdAt._seconds * 1000 
-          : new Date(campaign?.createdAt || Date.now()).getTime();
-
-        const getMsgTimestamp = (msg) => {
-          if (msg.timestamp) {
-            return typeof msg.timestamp === 'object' && msg.timestamp._seconds
-              ? msg.timestamp._seconds * 1000
-              : new Date(msg.timestamp).getTime();
-          }
-          const match = msg.id ? msg.id.match(/\d+$/) : null;
-          return match ? parseInt(match[0], 10) : Date.now();
-        };
-
-        const updatedList = list.map(r => {
-          const cleanRepPhone = r.phone.replace(/\D/g, '');
-          const lead = leads.find(l => l.phone && l.phone.replace(/\D/g, '') === cleanRepPhone);
-          const msgs = lead?.whatsappMessages || [];
-          const hasReplied = msgs.some(m => {
-            const isIncoming = m.sender === 'lead' || m.direction === 'inbound';
-            if (!isIncoming) return false;
-            const msgTime = getMsgTimestamp(m);
-            return msgTime >= campaignTime - 5000; // 5s buffer
-          });
-          return {
-            ...r,
-            replied: hasReplied
-          };
-        });
-
-        setRecipients(updatedList);
+        setRecipients(list);
 
         // Sync local storage so other dashboard views reflect the new status
         try {
@@ -100,7 +75,38 @@ export default function CampaignReport({ campaignId, setSubView }) {
       unsubCamp();
       unsubRecs();
     };
-  }, [campaignId, leads, campaign?.createdAt]);
+  }, [campaignId]);
+
+  // Decoupled computation of replied flag — runs dynamically on changes without triggering Firestore subscriptions
+  const mappedRecipients = useMemo(() => {
+    const campaignTime = campaignTimeRef.current || Date.now();
+
+    const getMsgTimestamp = (msg) => {
+      if (msg.timestamp) {
+        return typeof msg.timestamp === 'object' && msg.timestamp._seconds
+          ? msg.timestamp._seconds * 1000
+          : new Date(msg.timestamp).getTime();
+      }
+      const match = msg.id ? msg.id.match(/\d+$/) : null;
+      return match ? parseInt(match[0], 10) : Date.now();
+    };
+
+    return recipients.map(r => {
+      const cleanRepPhone = r.phone.replace(/\D/g, '');
+      const lead = leads.find(l => l.phone && l.phone.replace(/\D/g, '') === cleanRepPhone);
+      const msgs = lead?.whatsappMessages || [];
+      const hasReplied = msgs.some(m => {
+        const isIncoming = m.sender === 'lead' || m.direction === 'inbound';
+        if (!isIncoming) return false;
+        const msgTime = getMsgTimestamp(m);
+        return msgTime >= campaignTime - 5000; // 5s buffer
+      });
+      return {
+        ...r,
+        replied: hasReplied
+      };
+    });
+  }, [recipients, leads]);
 
   if (loading) {
     return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh', color: '#64748b' }}>Loading...</div>;
@@ -126,7 +132,7 @@ export default function CampaignReport({ campaignId, setSubView }) {
     }
   };
 
-  const filteredRecipients = recipients.filter(r => matchesFilter(r, filter));
+  const filteredRecipients = mappedRecipients.filter(r => matchesFilter(r, filter));
 
   // Funnel data
   const funnelSteps = [
@@ -137,7 +143,7 @@ export default function CampaignReport({ campaignId, setSubView }) {
 
   // Error breakdown
   const errorMap = {};
-  recipients.filter(r => r.status === 'failed').forEach(r => {
+  mappedRecipients.filter(r => r.status === 'failed').forEach(r => {
     const key = r.errorCode ? `${r.errorCode}: ${r.error || 'Unknown'}` : (r.error || 'Unknown error');
     errorMap[key] = (errorMap[key] || 0) + 1;
   });
@@ -371,19 +377,21 @@ export default function CampaignReport({ campaignId, setSubView }) {
           <h2 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 12, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 6 }}>
             <AlertTriangle size={16} color="#ef4444" /> Failure Breakdown
           </h2>
-          <ResponsiveContainer width="100%" height={Math.max(120, errorData.length * 40)}>
-            <BarChart data={errorData} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis type="number" tick={{ fontSize: 11, fill: '#94a3b8' }} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: '#475569' }} width={220} />
-              <Tooltip />
-              <Bar dataKey="value" fill="#ef4444" radius={[0, 6, 6, 0]} name="Failures">
-                {errorData.map((_, i) => (
-                  <Cell key={i} fill={`rgba(239, 68, 68, ${Math.max(0.4, 1 - i * 0.15)})`} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+          <div style={{ height: Math.max(120, errorData.length * 40), width: '100%' }}>
+            <ResponsiveContainer width="100%" height="100%" minWidth={1}>
+              <BarChart data={errorData} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis type="number" tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: '#475569' }} width={220} />
+                <Tooltip />
+                <Bar dataKey="value" fill="#ef4444" radius={[0, 6, 6, 0]} name="Failures">
+                  {errorData.map((_, i) => (
+                    <Cell key={i} fill={`rgba(239, 68, 68, ${Math.max(0.4, 1 - i * 0.15)})`} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       )}
 
