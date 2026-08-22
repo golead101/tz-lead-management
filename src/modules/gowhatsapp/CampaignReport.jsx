@@ -6,6 +6,8 @@ import {
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { whatsappDb } from './whatsappDb';
 import { useCRM } from '../../context/CRMContext';
+import { db } from '../../firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
 
 const BRAND_BLUE = '#2563eb';
 export default function CampaignReport({ campaignId, setSubView }) {
@@ -25,80 +27,80 @@ export default function CampaignReport({ campaignId, setSubView }) {
   const { leads } = useCRM();
 
   useEffect(() => {
-    loadCampaign();
-  }, [campaignId, leads]);
-
-  const loadCampaign = () => {
     if (!campaignId) {
       setLoading(false);
       return;
     }
 
-    try {
-      const camps = whatsappDb.getCampaigns();
-      const targetCamp = camps.find(c => c.id === campaignId);
-      if (!targetCamp) {
-        setCampaign(null);
-        setLoading(false);
-        return;
+    setLoading(true);
+
+    // 1. Listen to Campaign Document
+    const unsubCamp = onSnapshot(doc(db, 'whatsapp_campaigns', campaignId), (snap) => {
+      if (snap.exists()) {
+        const campData = snap.data();
+        setCampaign(campData);
       }
-
-      const allRecipients = whatsappDb.getRecipients();
-      const list = allRecipients[campaignId] || [];
-
-      const campaignTime = targetCamp.createdAt?._seconds 
-        ? targetCamp.createdAt._seconds * 1000 
-        : new Date(targetCamp.createdAt).getTime();
-
-      const getMsgTimestamp = (msg) => {
-        if (msg.timestamp) {
-          return typeof msg.timestamp === 'object' && msg.timestamp._seconds
-            ? msg.timestamp._seconds * 1000
-            : new Date(msg.timestamp).getTime();
-        }
-        const match = msg.id ? msg.id.match(/\d+$/) : null;
-        return match ? parseInt(match[0], 10) : Date.now();
-      };
-
-      const updatedList = list.map(r => {
-        const cleanRepPhone = r.phone.replace(/\D/g, '');
-        const lead = leads.find(l => l.phone && l.phone.replace(/\D/g, '') === cleanRepPhone);
-        const msgs = lead?.whatsappMessages || [];
-        const hasReplied = msgs.some(m => {
-          const isIncoming = m.sender === 'lead' || m.direction === 'inbound';
-          if (!isIncoming) return false;
-          const msgTime = getMsgTimestamp(m);
-          return msgTime >= campaignTime - 5000; // 5s buffer
-        });
-        return {
-          ...r,
-          replied: hasReplied
-        };
-      });
-
-      setRecipients(updatedList);
-
-      const repliedCount = updatedList.filter(r => r.replied).length;
-      const updatedCamp = {
-        ...targetCamp,
-        replied: repliedCount
-      };
-      setCampaign(updatedCamp);
-
-      // Save back to db if changed to keep dashboard/analytics synced
-      if (targetCamp.replied !== repliedCount) {
-        const updatedCamps = camps.map(c => c.id === campaignId ? updatedCamp : c);
-        whatsappDb.saveCampaigns(updatedCamps);
-        
-        allRecipients[campaignId] = updatedList;
-        whatsappDb.saveRecipients(allRecipients);
-      }
-    } catch (error) {
-      console.error('Failed to load campaign report:', error);
-    } finally {
       setLoading(false);
-    }
-  };
+    }, (err) => {
+      console.error('Failed to listen to campaign:', err);
+      setLoading(false);
+    });
+
+    // 2. Listen to Recipients Document
+    const unsubRecs = onSnapshot(doc(db, 'whatsapp_recipients', campaignId), (snap) => {
+      if (snap.exists()) {
+        const recsData = snap.data() || {};
+        const list = recsData.recipients || [];
+
+        // Calculate if any lead has replied
+        const campaignTime = campaign?.createdAt?._seconds 
+          ? campaign.createdAt._seconds * 1000 
+          : new Date(campaign?.createdAt || Date.now()).getTime();
+
+        const getMsgTimestamp = (msg) => {
+          if (msg.timestamp) {
+            return typeof msg.timestamp === 'object' && msg.timestamp._seconds
+              ? msg.timestamp._seconds * 1000
+              : new Date(msg.timestamp).getTime();
+          }
+          const match = msg.id ? msg.id.match(/\d+$/) : null;
+          return match ? parseInt(match[0], 10) : Date.now();
+        };
+
+        const updatedList = list.map(r => {
+          const cleanRepPhone = r.phone.replace(/\D/g, '');
+          const lead = leads.find(l => l.phone && l.phone.replace(/\D/g, '') === cleanRepPhone);
+          const msgs = lead?.whatsappMessages || [];
+          const hasReplied = msgs.some(m => {
+            const isIncoming = m.sender === 'lead' || m.direction === 'inbound';
+            if (!isIncoming) return false;
+            const msgTime = getMsgTimestamp(m);
+            return msgTime >= campaignTime - 5000; // 5s buffer
+          });
+          return {
+            ...r,
+            replied: hasReplied
+          };
+        });
+
+        setRecipients(updatedList);
+
+        // Sync local storage so other dashboard views reflect the new status
+        try {
+          const allRecipients = whatsappDb.getRecipients();
+          allRecipients[campaignId] = list;
+          localStorage.setItem('gowha_recipients', JSON.stringify(allRecipients));
+        } catch (e) {}
+      }
+    }, (err) => {
+      console.error('Failed to listen to recipients:', err);
+    });
+
+    return () => {
+      unsubCamp();
+      unsubRecs();
+    };
+  }, [campaignId, leads, campaign?.createdAt]);
 
   if (loading) {
     return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh', color: '#64748b' }}>Loading...</div>;
