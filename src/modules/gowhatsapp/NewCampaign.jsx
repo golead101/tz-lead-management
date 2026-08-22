@@ -395,9 +395,24 @@ export default function NewCampaign({ setSubView }) {
     setExistingLists([crmList, ...lists]);
   };
 
-  const loadTemplates = () => {
+  const loadTemplates = async () => {
+    // Load from local storage cache instantly
     const tmpls = whatsappDb.getTemplates();
     setTemplates(tmpls);
+
+    // Fetch live templates from Meta API in background to get latest updates
+    try {
+      const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'leads-management-tz';
+      const url = `https://us-central1-${projectId}.cloudfunctions.net/getWhatsAppTemplates`;
+      const res = await fetch(url, { method: 'POST' });
+      const data = await res.json();
+      if (res.ok && data.success && data.templates) {
+        setTemplates(data.templates);
+        whatsappDb.saveTemplates(data.templates);
+      }
+    } catch (err) {
+      console.error('Failed to sync live templates on campaign page load:', err);
+    }
   };
 
   const handleFileUpload = (e) => {

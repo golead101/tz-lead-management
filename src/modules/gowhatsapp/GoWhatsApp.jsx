@@ -17,11 +17,18 @@ const GoWhatsApp = () => {
   const { whatsappSubView, setWhatsappSubView } = useCRM();
   const subView = whatsappSubView;
   const setSubView = setWhatsappSubView;
-  const [selectedCampaignId, setSelectedCampaignId] = useState(null);
+  const [selectedCampaignId, setSelectedCampaignId] = useState(() => {
+    return sessionStorage.getItem('gowha_selected_campaign_id') || null;
+  });
   const [reusedCampaign, setReusedCampaign] = useState(null);
 
   const navigateToCampaignReport = (id) => {
     setSelectedCampaignId(id);
+    if (id) {
+      sessionStorage.setItem('gowha_selected_campaign_id', id);
+    } else {
+      sessionStorage.removeItem('gowha_selected_campaign_id');
+    }
     setSubView('campaign-report');
   };
 

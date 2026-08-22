@@ -1370,7 +1370,90 @@ exports.whatsappWebhook = functions.https.onRequest(async (req, res) => {
       const change = entry?.changes?.[0];
       const value = change?.value;
 
-      if (!value || !value.messages) {
+      if (!value || (!value.messages && !value.statuses)) {
+        return res.status(200).send('EVENT_RECEIVED');
+      }
+
+      // Handle message delivery status updates (delivered, read, failed) from Meta
+      if (value.statuses && Array.isArray(value.statuses) && value.statuses.length > 0) {
+        console.log('Processing WhatsApp status webhook update...');
+        for (const statusObj of value.statuses) {
+          const messageId = statusObj.id;
+          const status = statusObj.status; // "delivered", "read", "failed", "sent"
+          const timestamp = statusObj.timestamp;
+          const errors = statusObj.errors; // Array of errors if failed
+
+          console.log(`WhatsApp Status Update: Message ${messageId} is now "${status}"`);
+
+          try {
+            // Find campaignId from message map
+            const mapDoc = await db.collection('whatsapp_message_map').doc(messageId).get();
+            if (mapDoc.exists) {
+              const { campaignId } = mapDoc.data();
+              console.log(`Matched Message ${messageId} to Campaign ${campaignId}`);
+
+              // Get recipients
+              const recDocRef = db.collection('whatsapp_recipients').doc(campaignId);
+              const recSnap = await recDocRef.get();
+              if (recSnap.exists) {
+                const recsData = recSnap.data() || {};
+                const recipients = recsData.recipients || [];
+                let updated = false;
+
+                const updatedRecipients = recipients.map(r => {
+                  if (r.messageId === messageId) {
+                    r.status = status;
+                    if (status === 'delivered') {
+                      r.deliveredAt = new Date(parseInt(timestamp, 10) * 1000).toISOString();
+                    } else if (status === 'read') {
+                      r.readAt = new Date(parseInt(timestamp, 10) * 1000).toISOString();
+                    } else if (status === 'failed') {
+                      if (errors && errors.length > 0) {
+                        r.error = errors[0].message || errors[0].title || 'Delivery failed';
+                        r.errorCode = String(errors[0].code || '500');
+                      } else {
+                        r.error = 'Delivery failed';
+                        r.errorCode = '500';
+                      }
+                    }
+                    updated = true;
+                  }
+                  return r;
+                });
+
+                if (updated) {
+                  await recDocRef.update({ recipients: updatedRecipients });
+                  console.log(`Updated recipient status in Firestore for message ${messageId}`);
+
+                  // Re-calculate totals and save to campaign document
+                  const campDocRef = db.collection('whatsapp_campaigns').doc(campaignId);
+                  const campSnap = await campDocRef.get();
+                  if (campSnap.exists) {
+                    const campData = campSnap.data() || {};
+                    const total = campData.totalRecipients || updatedRecipients.length;
+                    const sent = updatedRecipients.filter(r => r.status !== 'failed').length;
+                    const delivered = updatedRecipients.filter(r => r.status === 'delivered' || r.status === 'read').length;
+                    const read = updatedRecipients.filter(r => r.status === 'read').length;
+                    const failed = updatedRecipients.filter(r => r.status === 'failed').length;
+
+                    await campDocRef.update({
+                      sent,
+                      delivered,
+                      read,
+                      failed
+                    });
+                    console.log(`Updated campaign totals: sent=${sent}, delivered=${delivered}, read=${read}, failed=${failed}`);
+                  }
+                }
+              }
+            } else {
+              console.log(`No campaign mapping found for message ${messageId}. Skipping status update.`);
+            }
+          } catch (err) {
+            console.error('Failed to process status update for message:', messageId, err);
+          }
+        }
+
         return res.status(200).send('EVENT_RECEIVED');
       }
 
@@ -3313,6 +3396,13 @@ exports.sendBulkWhatsAppCampaign = functions.runWith({ timeoutSeconds: 540, memo
             });
 
             const messageId = response.data?.messages?.[0]?.id || null;
+
+            if (messageId) {
+              await db.collection('whatsapp_message_map').doc(messageId).set({
+                campaignId: campaignId,
+                recipientPhone: cleanPhone
+              }).catch(err => console.error('Failed to save whatsapp_message_map:', err.message));
+            }
 
             // Log to timeline
             const outboundMsg = {
