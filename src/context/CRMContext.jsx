@@ -745,19 +745,27 @@ export const CRMProvider = ({ children }) => {
       });
 
       if (existingLead) {
-        // Append to existing lead instead of creating a new one
+        // Build a detailed re-inquiry log showing old course vs new course
+        const oldCourse = existingLead.course || 'Unknown';
+        const newCourse = leadData.course || oldCourse;
+        const courseChanged = newCourse && newCourse !== oldCourse;
+
         const reinquiryLog = {
           id: `log-${Date.now()}`,
           type: 'system',
           title: 'Re-inquiry Captured',
-          content: `User submitted another inquiry for course: ${leadData.course || 'Unknown'} via ${leadData.source || 'Website Form'}`,
+          content: courseChanged
+            ? `Lead re-enquired via ${leadData.source || 'Walk-in'}. Previously interested in "${oldCourse}", now enquiring for "${newCourse}".`
+            : `Lead re-enquired via ${leadData.source || 'Walk-in'} for "${oldCourse}".`,
           timestamp: new Date().toISOString(),
           user: 'System'
         };
 
         const updatedLead = {
           ...existingLead,
-          stage: 'New Lead', // Bring them back to New Lead stage to ensure they get attention
+          // Update course and stage — createdDate is NOT touched (kept from existingLead)
+          course: newCourse,
+          stage: 'New Lead',
           lastContacted: new Date().toISOString(),
           timeline: [...(existingLead.timeline || []), reinquiryLog]
         };
@@ -766,7 +774,7 @@ export const CRMProvider = ({ children }) => {
           setDoc(doc(db, 'leads', existingLead.id), updatedLead).catch(console.error);
         }
         setLeads(prev => prev.map(l => l.id === existingLead.id ? updatedLead : l));
-        showToastMsg(`Existing lead found. Inquiry added to timeline!`);
+        showToastMsg(`Existing lead found. Re-inquiry logged and course updated!`);
         return updatedLead;
       }
     }
