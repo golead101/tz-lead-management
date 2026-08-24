@@ -736,12 +736,14 @@ export const CRMProvider = ({ children }) => {
   // Adding a brand new inquiry
   const addLead = (leadData) => {
     const cleanPhone = leadData.phone ? String(leadData.phone).replace(/\D/g, '') : '';
+    // Use last 10 digits for matching to handle +91, country codes, spaces, dashes, etc.
+    const cleanPhoneLast10 = cleanPhone.slice(-10);
 
-    // Check if lead already exists by phone
-    if (cleanPhone) {
+    // Check if lead already exists by phone (last 10 digits comparison)
+    if (cleanPhoneLast10.length === 10) {
       const existingLead = leads.find(l => {
-        const lPhone = l.phone ? String(l.phone).replace(/\D/g, '') : '';
-        return lPhone === cleanPhone;
+        const lPhone = l.phone ? String(l.phone).replace(/\D/g, '').slice(-10) : '';
+        return lPhone === cleanPhoneLast10;
       });
 
       if (existingLead) {
