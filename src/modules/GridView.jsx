@@ -526,7 +526,7 @@ export default function GridView() {
       courseIdx = headers.findIndex(h => h.includes('course') || h.includes('program'));
       statusIdx = headers.findIndex(h => h.includes('status') || h.includes('stage'));
       sourceIdx = headers.findIndex(h => h.includes('source') || h.includes('platform'));
-      counselorIdx = headers.findIndex(h => h.includes('assigned') || h.includes('counselor') || h.includes('owner'));
+      counselorIdx = headers.findIndex(h => h.includes('assign') || h.includes('counselor') || h.includes('owner'));
       tempIdx = headers.findIndex(h => h.includes('temperature') || h.includes('temp') || h.includes('priority'));
       createdDateIdx = headers.findIndex(h => h.includes('created') || h.includes('date'));
       campaignIdx = headers.findIndex(h => h.includes('campaign'));
@@ -549,7 +549,7 @@ export default function GridView() {
     };
 
     const mapCsvCounselor = (raw) => {
-      if (!raw) return activeUser || 'Unassigned';
+      if (!raw || !raw.trim()) return 'Unassigned';
       const trimmed = raw.trim();
       if (trimmed.toLowerCase() === 'unassigned' || trimmed.toLowerCase() === 'none' || trimmed === '') {
         return 'Unassigned';

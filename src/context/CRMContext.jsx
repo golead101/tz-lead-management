@@ -799,7 +799,7 @@ export const CRMProvider = ({ children }) => {
       counselor: leadData.counselor || activeUser,
       stage: leadData.stage || 'New Lead',
       temperature: leadData.temperature || 'Warm',
-      createdDate: new Date().toISOString(),
+      createdDate: leadData.createdDate || new Date().toISOString(),
       lastContacted: new Date().toISOString(),
       customFields: leadData.customFields || {},
       timeline: [
@@ -916,18 +916,19 @@ export const CRMProvider = ({ children }) => {
 
   // Editing lead variables
   const updateLead = (leadId, updatedFields) => {
+    const { createdDate, ...safeFields } = updatedFields;
     let updatedLead = null;
     const nextLeads = leads.map(lead => {
       if (lead.id === leadId) {
         // Generate an audit log entry for changes
         const auditLogs = [];
-        Object.keys(updatedFields).forEach(key => {
-          if (lead[key] !== undefined && lead[key] !== updatedFields[key] && key !== 'timeline' && key !== 'whatsappMessages' && key !== 'instagramMessages') {
+        Object.keys(safeFields).forEach(key => {
+          if (lead[key] !== undefined && lead[key] !== safeFields[key] && key !== 'timeline' && key !== 'whatsappMessages' && key !== 'instagramMessages') {
             auditLogs.push({
               id: `log-${Date.now()}-${Math.random()}`,
               type: 'system',
               title: `${key.toUpperCase()} Modified`,
-              content: `Changed from "${lead[key]}" to "${updatedFields[key]}"`,
+              content: `Changed from "${lead[key]}" to "${safeFields[key]}"`,
               timestamp: new Date().toISOString(),
               user: activeUser
             });
@@ -936,10 +937,10 @@ export const CRMProvider = ({ children }) => {
 
         updatedLead = {
           ...lead,
-          ...updatedFields,
+          ...safeFields,
           lastContacted: new Date().toISOString(),
           timeline: [...(lead.timeline || []), ...auditLogs],
-          convertedAt: updatedFields.stage === 'Converted' ? new Date().toISOString() : (updatedFields.stage && updatedFields.stage !== 'Converted' ? null : (lead.convertedAt || null))
+          convertedAt: safeFields.stage === 'Converted' ? new Date().toISOString() : (safeFields.stage && safeFields.stage !== 'Converted' ? null : (lead.convertedAt || null))
         };
         return updatedLead;
       }
