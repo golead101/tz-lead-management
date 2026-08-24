@@ -1285,8 +1285,9 @@ export default function GridView() {
                     <span className="gv-checkmark" />
                   </label>
                 </th>
-                <th>
+                <th className="gv-th-sortable" onClick={() => handleSort('name')}>
                   <span>Name & Contact</span>
+                  <span className="gv-sort-icon">{sortBy === 'name' ? (sortOrder === 'asc' ? '▲' : '▼') : '⇅'}</span>
                 </th>
                 <th>
                   <span>STATUS</span>
@@ -1297,8 +1298,9 @@ export default function GridView() {
                 <th>
                   <span>ASSIGNED TO</span>
                 </th>
-                <th>
+                <th className="gv-th-sortable" onClick={() => handleSort('createdDate')}>
                   <span>DATE</span>
+                  <span className="gv-sort-icon">{sortBy === 'createdDate' ? (sortOrder === 'asc' ? '▲' : '▼') : '⇅'}</span>
                 </th>
               </tr>
             </thead>
@@ -1412,10 +1414,10 @@ export default function GridView() {
                           return (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                               <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                                {parsedDate ? parsedDate.toLocaleDateString() : '—'}
+                                {parsedDate ? parsedDate.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}
                               </span>
                               <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
-                                {parsedDate ? parsedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                                {parsedDate ? parsedDate.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true }) : ''}
                               </span>
                             </div>
                           );
