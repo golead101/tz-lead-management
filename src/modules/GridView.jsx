@@ -255,6 +255,32 @@ export default function GridView() {
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  // Detect "orphan" course values in leads that aren't in the configured courses list
+  const courseFilterOptions = React.useMemo(() => {
+    const knownNames = new Set(courses.map(c => (c.name || '').trim().toLowerCase()));
+    const orphanSet = new Map(); // lowercase -> original casing
+    let hasEmpty = false;
+    leads.forEach(lead => {
+      const raw = (lead.course || '').trim();
+      if (!raw) { hasEmpty = true; return; }
+      const lower = raw.toLowerCase();
+      if (!knownNames.has(lower)) {
+        // Check fuzzy: is this lead's course already covered by a known course name?
+        let covered = false;
+        for (const kn of knownNames) {
+          if (kn.includes(lower) || lower.includes(kn)) { covered = true; break; }
+        }
+        if (!covered && !orphanSet.has(lower)) {
+          orphanSet.set(lower, raw);
+        }
+      }
+    });
+    const mainOptions = courses.map(c => ({ value: c.name, label: `${c.code ? `${c.code} \u2014 ` : ''}${c.name}` }));
+    const orphanOptions = Array.from(orphanSet.values()).sort().map(name => ({ value: name, label: `\u2753 ${name}` }));
+    const extras = [];
+    if (hasEmpty) extras.push({ value: 'No Course', label: '\u26a0\ufe0f No Course Assigned' });
+    return [...mainOptions, ...orphanOptions, ...extras];
+  }, [leads, courses]);
 
   // Filter Leads
   const filteredLeads = leads.filter(lead => {
@@ -265,6 +291,8 @@ export default function GridView() {
     if (selectedCourse && selectedCourse.length > 0 && !selectedCourse.includes('All')) {
       const leadC = (lead.course || '').trim().toLowerCase();
       const match = selectedCourse.some(val => {
+        // Special handling: "No Course" matches leads with empty/blank course
+        if (val === 'No Course') return leadC === '';
         const filterC = val.trim().toLowerCase();
         return leadC === filterC || leadC.includes(filterC) || filterC.includes(leadC);
       });
@@ -987,7 +1015,7 @@ export default function GridView() {
         <MultiSelectFilter
           label="Course"
           icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20M4 19.5A2.5 2.5 0 014 17V5a2 2 0 012-2h14v14H6.5A2.5 2.5 0 004 19.5z"/></svg>}
-          options={courses.map(c => ({ value: c.name, label: `${c.code ? `${c.code} — ` : ''}${c.name}` }))}
+          options={courseFilterOptions}
           selectedValues={selectedCourse}
           onChange={(vals) => { setSelectedCourse(vals); setCurrentPage(1); }}
         />
