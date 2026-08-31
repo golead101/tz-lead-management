@@ -1,15 +1,29 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCRM } from '../context/CRMContext';
 
 export default function History() {
-  const { leads, activeRole, activeUser } = useCRM();
+  const { leads, activeRole, activeUser, counselors, pendingActivityFilter, setPendingActivityFilter } = useCRM();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('All');
+  const [filterCounselor, setFilterCounselor] = useState('All');
+
+  // Consume a one-shot counselor filter handed off from another page (e.g. Lead Assignment & Activity), then clear it
+  useEffect(() => {
+    if (pendingActivityFilter && pendingActivityFilter.counselor) {
+      setFilterCounselor(pendingActivityFilter.counselor);
+      setPendingActivityFilter(null);
+    }
+  }, [pendingActivityFilter, setPendingActivityFilter]);
+
+  const counselorList = (counselors || []).filter(c => c.role === 'Counselor').map(c => c.name).filter(Boolean);
 
   // Filter leads based on counselor permissions
   const visibleLeads = leads.filter(lead => {
     if (activeRole === 'Counselor') {
       return lead.counselor === activeUser;
+    }
+    if (filterCounselor !== 'All') {
+      return lead.counselor === filterCounselor;
     }
     return true;
   });
@@ -112,6 +126,18 @@ export default function History() {
           <option value="whatsapp">WhatsApp Messages</option>
           <option value="system">System Updates</option>
         </select>
+
+        {activeRole !== 'Counselor' && (
+          <select
+            className="form-control"
+            style={{ width: '180px', borderRadius: '10px' }}
+            value={filterCounselor}
+            onChange={(e) => setFilterCounselor(e.target.value)}
+          >
+            <option value="All">All Counselors</option>
+            {counselorList.map(name => <option key={name} value={name}>{name}</option>)}
+          </select>
+        )}
       </div>
 
       {/* Timeline Stream */}

@@ -54,14 +54,14 @@ export default function Sidebar({ mobileMenuOpen, setMobileMenuOpen }) {
 
   // Local state to track Reports menu expansion
   const [isReportsExpanded, setIsReportsExpanded] = useState(() => {
-    return ['analytics', 'basic-reports'].includes(activeView) || sessionStorage.getItem('reports_expanded') === 'true';
+    return ['analytics', 'basic-reports', 'lead-assignment-activity'].includes(activeView) || sessionStorage.getItem('reports_expanded') === 'true';
   });
 
   const toggleReportsExpand = () => {
     const nextState = !isReportsExpanded;
     setIsReportsExpanded(nextState);
     sessionStorage.setItem('reports_expanded', nextState ? 'true' : 'false');
-    if (nextState && !['analytics', 'basic-reports'].includes(activeView)) {
+    if (nextState && !['analytics', 'basic-reports', 'lead-assignment-activity'].includes(activeView)) {
       setActiveView('analytics');
     }
   };
@@ -423,7 +423,7 @@ export default function Sidebar({ mobileMenuOpen, setMobileMenuOpen }) {
           }
 
           if (item.id === 'reports') {
-            const isActive = ['analytics', 'basic-reports'].includes(activeView);
+            const isActive = ['analytics', 'basic-reports', 'lead-assignment-activity'].includes(activeView);
             return (
               <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <button
@@ -458,7 +458,8 @@ export default function Sidebar({ mobileMenuOpen, setMobileMenuOpen }) {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '14px', borderLeft: '1px dashed rgba(255, 255, 255, 0.15)', marginLeft: '24px', marginTop: '2px', marginBottom: '6px' }}>
                     {[
                       { subTarget: 'analytics', label: 'Performance Analytics' },
-                      { subTarget: 'basic-reports', label: 'Basic Reports' }
+                      { subTarget: 'basic-reports', label: 'Basic Reports' },
+                      { subTarget: 'lead-assignment-activity', label: 'Lead Assignment & Activity' }
                     ].map(sub => {
                       const isSubActive = activeView === sub.subTarget;
                       return (

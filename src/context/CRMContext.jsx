@@ -368,6 +368,7 @@ export const CRMProvider = ({ children }) => {
   });
 
   const [prefilledCampaignLeads, setPrefilledCampaignLeads] = useState(null);
+  const [pendingActivityFilter, setPendingActivityFilter] = useState(null);
 
   const changeWhatsappSubView = (view) => {
     sessionStorage.setItem('gowha_subview', view);
@@ -2207,6 +2208,8 @@ export const CRMProvider = ({ children }) => {
       deleteLead,
       prefilledCampaignLeads,
       setPrefilledCampaignLeads,
+      pendingActivityFilter,
+      setPendingActivityFilter,
       updateLeadStage,
       logCall,
       logNote,

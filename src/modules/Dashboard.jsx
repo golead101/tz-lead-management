@@ -2,9 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useCRM } from '../context/CRMContext';
 import { db } from '../firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
+import { computeCounselorMetrics } from '../utils/leadAssignmentMetrics';
 
 export default function Dashboard() {
-  const { leads, activeUser, activeRole } = useCRM();
+  const { leads, activeUser, activeRole, counselors, setActiveView } = useCRM();
 
   const [hoveredPoint, setHoveredPoint] = useState(null);
   const [timeRange, setTimeRange] = useState('7days'); // '7days', '1month', '1year'
@@ -982,7 +983,56 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Today's Lead Assignment (summary of the Lead Assignment & Activity report) */}
+      {(() => {
+        const isCounselorView = activeRole === 'Counselor';
+        const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+        const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
+        const counselorNames = isCounselorView
+          ? [activeUser]
+          : (counselors || []).filter(c => c.role === 'Counselor').map(c => c.name).filter(Boolean);
+        const perCounselor = computeCounselorMetrics(leads, counselorNames, todayStart, todayEnd);
+        const todayTotals = perCounselor.reduce((acc, m) => ({
+          assigned: acc.assigned + m.assigned,
+          contacted: acc.contacted + m.contacted,
+          pending: acc.pending + m.pending,
+          converted: acc.converted + m.converted
+        }), { assigned: 0, contacted: 0, pending: 0, converted: 0 });
 
+        return (
+          <div className="chart-card" style={{ marginTop: '24px', padding: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
+              <h3 className="panel-title" style={{ margin: 0 }}>{isCounselorView ? "Your Today's Activity" : "Today's Lead Assignment"}</h3>
+              {!isCounselorView && (
+                <button
+                  onClick={() => setActiveView('lead-assignment-activity')}
+                  style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '12px', fontWeight: '700', cursor: 'pointer', padding: 0 }}
+                >
+                  View Details &rarr;
+                </button>
+              )}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '16px' }}>
+              <div>
+                <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Assigned</div>
+                <div style={{ fontSize: '22px', fontWeight: '800', color: '#0f172a' }}>{todayTotals.assigned}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Contacted</div>
+                <div style={{ fontSize: '22px', fontWeight: '800', color: '#2563eb' }}>{todayTotals.contacted}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Pending</div>
+                <div style={{ fontSize: '22px', fontWeight: '800', color: '#b45309' }}>{todayTotals.pending}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Converted</div>
+                <div style={{ fontSize: '22px', fontWeight: '800', color: '#10b981' }}>{todayTotals.converted}</div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
     </div>
   );

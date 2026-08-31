@@ -347,7 +347,7 @@ export async function autoRepairOverwrittenLeads() {
       const currentCampaignText = `${data.campaign || ''} ${data.campaignName || ''} ${data.subSource || ''}`.toLowerCase();
       const isDigitalMarketingCampaign = currentCampaignText.includes('digital') || currentCampaignText.includes('102') || (originalRecipient && String(originalRecipient.course).toLowerCase().includes('digital'));
       
-      if (!data.course || data.course === '' || (isDigitalMarketingCampaign && data.course.toLowerCase().includes('data science'))) {
+      if (isDigitalMarketingCampaign && (!data.course || data.course === '' || data.course.toLowerCase().includes('data science'))) {
         repairData.course = 'Digital Marketing';
       } else if (!data.course) {
         let detectedCourse = (originalRecipient && originalRecipient.course);

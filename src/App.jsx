@@ -19,6 +19,7 @@ import FollowUps from './modules/FollowUps';
 import LiveFormEmbed from './modules/LiveFormEmbed';
 import History from './modules/History';
 import KanbanView from './modules/KanbanView';
+import LeadAssignmentActivity from './modules/LeadAssignmentActivity';
 
 // Beautiful visual page skeleton shimmer loader
 function ShimmerLoader() {
@@ -68,7 +69,7 @@ function MainAppContent() {
     const isManager = activeRole === 'Manager' || activeRole === 'Telecaller';
     const isAdmin = activeRole === 'Admin';
 
-    const isCounselorRestricted = isCounselor && ['analytics', 'sandbox', 'settings', 'integrations'].includes(activeView);
+    const isCounselorRestricted = isCounselor && ['analytics', 'sandbox', 'settings', 'integrations', 'lead-assignment-activity'].includes(activeView);
     const isManagerRestricted = isManager && ['sandbox', 'settings', 'analytics', 'integrations'].includes(activeView);
     const isTelecallerRestricted = activeRole === 'Telecaller' && (activeView === 'gowhatsapp' || activeView === 'history');
 
@@ -123,6 +124,8 @@ function MainAppContent() {
         return <History />;
       case 'kanban':
         return <KanbanView />;
+      case 'lead-assignment-activity':
+        return <LeadAssignmentActivity />;
       default:
         return <Dashboard />;
     }
