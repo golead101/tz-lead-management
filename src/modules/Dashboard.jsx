@@ -460,6 +460,7 @@ export default function Dashboard() {
       </div>
 
       {/* 2. Top Row (Five Lead Sources) */}
+      <h3 className="db-chart-title" style={{ marginBottom: '12px' }}>Lead Sources</h3>
       <div className="db-source-grid">
         {/* Meta Leads Card */}
         <div className="db-source-card">
@@ -594,6 +595,7 @@ export default function Dashboard() {
       </div>
 
       {/* 2.5 Row (Seven Core Funnel KPIs) */}
+      <h3 className="db-chart-title" style={{ marginBottom: '12px' }}>Lead Stages</h3>
       <div className="db-funnel-grid" style={{ marginBottom: '24px' }}>
         {/* New Leads Card */}
         <div className="db-funnel-card new-leads-card">

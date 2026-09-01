@@ -1105,8 +1105,8 @@ export const CRMProvider = ({ children }) => {
         };
         const nextTimeline = [...(lead.timeline || []), callLog];
         let nextStage = lead.stage;
-        let nextFollowupDate = lead.followupDate || null;
-        let nextFollowupReason = lead.followupReason || null;
+        let nextFollowupDate = null;
+        let nextFollowupReason = null;
         let whatsappHistory = [...(lead.whatsappMessages || [])];
 
         // Determine if outcome maps to a pipeline stage shift
