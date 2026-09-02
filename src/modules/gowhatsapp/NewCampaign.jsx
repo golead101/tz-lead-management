@@ -291,7 +291,7 @@ export default function NewCampaign({ setSubView }) {
   const [scheduleDate, setScheduleDate] = useState('');
   const [result, setResult] = useState(null);
 
-  const { leads, courses, activeUser, sendWhatsAppMsg, prefilledCampaignLeads, setPrefilledCampaignLeads } = useCRM();
+  const { leads, courses, counselors, activeUser, sendWhatsAppMsg, prefilledCampaignLeads, setPrefilledCampaignLeads } = useCRM();
 
   useEffect(() => {
     if (prefilledCampaignLeads && prefilledCampaignLeads.length > 0) {
@@ -308,6 +308,7 @@ export default function NewCampaign({ setSubView }) {
   const [campaignStageFilters, setCampaignStageFilters] = useState([]);
   const [campaignSourceFilters, setCampaignSourceFilters] = useState([]);
   const [campaignNameFilter, setCampaignNameFilter] = useState('');
+  const [campaignCounselorFilters, setCampaignCounselorFilters] = useState([]);
 
   const getBaseLeads = () => {
     if (!selectedListId || selectedListId === 'crm-leads-all') {
@@ -329,11 +330,16 @@ export default function NewCampaign({ setSubView }) {
         : true;
 
       const hasMetaSourceSelected = campaignSourceFilters.some(s => s.toLowerCase().includes('meta'));
-      const matchCampaign = campaignNameFilter && hasMetaSourceSelected 
-        ? (lead.campaign === campaignNameFilter || lead.campaignName === campaignNameFilter || lead.subSource === campaignNameFilter) 
+      const matchCampaign = campaignNameFilter && hasMetaSourceSelected
+        ? (lead.campaign === campaignNameFilter || lead.campaignName === campaignNameFilter || lead.subSource === campaignNameFilter)
         : true;
 
-      return matchCourse && matchStage && matchSource && matchCampaign;
+      const leadCounselor = lead.counselor || 'Unassigned';
+      const matchCounselor = campaignCounselorFilters.length > 0
+        ? campaignCounselorFilters.some(c => c === 'Unassigned' ? (leadCounselor.trim().toLowerCase() === 'unassigned' || !lead.counselor) : lead.counselor === c)
+        : true;
+
+      return matchCourse && matchStage && matchSource && matchCampaign && matchCounselor;
     });
   };
 
@@ -342,13 +348,18 @@ export default function NewCampaign({ setSubView }) {
   const uniqueStages = [...new Set(baseLeads.map(l => l.stage).filter(Boolean))];
   const uniqueSources = [...new Set(baseLeads.map(l => normalizeLeadSource(l.source)).filter(Boolean))];
   const uniqueCampaigns = [...new Set(baseLeads.filter(l => (l.source || '').toLowerCase().includes('meta')).map(l => l.campaign || l.campaignName || l.subSource).filter(Boolean))];
+  const uniqueCounselors = [...new Set([
+    ...((counselors || []).filter(c => c.role === 'Counselor').map(c => c.name)),
+    ...baseLeads.map(l => l.counselor).filter(Boolean),
+    'Unassigned'
+  ].filter(Boolean))];
 
   useEffect(() => {
     if (selectedListId) {
       const filtered = getFilteredLeads();
       setPreviewContacts(filtered.slice(0, 3));
     }
-  }, [selectedListId, campaignCourseFilter, campaignStageFilters, campaignSourceFilters, campaignNameFilter, leads]);
+  }, [selectedListId, campaignCourseFilter, campaignStageFilters, campaignSourceFilters, campaignNameFilter, campaignCounselorFilters, leads]);
 
   useEffect(() => {
     loadExistingLists();
@@ -959,6 +970,14 @@ export default function NewCampaign({ setSubView }) {
                   <option value="">All Courses</option>
                   {uniqueCourses.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
+
+                {/* Multi-select for Assigned To (Counselor) */}
+                <MultiSelectDropdown
+                  options={uniqueCounselors}
+                  selectedValues={campaignCounselorFilters}
+                  onChange={setCampaignCounselorFilters}
+                  placeholder="Assigned To"
+                />
 
                 {/* Multi-select for Stage */}
                 <MultiSelectDropdown
