@@ -812,6 +812,12 @@ export default function GridView() {
   const [editSubSource, setEditSubSource] = useState('');
   const [editCampaign, setEditCampaign] = useState('');
   const [editFollowupDate, setEditFollowupDate] = useState('');
+  const [editCreatedDate, setEditCreatedDate] = useState('');
+
+  const toLocalDateInputValue = (date) => {
+    const d = date ? new Date(date) : new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
 
   const handleEditStart = (lead) => {
     setEditName(lead.name || '');
@@ -825,6 +831,7 @@ export default function GridView() {
     setEditSubSource(lead.subSource || '');
     setEditCampaign(lead.campaign || lead.campaignName || '');
     setEditFollowupDate(lead.followupDate || '');
+    setEditCreatedDate(toLocalDateInputValue(lead.createdDate));
     setIsEditing(true);
   };
 
@@ -844,7 +851,8 @@ export default function GridView() {
       source: editSource,
       subSource: editSubSource,
       campaign: editCampaign,
-      followupDate: editStage === 'Follow-up' ? editFollowupDate : null
+      followupDate: editStage === 'Follow-up' ? editFollowupDate : null,
+      ...(editCreatedDate ? { createdDate: new Date(`${editCreatedDate}T00:00:00`).toISOString() } : {})
     });
     setIsEditing(false);
   };
@@ -1623,6 +1631,16 @@ export default function GridView() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
                       {lead.phone}
+                      {!isEditing && (
+                        <button
+                          type="button"
+                          onClick={() => handleEditStart(lead)}
+                          title="Edit Lead"
+                          style={{ background: 'none', border: 'none', padding: '2px', margin: 0, cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center' }}
+                        >
+                          <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" strokeWidth="2.5" fill="none"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        </button>
+                      )}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -1780,6 +1798,17 @@ export default function GridView() {
                           onChange={(e) => setEditPhone(e.target.value)}
                           placeholder="Phone"
                           style={{ padding: '8px 12px', fontSize: '13px' }}
+                        />
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#475569' }}>Date</label>
+                        <input
+                          type="date"
+                          className="form-control"
+                          value={editCreatedDate}
+                          onChange={(e) => setEditCreatedDate(e.target.value)}
+                          style={{ padding: '8px 12px', fontSize: '13px', height: '38px' }}
                         />
                       </div>
 

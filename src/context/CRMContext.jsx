@@ -927,7 +927,7 @@ export const CRMProvider = ({ children }) => {
 
   // Editing lead variables
   const updateLead = (leadId, updatedFields) => {
-    const { createdDate, ...safeFields } = updatedFields;
+    const safeFields = updatedFields;
     let updatedLead = null;
     const nextLeads = leads.map(lead => {
       if (lead.id === leadId) {

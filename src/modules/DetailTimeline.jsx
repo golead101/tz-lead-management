@@ -56,7 +56,11 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
   const [formCourse, setFormCourse] = useState(lead ? lead.course : courses[0]?.name || '');
   const [formSource, setFormSource] = useState(lead ? lead.source : 'Walk-in');
   const [formTemperature, setFormTemperature] = useState(lead ? (lead.temperature || 'Warm') : 'Warm');
-  const [formInquiryDate, setFormInquiryDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const toLocalDateInputValue = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+  const [formInquiryDate, setFormInquiryDate] = useState(toLocalDateInputValue);
 
   // Dynamic list of unique sub-sources for walk-in leads
   const [localSubSources, setLocalSubSources] = useState([]);
@@ -184,7 +188,7 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
       setFormStage('New Lead');
       setFormFreeClassBatch('');
       setFormCustomFields({});
-      setFormInquiryDate(new Date().toISOString().slice(0, 10));
+      setFormInquiryDate(toLocalDateInputValue());
       setIsEditMode(true);
     }
   }, [selectedLeadId, leads, courses, counselors, activeRole, activeUser]);
@@ -208,8 +212,8 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
       stage: formStage,
       freeClassBatch: formStage === 'Free Class' ? formFreeClassBatch : null,
       temperature: formTemperature,
-      createdDate: formInquiryDate ? new Date(`${formInquiryDate}T00:00:00`).toISOString() : undefined,
-      customFields: formCustomFields
+      customFields: formCustomFields,
+      ...(!lead && formInquiryDate ? { createdDate: new Date(`${formInquiryDate}T00:00:00`).toISOString() } : {})
     };
 
     if (lead) {
