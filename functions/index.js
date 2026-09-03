@@ -275,6 +275,40 @@ exports.googleAdsWebhook = functions.https.onRequest(async (req, res) => {
       }
     }
 
+    // Phone deduplication (prevent creating a second lead for a number that
+    // already exists in the CRM, regardless of which source created it first)
+    if (phone) {
+      const matched = await findLeadByPhone(phone);
+      if (matched) {
+        console.log(`Lead with phone ${phone} already exists (id=${matched.ref.id}). Merging re-inquiry instead of creating a duplicate.`);
+        const oldCourse = matched.data.course || 'Unknown';
+        const newCourse = course || oldCourse;
+        await matched.ref.update({
+          course: newCourse,
+          stage: 'New Lead',
+          lastContacted: new Date().toISOString(),
+          timeline: admin.firestore.FieldValue.arrayUnion({
+            id: `log-${Date.now()}`,
+            type: 'system',
+            title: 'Re-inquiry Captured',
+            content: `Lead re-enquired via Google Ads (Campaign: ${campaignId}, Ad Group: ${adgroupId}).` +
+              (newCourse !== oldCourse ? ` Previously interested in "${oldCourse}", now enquiring for "${newCourse}".` : ''),
+            timestamp: new Date().toISOString(),
+            user: 'System'
+          })
+        });
+        await logRef.set({
+          timestamp: new Date().toISOString(),
+          type: 'webhook',
+          status: 'merged',
+          leadId: leadId,
+          matchedLeadId: matched.ref.id,
+          message: 'Phone number already exists in CRM. Merged as re-inquiry instead of creating a duplicate lead.'
+        });
+        return res.status(200).send('Merged Duplicate Phone');
+      }
+    }
+
     // 4. Create Lead Record matching CRM Schema
     const leadRecord = {
       id: `lead-gads-${Date.now()}`,
@@ -434,6 +468,28 @@ exports.googleAdsSync = functions.https.onRequest((req, res) => {
             phone = val;
           }
         });
+
+        // Phone deduplication (prevent creating a second lead for a number
+        // that already exists in the CRM, regardless of source)
+        if (phone) {
+          const matched = await findLeadByPhone(phone);
+          if (matched) {
+            await matched.ref.update({
+              stage: 'New Lead',
+              lastContacted: new Date().toISOString(),
+              timeline: admin.firestore.FieldValue.arrayUnion({
+                id: `log-${Date.now()}`,
+                type: 'system',
+                title: 'Re-inquiry Captured',
+                content: `Lead re-enquired via Google Ads (Campaign: ${campaign}, Ad Group: ${adGroup}), reconciled via API sync.`,
+                timestamp: new Date().toISOString(),
+                user: 'System'
+              })
+            });
+            leadsSkipped++;
+            continue;
+          }
+        }
 
         // Insert lead
         const leadRecord = {
@@ -942,6 +998,40 @@ exports.createUserAccount = functions.https.onCall(async (data, context) => {
     );
   }
 });
+
+/**
+ * Finds an existing lead by phone number, checking the direct doc-ID lookup
+ * (many lead-creation paths use the cleaned phone as the doc ID) and then a
+ * query across common formatting variants. Used to prevent duplicate leads
+ * for the same number when a fresh inquiry comes in from a different source.
+ */
+async function findLeadByPhone(rawPhone) {
+  const cleaned = String(rawPhone || '').replace(/[^0-9]/g, '');
+  if (!cleaned) return null;
+  const last10 = cleaned.length >= 10 ? cleaned.slice(-10) : cleaned;
+
+  const directDoc = await db.collection('leads').doc(cleaned).get();
+  if (directDoc.exists) return { ref: directDoc.ref, data: directDoc.data() };
+
+  const variants = [
+    rawPhone,
+    cleaned,
+    `+${cleaned}`,
+    last10 ? `+91 ${last10.slice(0, 5)} ${last10.slice(5)}` : null,
+    last10 ? `+91${last10}` : null,
+    last10
+  ].filter(Boolean);
+
+  const snap = await db.collection('leads').where('phone', 'in', variants.slice(0, 10)).get();
+  if (snap.empty) return null;
+
+  const match = snap.docs.find(d => {
+    const p = String(d.data().phone || '').replace(/[^0-9]/g, '');
+    return p.slice(-10) === last10;
+  }) || snap.docs[0];
+
+  return { ref: match.ref, data: match.data() };
+}
 
 /**
  * Helper to fetch decrypted WhatsApp integration credentials.

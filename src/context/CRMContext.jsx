@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { db, auth } from '../firebase';
-import { collection, doc, setDoc, deleteDoc, onSnapshot, writeBatch, getDoc, getDocs } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, onSnapshot, writeBatch, getDoc, getDocs, arrayUnion } from 'firebase/firestore';
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
 import { autoRepairOverwrittenLeads } from '../modules/gowhatsapp/whatsappDb';
 const CRMContext = createContext();
@@ -860,9 +860,38 @@ export const CRMProvider = ({ children }) => {
   const addBulkLeads = (leadsArray) => {
     if (!leadsArray || leadsArray.length === 0) return [];
 
-    const newLeads = leadsArray.map((leadData, index) => {
+    // Build a last-10-digit phone lookup of existing leads, so a re-imported
+    // number merges into the same lead instead of creating a duplicate.
+    const existingByPhone = new Map();
+    leads.forEach(l => {
+      const p = l.phone ? String(l.phone).replace(/\D/g, '').slice(-10) : '';
+      if (p) existingByPhone.set(p, l);
+    });
+
+    const newLeads = [];
+    const leadsToMerge = new Map(); // existingLeadId -> { course, source }
+    const seenInBatch = new Set(); // numbers already queued for creation within this same import
+
+    leadsArray.forEach((leadData, index) => {
       const cleanPhone = leadData.phone ? String(leadData.phone).replace(/\D/g, '') : '';
-      return {
+      const last10 = cleanPhone.length >= 10 ? cleanPhone.slice(-10) : cleanPhone;
+
+      const existingLead = last10 ? existingByPhone.get(last10) : null;
+      if (existingLead) {
+        leadsToMerge.set(existingLead.id, {
+          course: leadData.course || existingLead.course,
+          source: leadData.source || 'CSV Import'
+        });
+        return;
+      }
+
+      if (last10 && seenInBatch.has(last10)) {
+        // Same number appears more than once in this import — keep only the first entry.
+        return;
+      }
+      if (last10) seenInBatch.add(last10);
+
+      newLeads.push({
         id: cleanPhone ? cleanPhone : `lead-${Date.now()}-${index}`,
         name: leadData.name || (cleanPhone ? cleanPhone : 'Lead'),
         email: leadData.email || '',
@@ -895,19 +924,39 @@ export const CRMProvider = ({ children }) => {
         instagramUserId: leadData.instagramUserId || '',
         instagramUsername: leadData.instagramUsername || '',
         instagramMessages: leadData.instagramMessages || []
-      };
+      });
     });
 
     if (isFirebaseEnabled) {
       // Firestore batch size limit is 500
       const CHUNK_SIZE = 450;
+      const ops = [
+        ...newLeads.map(lead => ({ type: 'create', lead })),
+        ...Array.from(leadsToMerge.entries()).map(([id, fields]) => ({ type: 'merge', id, fields }))
+      ];
       const processBatches = async () => {
         try {
-          for (let i = 0; i < newLeads.length; i += CHUNK_SIZE) {
-            const chunk = newLeads.slice(i, i + CHUNK_SIZE);
+          for (let i = 0; i < ops.length; i += CHUNK_SIZE) {
+            const chunk = ops.slice(i, i + CHUNK_SIZE);
             const batch = writeBatch(db);
-            chunk.forEach(lead => {
-              batch.set(doc(db, 'leads', lead.id), lead, { merge: true });
+            chunk.forEach(op => {
+              if (op.type === 'create') {
+                batch.set(doc(db, 'leads', op.lead.id), op.lead, { merge: true });
+              } else {
+                batch.update(doc(db, 'leads', op.id), {
+                  course: op.fields.course,
+                  stage: 'New Lead',
+                  lastContacted: new Date().toISOString(),
+                  timeline: arrayUnion({
+                    id: `log-${Date.now()}-${op.id}`,
+                    type: 'system',
+                    title: 'Re-inquiry Captured',
+                    content: `Lead re-enquired via ${op.fields.source}.`,
+                    timestamp: new Date().toISOString(),
+                    user: 'System'
+                  })
+                });
+              }
             });
             await batch.commit();
           }
@@ -921,7 +970,7 @@ export const CRMProvider = ({ children }) => {
       setLeads(prev => [...newLeads, ...prev]);
     }
 
-    showToastMsg(`${newLeads.length} leads successfully imported!`);
+    showToastMsg(`${newLeads.length} new leads imported${leadsToMerge.size ? `, ${leadsToMerge.size} matched existing numbers and were updated` : ''}.`);
     return newLeads;
   };
 
