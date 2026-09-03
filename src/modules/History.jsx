@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useCRM } from '../context/CRMContext';
+import { getPeriodBounds } from '../utils/leadAssignmentMetrics';
 
 export default function History() {
   const { leads, activeRole, activeUser, counselors, pendingActivityFilter, setPendingActivityFilter } = useCRM();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('All');
   const [filterCounselor, setFilterCounselor] = useState('All');
+  const [dateFilter, setDateFilter] = useState('All Time');
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
 
   // Consume a one-shot counselor filter handed off from another page (e.g. Lead Assignment & Activity), then clear it
   useEffect(() => {
@@ -17,13 +21,12 @@ export default function History() {
 
   const counselorList = (counselors || []).filter(c => c.role === 'Counselor').map(c => c.name).filter(Boolean);
 
-  // Filter leads based on counselor permissions
+  // Restrict by role permission only (a Counselor only sees history for leads currently theirs).
+  // The "Assigned To" filter dropdown is applied later, by who actually performed each event —
+  // not by which lead the event's timeline happens to belong to.
   const visibleLeads = leads.filter(lead => {
     if (activeRole === 'Counselor') {
       return lead.counselor === activeUser;
-    }
-    if (filterCounselor !== 'All') {
-      return lead.counselor === filterCounselor;
     }
     return true;
   });
@@ -47,10 +50,19 @@ export default function History() {
   // Sort by timestamp descending
   allHistory.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
-  // Filter by search query and type
-  const filteredHistory = allHistory.filter(item => {
-    if (filterType !== 'All' && item.type !== filterType) return false;
-    
+  // Filter by search query and date range only (used for the summary counts, independent of event type)
+  const { start: rangeStart, end: rangeEnd } = dateFilter !== 'All Time'
+    ? getPeriodBounds(dateFilter, customStart, customEnd)
+    : { start: null, end: null };
+
+  const scopedHistory = allHistory.filter(item => {
+    if (activeRole !== 'Counselor' && filterCounselor !== 'All' && item.user !== filterCounselor) return false;
+
+    if (rangeStart && rangeEnd) {
+      const itemDate = new Date(item.timestamp);
+      if (isNaN(itemDate.getTime()) || itemDate < rangeStart || itemDate > rangeEnd) return false;
+    }
+
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       return (
@@ -62,6 +74,17 @@ export default function History() {
     }
     return true;
   });
+
+  // Further narrowed by the selected event type — this is what's actually rendered in the list
+  const filteredHistory = filterType === 'All' ? scopedHistory : scopedHistory.filter(item => item.type === filterType);
+
+  // Counts follow the same scope as the rendered list, so they update with every filter (including Event Type)
+  const summaryCounts = {
+    total: filteredHistory.length,
+    call: filteredHistory.filter(item => item.type === 'call').length,
+    whatsapp: filteredHistory.filter(item => item.type === 'whatsapp').length,
+    system: filteredHistory.filter(item => item.type === 'system').length
+  };
 
   const getEventIcon = (type) => {
     switch (type) {
@@ -127,6 +150,38 @@ export default function History() {
           <option value="system">System Updates</option>
         </select>
 
+        <select
+          className="form-control"
+          style={{ width: '150px', borderRadius: '10px' }}
+          value={dateFilter}
+          onChange={(e) => setDateFilter(e.target.value)}
+        >
+          <option value="All Time">All Time</option>
+          <option value="Today">Today</option>
+          <option value="This Week">This Week</option>
+          <option value="This Month">This Month</option>
+          <option value="Custom Range">Custom Range</option>
+        </select>
+
+        {dateFilter === 'Custom Range' && (
+          <>
+            <input
+              type="date"
+              className="form-control"
+              style={{ width: '150px', borderRadius: '10px' }}
+              value={customStart}
+              onChange={(e) => setCustomStart(e.target.value)}
+            />
+            <input
+              type="date"
+              className="form-control"
+              style={{ width: '150px', borderRadius: '10px' }}
+              value={customEnd}
+              onChange={(e) => setCustomEnd(e.target.value)}
+            />
+          </>
+        )}
+
         {activeRole !== 'Counselor' && (
           <select
             className="form-control"
@@ -138,6 +193,26 @@ export default function History() {
             {counselorList.map(name => <option key={name} value={name}>{name}</option>)}
           </select>
         )}
+      </div>
+
+      {/* Summary Counts (reflects current search/date/counselor filters) */}
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
+        <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '10px 18px', minWidth: '110px' }}>
+          <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Total</div>
+          <div style={{ fontSize: '20px', fontWeight: '800', color: '#0f172a' }}>{summaryCounts.total}</div>
+        </div>
+        <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '10px 18px', minWidth: '110px' }}>
+          <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Calls</div>
+          <div style={{ fontSize: '20px', fontWeight: '800', color: '#2563eb' }}>{summaryCounts.call}</div>
+        </div>
+        <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '10px 18px', minWidth: '110px' }}>
+          <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>WhatsApp</div>
+          <div style={{ fontSize: '20px', fontWeight: '800', color: '#10b981' }}>{summaryCounts.whatsapp}</div>
+        </div>
+        <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '10px 18px', minWidth: '110px' }}>
+          <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>System</div>
+          <div style={{ fontSize: '20px', fontWeight: '800', color: '#8b5cf6' }}>{summaryCounts.system}</div>
+        </div>
       </div>
 
       {/* Timeline Stream */}
