@@ -58,7 +58,7 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
   const [formTemperature, setFormTemperature] = useState(lead ? (lead.temperature || 'Warm') : 'Warm');
   const toLocalDateInputValue = () => {
     const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   };
   const [formInquiryDate, setFormInquiryDate] = useState(toLocalDateInputValue);
 
@@ -213,7 +213,7 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
       freeClassBatch: formStage === 'Free Class' ? formFreeClassBatch : null,
       temperature: formTemperature,
       customFields: formCustomFields,
-      ...(!lead && formInquiryDate ? { createdDate: new Date(`${formInquiryDate}T00:00:00`).toISOString() } : {})
+      ...(!lead && formInquiryDate ? { createdDate: new Date(formInquiryDate).toISOString() } : {})
     };
 
     if (lead) {
@@ -530,7 +530,7 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
                 <div className="form-group">
                   <label className="form-label">Date</label>
                   <input
-                    type="date"
+                    type="datetime-local"
                     className="form-control"
                     required
                     value={formInquiryDate}

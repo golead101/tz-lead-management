@@ -1675,16 +1675,22 @@ exports.whatsappWebhook = functions.https.onRequest(async (req, res) => {
                 // whatsapp_templates by getWhatsAppTemplates) instead of assuming 'en',
                 // since templates can be approved under en_US, hi, es, etc.
                 const tplDoc = await db.collection('whatsapp_templates').doc(matchedReply.preview).get();
-                const templateLanguage = (tplDoc.exists && tplDoc.data().language) || 'en';
+                const tplData = tplDoc.exists ? tplDoc.data() : null;
+                const templateLanguage = tplData?.language || 'en';
                 payload.type = 'template';
                 payload.template = { name: matchedReply.preview, language: { code: templateLanguage } };
-                botReplySummary = `[Template: ${matchedReply.preview}]`;
+                // Show the template's actual body text in the Inbox (same as a manually
+                // sent template) instead of a bare placeholder.
+                const tplBodyText = tplData?.components?.find(c => c.type === 'BODY')?.text || '';
+                botReplySummary = tplBodyText || `[Template: ${matchedReply.preview}]`;
               } else if (matchedReply.responseType === 'Document') {
                 const docFile = (chatbotSettings.mediaFiles || []).find(f => f.name === matchedReply.preview);
                 if (docFile && docFile.url) {
                   payload.type = 'document';
                   payload.document = { link: docFile.url, filename: docFile.name };
-                  botReplySummary = `[Document: ${docFile.name}]`;
+                  // Match the "[Attached: name\nLink: url]" convention the Inbox UI
+                  // (renderMessageBubbleContent) parses to render a document card.
+                  botReplySummary = `[Attached: ${docFile.name}\nLink: ${docFile.url}]`;
                 }
               } else if (matchedReply.responseType === 'Buttons') {
                 payload.type = 'interactive';
@@ -1697,7 +1703,10 @@ exports.whatsappWebhook = functions.https.onRequest(async (req, res) => {
                   body: { text: matchedReply.preview },
                   action: { buttons }
                 };
-                botReplySummary = matchedReply.preview || '';
+                // Include the button labels in the logged text so the Inbox shows
+                // what options were offered, since InboxPage has no button-chip UI.
+                const buttonLabels = buttons.map(b => b.reply.title).filter(Boolean).join(' | ');
+                botReplySummary = (matchedReply.preview || '') + (buttonLabels ? `\n[Buttons: ${buttonLabels}]` : '');
               }
 
               if (payload.type) {

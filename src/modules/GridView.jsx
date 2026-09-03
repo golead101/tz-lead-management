@@ -816,7 +816,7 @@ export default function GridView() {
 
   const toLocalDateInputValue = (date) => {
     const d = date ? new Date(date) : new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   };
 
   const handleEditStart = (lead) => {
@@ -852,7 +852,7 @@ export default function GridView() {
       subSource: editSubSource,
       campaign: editCampaign,
       followupDate: editStage === 'Follow-up' ? editFollowupDate : null,
-      ...(editCreatedDate ? { createdDate: new Date(`${editCreatedDate}T00:00:00`).toISOString() } : {})
+      ...(editCreatedDate ? { createdDate: new Date(editCreatedDate).toISOString() } : {})
     });
     setIsEditing(false);
   };
@@ -1804,7 +1804,7 @@ export default function GridView() {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                         <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#475569' }}>Date</label>
                         <input
-                          type="date"
+                          type="datetime-local"
                           className="form-control"
                           value={editCreatedDate}
                           onChange={(e) => setEditCreatedDate(e.target.value)}
