@@ -56,6 +56,7 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
   const [formCourse, setFormCourse] = useState(lead ? lead.course : courses[0]?.name || '');
   const [formSource, setFormSource] = useState(lead ? lead.source : 'Walk-in');
   const [formTemperature, setFormTemperature] = useState(lead ? (lead.temperature || 'Warm') : 'Warm');
+  const [formInquiryDate, setFormInquiryDate] = useState(() => new Date().toISOString().slice(0, 10));
 
   // Dynamic list of unique sub-sources for walk-in leads
   const [localSubSources, setLocalSubSources] = useState([]);
@@ -183,6 +184,7 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
       setFormStage('New Lead');
       setFormFreeClassBatch('');
       setFormCustomFields({});
+      setFormInquiryDate(new Date().toISOString().slice(0, 10));
       setIsEditMode(true);
     }
   }, [selectedLeadId, leads, courses, counselors, activeRole, activeUser]);
@@ -206,6 +208,7 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
       stage: formStage,
       freeClassBatch: formStage === 'Free Class' ? formFreeClassBatch : null,
       temperature: formTemperature,
+      createdDate: formInquiryDate ? new Date(`${formInquiryDate}T00:00:00`).toISOString() : undefined,
       customFields: formCustomFields
     };
 
@@ -518,6 +521,19 @@ export default function DetailTimeline({ onClose, backText = 'Back to Leads', hi
               </div>
 
 
+
+              {!lead && (
+                <div className="form-group">
+                  <label className="form-label">Date</label>
+                  <input
+                    type="date"
+                    className="form-control"
+                    required
+                    value={formInquiryDate}
+                    onChange={(e) => setFormInquiryDate(e.target.value)}
+                  />
+                </div>
+              )}
 
               <div className="form-group">
                 <label className="form-label">Education/Experience</label>

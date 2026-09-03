@@ -1464,6 +1464,19 @@ exports.whatsappWebhook = functions.https.onRequest(async (req, res) => {
         return res.status(200).send('No message details');
       }
 
+      // Idempotency guard: Meta may redeliver the same webhook event on retry.
+      // Firestore's create() throws if the doc already exists, so this also
+      // protects against two near-simultaneous deliveries of the same message.
+      if (message.id) {
+        const dedupeRef = db.collection('whatsapp_processed_messages').doc(message.id);
+        try {
+          await dedupeRef.create({ processedAt: new Date().toISOString() });
+        } catch (dedupeErr) {
+          console.log(`[WhatsApp Webhook] Duplicate message ${message.id} ignored.`);
+          return res.status(200).send('EVENT_RECEIVED');
+        }
+      }
+
       const senderPhoneRaw = message.from;
       const senderName = contact?.profile?.name || 'WhatsApp Student';
       let messageText = '';
@@ -1572,24 +1585,29 @@ exports.whatsappWebhook = functions.https.onRequest(async (req, res) => {
         timestamp: new Date().toISOString()
       };
 
+      let leadRefForBot = null;
+
       if (matchedLeadRef && matchedLeadData) {
         console.log(`[WhatsApp Webhook] Appending to lead: ${matchedLeadData.name || matchedLeadData.id}`);
 
-        const updatedChat = [...(matchedLeadData.whatsappMessages || []), inboundMsg];
-        const nextTimeline = [...(matchedLeadData.timeline || []), {
+        const nextTimelineEntry = {
           id: `log-wa-in-${Date.now()}`,
           type: 'whatsapp',
           title: 'WhatsApp Received',
           content: messageText || `[${message.type || 'attachment'} shared]`,
           timestamp: new Date().toISOString(),
           user: 'System'
-        }];
+        };
 
+        // Use arrayUnion (atomic) instead of read-modify-write so two messages
+        // arriving close together can't overwrite each other's appended entry.
         await matchedLeadRef.update({
-          whatsappMessages: updatedChat,
-          timeline: nextTimeline,
+          whatsappMessages: admin.firestore.FieldValue.arrayUnion(inboundMsg),
+          timeline: admin.firestore.FieldValue.arrayUnion(nextTimelineEntry),
           lastContacted: new Date().toISOString()
         });
+
+        leadRefForBot = matchedLeadRef;
 
       } else {
         console.log(`[WhatsApp Webhook] Creating new lead for phone ${senderPhoneRaw}`);
@@ -1611,7 +1629,9 @@ exports.whatsappWebhook = functions.https.onRequest(async (req, res) => {
           createdAt: new Date().toISOString()
         };
 
-        await db.collection('leads').doc(newLeadId).set(newLead);
+        const newLeadRef = db.collection('leads').doc(newLeadId);
+        await newLeadRef.set(newLead);
+        leadRefForBot = newLeadRef;
       }
 
       try {
@@ -1620,36 +1640,51 @@ exports.whatsappWebhook = functions.https.onRequest(async (req, res) => {
           const chatbotSettings = chatbotDoc.data();
           const replies = chatbotSettings.customReplies || [];
           
-          // Find a match (case-insensitive)
+          // Find a match (case-insensitive, whole-word/phrase — a short trigger
+          // like "hi" must not match inside an unrelated word like "history").
           const lowerMsg = messageText.toLowerCase().trim();
           const matchedReply = replies.find(r => {
             if (!r.trigger) return false;
-            const triggers = r.trigger.split(',').map(t => t.trim().toLowerCase());
-            return triggers.some(t => lowerMsg.includes(t) || t === lowerMsg);
+            const triggers = r.trigger.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+            return triggers.some(t => {
+              if (t === lowerMsg) return true;
+              const escaped = t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              return new RegExp(`(^|\\W)${escaped}($|\\W)`, 'i').test(lowerMsg);
+            });
           });
 
           if (matchedReply) {
             console.log(`[WhatsApp Webhook] Trigger matched for "${lowerMsg}":`, matchedReply.responseType);
-            
+
             const creds = await getDecryptedWhatsAppCredentials();
-            if (creds.accessToken && creds.phoneNumberId) {
+            if (creds.enabled && creds.accessToken && creds.phoneNumberId) {
               let payload = {
                 messaging_product: 'whatsapp',
                 recipient_type: 'individual',
                 to: senderPhoneRaw
               };
 
+              let botReplySummary = '';
+
               if (matchedReply.responseType === 'Text') {
                 payload.type = 'text';
                 payload.text = { preview_url: false, body: matchedReply.preview };
+                botReplySummary = matchedReply.preview || '';
               } else if (matchedReply.responseType === 'Template') {
+                // Use the template's actual registered language (cached in
+                // whatsapp_templates by getWhatsAppTemplates) instead of assuming 'en',
+                // since templates can be approved under en_US, hi, es, etc.
+                const tplDoc = await db.collection('whatsapp_templates').doc(matchedReply.preview).get();
+                const templateLanguage = (tplDoc.exists && tplDoc.data().language) || 'en';
                 payload.type = 'template';
-                payload.template = { name: matchedReply.preview, language: { code: 'en' } };
+                payload.template = { name: matchedReply.preview, language: { code: templateLanguage } };
+                botReplySummary = `[Template: ${matchedReply.preview}]`;
               } else if (matchedReply.responseType === 'Document') {
                 const docFile = (chatbotSettings.mediaFiles || []).find(f => f.name === matchedReply.preview);
                 if (docFile && docFile.url) {
                   payload.type = 'document';
                   payload.document = { link: docFile.url, filename: docFile.name };
+                  botReplySummary = `[Document: ${docFile.name}]`;
                 }
               } else if (matchedReply.responseType === 'Buttons') {
                 payload.type = 'interactive';
@@ -1662,14 +1697,42 @@ exports.whatsappWebhook = functions.https.onRequest(async (req, res) => {
                   body: { text: matchedReply.preview },
                   action: { buttons }
                 };
+                botReplySummary = matchedReply.preview || '';
               }
 
               if (payload.type) {
                 const url = `https://graph.facebook.com/${creds.apiVersion}/${creds.phoneNumberId}/messages`;
-                await axios.post(url, payload, {
+                const sendRes = await axios.post(url, payload, {
                   headers: { 'Authorization': `Bearer ${creds.accessToken}`, 'Content-Type': 'application/json' }
                 });
                 console.log(`[WhatsApp Webhook] Chatbot auto-reply sent successfully!`);
+
+                // Log the bot's own reply back onto the lead so the Inbox reflects
+                // what was actually sent on WhatsApp. Uses sender: 'counselor' (same
+                // convention as every other outbound message) so it renders correctly.
+                if (leadRefForBot) {
+                  const botMsg = {
+                    id: `msg-sent-${Date.now()}`,
+                    sender: 'counselor',
+                    text: botReplySummary || `[${matchedReply.responseType} auto-reply]`,
+                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    waMessageId: sendRes.data?.messages?.[0]?.id || null,
+                    status: 'sent',
+                    timestamp: new Date().toISOString()
+                  };
+                  const botTimelineEntry = {
+                    id: `log-wa-out-bot-${Date.now()}`,
+                    type: 'whatsapp',
+                    title: 'WhatsApp Auto-Reply Sent',
+                    content: botMsg.text,
+                    timestamp: new Date().toISOString(),
+                    user: 'Chatbot'
+                  };
+                  await leadRefForBot.update({
+                    whatsappMessages: admin.firestore.FieldValue.arrayUnion(botMsg),
+                    timeline: admin.firestore.FieldValue.arrayUnion(botTimelineEntry)
+                  });
+                }
               }
             }
           }
