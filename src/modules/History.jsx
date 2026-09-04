@@ -10,6 +10,8 @@ export default function History() {
   const [dateFilter, setDateFilter] = useState('All Time');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 20;
 
   // Consume a one-shot counselor filter handed off from another page (e.g. Lead Assignment & Activity), then clear it
   useEffect(() => {
@@ -77,6 +79,15 @@ export default function History() {
 
   // Further narrowed by the selected event type — this is what's actually rendered in the list
   const filteredHistory = filterType === 'All' ? scopedHistory : scopedHistory.filter(item => item.type === filterType);
+
+  // Reset to page 1 whenever the active filters change, so pagination stays in sync with the results
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, filterType, dateFilter, filterCounselor, customStart, customEnd]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredHistory.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedHistory = filteredHistory.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   // Counts follow the same scope as the rendered list, so they update with every filter (including Event Type)
   const summaryCounts = {
@@ -225,7 +236,7 @@ export default function History() {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            {filteredHistory.map(item => (
+            {paginatedHistory.map(item => (
               <div key={item.id} style={{ display: 'flex', gap: '16px', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px' }}>
                 {getEventIcon(item.type)}
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -250,6 +261,37 @@ export default function History() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {filteredHistory.length > 0 && totalPages > 1 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #f1f5f9' }}>
+            <span style={{ fontSize: '12px', color: '#64748b' }}>
+              Showing {(safePage - 1) * PAGE_SIZE + 1}-{Math.min(safePage * PAGE_SIZE, filteredHistory.length)} of {filteredHistory.length}
+            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <button
+                type="button"
+                className="secondary-btn"
+                style={{ padding: '6px 14px', fontSize: '12px', fontWeight: '600', opacity: safePage <= 1 ? 0.5 : 1, cursor: safePage <= 1 ? 'not-allowed' : 'pointer' }}
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={safePage <= 1}
+              >
+                Previous
+              </button>
+              <span style={{ fontSize: '12px', color: '#475569', fontWeight: '600' }}>
+                Page {safePage} of {totalPages}
+              </span>
+              <button
+                type="button"
+                className="secondary-btn"
+                style={{ padding: '6px 14px', fontSize: '12px', fontWeight: '600', opacity: safePage >= totalPages ? 0.5 : 1, cursor: safePage >= totalPages ? 'not-allowed' : 'pointer' }}
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={safePage >= totalPages}
+              >
+                Next
+              </button>
+            </div>
           </div>
         )}
       </div>

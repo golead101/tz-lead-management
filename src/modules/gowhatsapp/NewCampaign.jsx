@@ -304,7 +304,7 @@ export default function NewCampaign({ setSubView }) {
   }, [prefilledCampaignLeads, setPrefilledCampaignLeads]);
 
   // Filters for CRM Leads
-  const [campaignCourseFilter, setCampaignCourseFilter] = useState('');
+  const [campaignCourseFilters, setCampaignCourseFilters] = useState([]);
   const [campaignStageFilters, setCampaignStageFilters] = useState([]);
   const [campaignSourceFilters, setCampaignSourceFilters] = useState([]);
   const [campaignNameFilter, setCampaignNameFilter] = useState('');
@@ -320,8 +320,12 @@ export default function NewCampaign({ setSubView }) {
   const getFilteredLeads = () => {
     return getBaseLeads().filter(lead => {
       const leadCourse = (lead.course || '').trim().toLowerCase();
-      const filterCourse = (campaignCourseFilter || '').trim().toLowerCase();
-      const matchCourse = filterCourse ? (leadCourse === filterCourse || leadCourse.includes(filterCourse) || filterCourse.includes(leadCourse)) : true;
+      const matchCourse = campaignCourseFilters.length > 0
+        ? campaignCourseFilters.some(c => {
+            const fc = (c || '').trim().toLowerCase();
+            return leadCourse === fc || leadCourse.includes(fc) || fc.includes(leadCourse);
+          })
+        : true;
       const matchStage = campaignStageFilters.length > 0 ? campaignStageFilters.includes(lead.stage) : true;
       
       const leadNormSource = normalizeLeadSource(lead.source);
@@ -359,7 +363,7 @@ export default function NewCampaign({ setSubView }) {
       const filtered = getFilteredLeads();
       setPreviewContacts(filtered.slice(0, 3));
     }
-  }, [selectedListId, campaignCourseFilter, campaignStageFilters, campaignSourceFilters, campaignNameFilter, campaignCounselorFilters, leads]);
+  }, [selectedListId, campaignCourseFilters, campaignStageFilters, campaignSourceFilters, campaignNameFilter, campaignCounselorFilters, leads]);
 
   useEffect(() => {
     loadExistingLists();
@@ -537,7 +541,7 @@ export default function NewCampaign({ setSubView }) {
     setPhoneColumn('');
     
     // Reset filters when changing lists
-    setCampaignCourseFilter('');
+    setCampaignCourseFilters([]);
     setCampaignStageFilters([]);
     setCampaignSourceFilters([]);
     setCampaignNameFilter('');
@@ -962,14 +966,13 @@ export default function NewCampaign({ setSubView }) {
             <div style={{ background: '#f8fafc', padding: 16, borderRadius: 10, marginTop: 16, border: '1px solid #e2e8f0' }}>
               <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#334155', marginBottom: 12 }}>Filter {selectedListId === 'crm-leads-all' ? 'CRM Leads' : 'List Contacts'}</div>
               <div style={{ display: 'flex', gap: 12 }}>
-                <select
-                  value={campaignCourseFilter}
-                  onChange={e => setCampaignCourseFilter(e.target.value)}
-                  style={{ flex: 1, minWidth: 150, padding: '8px 12px', borderRadius: 6, border: '1px solid #cbd5e1', outline: 'none' }}
-                >
-                  <option value="">All Courses</option>
-                  {uniqueCourses.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
+                {/* Multi-select for Course */}
+                <MultiSelectDropdown
+                  options={uniqueCourses}
+                  selectedValues={campaignCourseFilters}
+                  onChange={setCampaignCourseFilters}
+                  placeholder="All Courses"
+                />
 
                 {/* Multi-select for Assigned To (Counselor) */}
                 <MultiSelectDropdown

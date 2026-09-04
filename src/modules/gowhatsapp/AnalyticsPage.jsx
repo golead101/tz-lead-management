@@ -680,23 +680,25 @@ export default function AnalyticsPage() {
       {campaignPerformance.length > 0 && (
         <Section title="Campaign Performance" subtitle="Delivery and reads metrics comparison">
           <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 20 }}>
-            <div style={{ height: 280 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={campaignPerformance} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: '#475569' }} width={140} />
-                  <Tooltip content={<ChartTooltip />} />
-                  <Bar dataKey="sent" fill={C.blue} name="Sent" radius={[0, 4, 4, 0]} />
-                  <Bar dataKey="delivered" fill={C.green} name="Delivered" radius={[0, 4, 4, 0]} />
-                  <Bar dataKey="read" fill={C.purple} name="Read" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+            <div style={{ height: 280, overflowY: 'auto' }}>
+              <div style={{ height: Math.max(280, campaignPerformance.length * 40) }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={campaignPerformance} layout="vertical" barCategoryGap="30%" barGap={2}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                    <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: '#475569' }} width={140} />
+                    <Tooltip content={<ChartTooltip />} />
+                    <Bar dataKey="sent" fill={C.blue} name="Sent" radius={[0, 4, 4, 0]} maxBarSize={10} />
+                    <Bar dataKey="delivered" fill={C.green} name="Delivered" radius={[0, 4, 4, 0]} maxBarSize={10} />
+                    <Bar dataKey="read" fill={C.purple} name="Read" radius={[0, 4, 4, 0]} maxBarSize={10} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
-            <div style={{ overflowX: 'auto' }}>
+            <div style={{ height: 280, overflowX: 'auto', overflowY: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                 <thead>
-                  <tr style={{ borderBottom: '2px solid #f1f5f9', fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase' }}>
+                  <tr style={{ borderBottom: '2px solid #f1f5f9', fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', position: 'sticky', top: 0, background: '#fff' }}>
                     <th style={{ textAlign: 'left', padding: '8px' }}>Campaign</th>
                     <th style={{ textAlign: 'center', padding: '8px' }}>Sent</th>
                     <th style={{ textAlign: 'center', padding: '8px' }}>Delivered</th>

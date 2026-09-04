@@ -841,6 +841,19 @@ exports.metaWebhook = functions.https.onRequest(async (req, res) => {
         return res.status(500).send('Configuration Error');
       }
 
+      // Resolve the campaign's human-readable name (the webhook payload only gives its ID)
+      let campaignName = 'N/A';
+      if (campaignId && campaignId !== 'N/A') {
+        try {
+          const campResponse = await axios.get(`https://graph.facebook.com/v20.0/${campaignId}`, {
+            params: { access_token: verifyToken, fields: 'name' }
+          });
+          campaignName = campResponse.data?.name || 'N/A';
+        } catch (campErr) {
+          console.warn('Could not fetch Meta campaign name:', campErr.response?.data || campErr.message);
+        }
+      }
+
       // Query Meta Graph API for lead content fields (explicitly requesting field_data)
       const graphUrl = `https://graph.facebook.com/v20.0/${leadId}`;
       let metaLead;
@@ -903,6 +916,7 @@ exports.metaWebhook = functions.https.onRequest(async (req, res) => {
         lastContacted: new Date().toISOString(),
         customFields: {
           campaignId: campaignId,
+          campaignName: campaignName,
           formId: formId,
           adId: value.ad_id || 'N/A'
         },
@@ -910,7 +924,7 @@ exports.metaWebhook = functions.https.onRequest(async (req, res) => {
           id: `log-${Date.now()}`,
           type: 'system',
           title: 'Lead Captured via Meta Ads Webhook',
-          content: `Real-time sync. Form ID: ${formId}, Campaign ID: ${campaignId}.`,
+          content: `Real-time sync. Form ID: ${formId}, Campaign: ${campaignName} (ID: ${campaignId}).`,
           timestamp: new Date().toISOString(),
           user: 'Meta Server'
         }],
